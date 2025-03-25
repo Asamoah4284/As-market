@@ -5,10 +5,19 @@ const bcrypt = require('bcryptjs');
 // Register User
 const registerUser = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    console.log('Registration request received:', req.body);
+    const { name, email, phone, password, role } = req.body;
 
-    // Check if user exists
-    const existingUser = await User.findOne({ email });
+    // Check if at least email or phone is provided
+    if (!email && !phone) {
+      return res.status(400).json({ error: 'Either email or phone is required' });
+    }
+
+    // Check if user exists with email or phone
+    const existingUser = email 
+      ? await User.findOne({ email }) 
+      : await User.findOne({ phone });
+      
     if (existingUser) {
       return res.status(400).json({ error: 'User already exists' });
     }
@@ -21,11 +30,14 @@ const registerUser = async (req, res) => {
     const user = new User({
       name,
       email,
+      phone,
       password: hashedPassword,
       role
     });
 
-    await user.save();
+    console.log('Attempting to save user:', user);
+    const savedUser = await user.save();
+    console.log('User saved successfully:', savedUser);
 
     // Create JWT token
     const token = jwt.sign(
@@ -39,9 +51,11 @@ const registerUser = async (req, res) => {
       _id: user._id,
       name: user.name,
       email: user.email,
+      phone: user.phone,
       role: user.role
     });
   } catch (error) {
+    console.error('Registration error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
@@ -49,10 +63,18 @@ const registerUser = async (req, res) => {
 // Login User
 const loginUser = async (req, res) => {
   try {
-    const { email, password } = req.body;
+    const { email, phone, password } = req.body;
 
-    // Find user
-    const user = await User.findOne({ email });
+    // Check if either email or phone is provided
+    if (!email && !phone) {
+      return res.status(400).json({ message: 'Email or phone is required' });
+    }
+
+    // Find user by email or phone
+    const user = email 
+      ? await User.findOne({ email }) 
+      : await User.findOne({ phone });
+      
     if (!user) {
       return res.status(400).json({ message: 'Invalid credentials' });
     }
@@ -75,9 +97,11 @@ const loginUser = async (req, res) => {
       _id: user._id,
       name: user.name,
       email: user.email,
+      phone: user.phone,
       role: user.role
     });
   } catch (error) {
+    console.error('Login error:', error);
     res.status(500).json({ message: 'Server error', error: error.message });
   }
 };

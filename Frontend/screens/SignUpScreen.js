@@ -29,7 +29,7 @@ function SignUpScreen({ navigation }) {
       }
 
       // Navigate based on user type after successful signup
-      navigation.navigate(userType === 'seller' ? 'SellerDashboard' : 'BuyerDashboard');
+      navigation.navigate(userType === 'seller' ? 'SellerDashboard' : 'BuyerHome');
     } catch (error) {
       setError(error.response?.data?.message || 'Something went wrong');
     }

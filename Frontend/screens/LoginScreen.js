@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { StyleSheet, Text, View, TouchableOpacity, TextInput, ScrollView } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, TextInput, ScrollView, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 function LoginScreen({ navigation }) {
@@ -25,7 +25,7 @@ function LoginScreen({ navigation }) {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          email: credential,
+          [loginMethod === 'email' ? 'email' : 'phone']: credential,
           password: password,
         }),
       });
@@ -36,33 +36,35 @@ function LoginScreen({ navigation }) {
       if (response.ok) {
         if (data.token) {
           // Store the token in AsyncStorage
-          await AsyncStorage.setItem('token', data.token);
+          await AsyncStorage.setItem('userToken', data.token);
           
-          // Extract user data from response
-          const userData = {
-            id: data._id,
-            name: data.name,
-            email: data.email,
-            role: data.role
-          };
+          // Store user data if needed
+          await AsyncStorage.setItem('userData', JSON.stringify({
+            id: data.user.id || data.id,
+            name: data.user?.name || data.name,
+            email: data.user?.email || data.email,
+            phone: data.user?.phone || data.phone,
+            role: data.user?.role || data.role
+          }));
           
-          // Store user data
-          await AsyncStorage.setItem('userData', JSON.stringify(userData));
+          // Navigate based on role
+          const userRole = data.user?.role || data.role;
           
-          if (data.role === 'seller') {
+          if (userRole === 'buyer') {
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'BuyerHome' }],
+            });
+          } else if (userRole === 'seller') {
             navigation.reset({
               index: 0,
               routes: [{ name: 'SellerDashboard' }],
             });
-          } else if (data.role === 'user') {
-            navigation.reset({
-              index: 0,
-              routes: [{ name: 'UserDashboard' }],
-            });
           } else {
+            // Default or admin route
             navigation.reset({
               index: 0,
-              routes: [{ name: 'BuyerHome' }],
+              routes: [{ name: 'Home' }],
             });
           }
         } else {

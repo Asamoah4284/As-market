@@ -7,8 +7,33 @@ const userSchema = new mongoose.Schema({
   },
   email: { 
     type: String, 
-    required: true, 
-    unique: true 
+    required: function() { return !this.phone; }, 
+    unique: true,
+    sparse: true,
+    validate: {
+      validator: function(v) {
+        // Only validate if email is provided
+        if (!v) return true;
+        // Simple email validation regex
+        return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+      },
+      message: props => `${props.value} is not a valid email address!`
+    }
+  },
+  phone: {
+    type: String,
+    required: function() { return !this.email; },
+    unique: true,
+    sparse: true,
+    validate: {
+      validator: function(v) {
+        // Only validate if phone is provided
+        if (!v) return true;
+        // Simple phone validation regex (adjust as needed)
+        return /^\d{10,15}$/.test(v);
+      },
+      message: props => `${props.value} is not a valid phone number!`
+    }
   },
   password: { 
     type: String, 
@@ -25,4 +50,13 @@ const userSchema = new mongoose.Schema({
   }
 });
 
-module.exports = mongoose.model('User', userSchema); 
+// Add a pre-save hook to ensure either email or phone is provided
+userSchema.pre('save', function(next) {
+  if (!this.email && !this.phone) {
+    return next(new Error('Either email or phone is required'));
+  }
+  next();
+});
+
+// Explicitly set the collection name to 'users'
+module.exports = mongoose.model('User', userSchema, 'users'); 
