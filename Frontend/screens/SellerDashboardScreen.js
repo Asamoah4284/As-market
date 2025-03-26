@@ -110,7 +110,7 @@ const SellerDashboardScreen = () => {
         throw new Error('Authentication required');
       }
       
-      const response = await fetch('http://localhost:5000/api/products/seller', {
+      const response = await fetch('http://172.20.10.3:5000/api/products/seller', {
         headers: {
           'Authorization': `Bearer ${token}`, // This will now use the correct token
           'Accept': 'application/json'
@@ -239,7 +239,7 @@ const SellerDashboardScreen = () => {
         return;
       }
       
-      const token = await AsyncStorage.getItem('userToken'); // Changed from 'token' to 'userToken'
+      const token = await AsyncStorage.getItem('userToken');
       if (!token) {
         throw new Error('Authentication required');
       }
@@ -255,7 +255,8 @@ const SellerDashboardScreen = () => {
         isService: productForm.isService
       };
       
-      const baseUrl = 'http://localhost:5000';
+      // Use the same base URL as fetch products
+      const baseUrl = 'http://172.20.10.3:5000';
       const url = isEditing 
         ? `${baseUrl}/api/products/${currentProductId}`
         : `${baseUrl}/api/products`;

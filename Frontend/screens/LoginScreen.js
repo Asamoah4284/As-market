@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, TextInput, ScrollView, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+const API_URL = 'http://172.20.10.3:5000';
+
 function LoginScreen({ navigation }) {
   const [loginMethod, setLoginMethod] = useState('email');
   const [email, setEmail] = useState('');
@@ -19,10 +21,11 @@ function LoginScreen({ navigation }) {
         return;
       }
 
-      const response = await fetch('http://localhost:5000/api/users/login', {
+      const response = await fetch(`${API_URL}/api/users/login`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Accept': 'application/json',
         },
         body: JSON.stringify({
           [loginMethod === 'email' ? 'email' : 'phone']: credential,
@@ -35,23 +38,22 @@ function LoginScreen({ navigation }) {
 
       if (response.ok) {
         if (data.token) {
-          // Store the token in AsyncStorage
           await AsyncStorage.setItem('userToken', data.token);
           
-          // Update this part to match the backend response structure
           const userData = {
-            id: data._id,
-            name: data.name,
-            email: data.email,
-            phone: data.phone,
-            role: data.role
+            id: data.user?._id || data._id,
+            name: data.user?.name || data.name,
+            email: data.user?.email || data.email,
+            role: data.user?.role || data.role
           };
 
-          // Store user data if needed
+          if (data.user?.phone || data.phone) {
+            userData.phone = data.user?.phone || data.phone;
+          }
+
           await AsyncStorage.setItem('userData', JSON.stringify(userData));
           
-          // Navigate based on role
-          const userRole = data.user?.role || data.role;
+          const userRole = userData.role;
           
           if (userRole === 'buyer') {
             navigation.reset({
@@ -64,7 +66,6 @@ function LoginScreen({ navigation }) {
               routes: [{ name: 'SellerDashboard' }],
             });
           } else {
-            // Default or admin route
             navigation.reset({
               index: 0,
               routes: [{ name: 'Home' }],
@@ -78,7 +79,11 @@ function LoginScreen({ navigation }) {
       }
     } catch (err) {
       console.error('Login error:', err);
-      setError('Something went wrong. Please try again.');
+      if (err.message.includes('Network request failed')) {
+        setError('Unable to connect to server. Please check your internet connection.');
+      } else {
+        setError('Something went wrong. Please try again.');
+      }
     }
   };
 

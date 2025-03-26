@@ -63,14 +63,35 @@ const BuyerHomeScreen = () => {
   const navigation = useNavigation();
   const [userName, setUserName] = useState('User');
 
-  // In a real app, you would fetch data from an API
+  // Add new useEffect to fetch products
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const response = await fetch('http://172.20.10.3:5000/api/products');
+        if (response.ok) {
+          const products = await response.json();
+          setFeaturedProducts(products);
+        } else {
+          // Fallback to mock data if API fails
+          setFeaturedProducts(FEATURED_PRODUCTS);
+        }
+      } catch (error) {
+        console.error('Error fetching products:', error);
+        // Fallback to mock data if API fails
+        setFeaturedProducts(FEATURED_PRODUCTS);
+      }
+    };
+
+    fetchProducts();
+  }, []);
+
   useEffect(() => {
     const getUserData = async () => {
       try {
         const token = await AsyncStorage.getItem('userToken');
         
         if (token) {
-          const response = await fetch('http://localhost:5000/api/users/me', {
+          const response = await fetch('http://172.20.10.3:5000/api/users/me', {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
@@ -91,23 +112,6 @@ const BuyerHomeScreen = () => {
     };
 
     getUserData();
-  }, []);
-
-  // Add new useEffect to fetch products
-  useEffect(() => {
-    const fetchProducts = async () => {
-      try {
-        const response = await fetch('http://localhost:5000/api/products');
-        if (response.ok) {
-          const products = await response.json();
-          setFeaturedProducts(products);
-        }
-      } catch (error) {
-        console.error('Error fetching products:', error);
-      }
-    };
-
-    fetchProducts();
   }, []);
 
   const handleSearch = (query) => {
@@ -145,161 +149,167 @@ const BuyerHomeScreen = () => {
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor="#5D3FD3" />
-      
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.headerContent}>
-          <Text style={styles.greeting}>Hello, {userName}!</Text>
-          <Text style={styles.subtitle}>Find amazing products</Text>
-        </View>
-        <TouchableOpacity style={styles.notificationButton}>
-          <Ionicons name="notifications-outline" size={24} color="#fff" />
-        </TouchableOpacity>
-      </View>
-      
-      {/* Search Bar */}
-      <View style={styles.searchContainer}>
-        <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
-        <TextInput
-          style={styles.searchInput}
-          placeholder="Search products..."
-          value={searchQuery}
-          onChangeText={handleSearch}
-        />
-        {searchQuery.length > 0 && (
-          <TouchableOpacity onPress={() => setSearchQuery('')}>
-            <Ionicons name="close-circle" size={20} color="#999" />
+    <SafeAreaView style={styles.safeArea}>
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      <View style={styles.container}>
+        {/* Header */}
+        <View style={styles.header}>
+          <View style={styles.headerContent}>
+            <Text style={styles.greeting}>Hello, {userName}!</Text>
+            <Text style={styles.subtitle}>Find amazing products</Text>
+          </View>
+          <TouchableOpacity style={styles.notificationButton}>
+            <Ionicons name="notifications-outline" size={24} color="#666" />
           </TouchableOpacity>
-        )}
-      </View>
-      
-      <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollContent}>
-        {/* Banner */}
-        <View style={styles.bannerContainer}>
-          <Image 
-            source={{ uri: 'https://images.unsplash.com/photo-1607082350899-7e105aa886ae?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2000&q=80' }} 
-            style={styles.banner}
-            resizeMode="cover"
-          />
-          <View style={styles.bannerOverlay}>
-            <Text style={styles.bannerTitle}>Special Offers</Text>
-            <Text style={styles.bannerSubtitle}>Up to 50% off</Text>
-            <TouchableOpacity style={styles.bannerButton}>
-              <Text style={styles.bannerButtonText}>Shop Now</Text>
-            </TouchableOpacity>
-          </View>
         </View>
         
-        {/* Categories */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Categories</Text>
-            <TouchableOpacity onPress={() => navigation.navigate('AllCategories')}>
-              <Text style={styles.seeAllText}>See All</Text>
-            </TouchableOpacity>
-          </View>
-          <FlatList
-            data={categories}
-            renderItem={renderCategory}
-            keyExtractor={(item) => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoriesList}
+        {/* Search Bar */}
+        <View style={styles.searchContainer}>
+          <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search products..."
+            value={searchQuery}
+            onChangeText={handleSearch}
           />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={20} color="#999" />
+            </TouchableOpacity>
+          )}
         </View>
         
-        {/* Featured Products */}
-        <View style={styles.sectionContainer}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleContainer}>
-              <View style={styles.sectionTitleAccent}></View>
-              <Text style={styles.sectionTitle}>Featured Products</Text>
+        <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollContent}>
+          {/* Banner */}
+          <View style={styles.bannerContainer}>
+            <Image 
+              source={{ uri: 'https://images.unsplash.com/photo-1607082350899-7e105aa886ae?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2000&q=80' }} 
+              style={styles.banner}
+              resizeMode="cover"
+            />
+            <View style={styles.bannerOverlay}>
+              <Text style={styles.bannerTitle}>Special Offers</Text>
+              <Text style={styles.bannerSubtitle}>Up to 50% off</Text>
+              <TouchableOpacity style={styles.bannerButton}>
+                <Text style={styles.bannerButtonText}>Shop Now</Text>
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity 
-              style={styles.seeAllButton} 
-              onPress={() => navigation.navigate('AllProducts')}
-            >
-              <Text style={styles.seeAllText}>See All</Text>
-              <Ionicons name="chevron-forward" size={16} color="#5D3FD3" />
-            </TouchableOpacity>
           </View>
-          <FlatList
-            data={featuredProducts}
-            renderItem={renderFeaturedProduct}
-            keyExtractor={(item) => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.productsList}
-          />
-        </View>
-        
-        {/* New Arrivals */}
-        <View style={[styles.sectionContainer, { marginBottom: 20 }]}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleContainer}>
-              <View style={[styles.sectionTitleAccent, {backgroundColor: '#FF6B6B'}]}></View>
-              <Text style={styles.sectionTitle}>New Arrivals</Text>
+          
+          {/* Categories */}
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeader}>
+              <Text style={styles.sectionTitle}>Categories</Text>
+              <TouchableOpacity onPress={() => navigation.navigate('AllCategories')}>
+                <Text style={styles.seeAllText}>See All</Text>
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity 
-              style={styles.seeAllButton} 
-              onPress={() => navigation.navigate('NewArrivals')}
-            >
-              <Text style={styles.seeAllText}>See All</Text>
-              <Ionicons name="chevron-forward" size={16} color="#5D3FD3" />
-            </TouchableOpacity>
+            <FlatList
+              data={categories}
+              renderItem={renderCategory}
+              keyExtractor={(item) => item.id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoriesList}
+            />
           </View>
-          <FlatList
-            data={featuredProducts.slice(-3)}
-            renderItem={renderFeaturedProduct}
-            keyExtractor={(item) => `new-${item._id}`}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.productsList}
-          />
-        </View>
-      </ScrollView>
+          
+          {/* Featured Products */}
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTitleContainer}>
+                <View style={styles.sectionTitleAccent}></View>
+                <Text style={styles.sectionTitle}>Featured Products</Text>
+              </View>
+              <TouchableOpacity 
+                style={styles.seeAllButton} 
+                onPress={() => navigation.navigate('AllProducts')}
+              >
+                <Text style={styles.seeAllText}>See All</Text>
+                <Ionicons name="chevron-forward" size={16} color="#5D3FD3" />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={featuredProducts}
+              renderItem={renderFeaturedProduct}
+              keyExtractor={(item) => item.id}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.productsList}
+            />
+          </View>
+          
+          {/* New Arrivals */}
+          <View style={[styles.sectionContainer, { marginBottom: 20 }]}>
+            <View style={styles.sectionHeader}>
+              <View style={styles.sectionTitleContainer}>
+                <View style={[styles.sectionTitleAccent, {backgroundColor: '#FF6B6B'}]}></View>
+                <Text style={styles.sectionTitle}>New Arrivals</Text>
+              </View>
+              <TouchableOpacity 
+                style={styles.seeAllButton} 
+                onPress={() => navigation.navigate('NewArrivals')}
+              >
+                <Text style={styles.seeAllText}>See All</Text>
+                <Ionicons name="chevron-forward" size={16} color="#5D3FD3" />
+              </TouchableOpacity>
+            </View>
+            <FlatList
+              data={featuredProducts.slice(-3)}
+              renderItem={renderFeaturedProduct}
+              keyExtractor={(item) => `new-${item._id}`}
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.productsList}
+            />
+          </View>
+        </ScrollView>
 
-      {/* Bottom Navigation */}
-      <View style={styles.bottomNavigation}>
-        <TouchableOpacity 
-          style={styles.navItem} 
-          onPress={() => navigation.navigate('Home')}
-        >
-          <Ionicons name="home" size={24} color="#5D3FD3" />
-          <Text style={[styles.navText, styles.activeNavText]}>Home</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.navItem} 
-          onPress={() => navigation.navigate('Categories')}
-        >
-          <Ionicons name="grid-outline" size={24} color="#999" />
-          <Text style={styles.navText}>Categories</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.navItem} 
-          onPress={() => navigation.navigate('Cart')}
-        >
-          <Ionicons name="cart-outline" size={24} color="#999" />
-          <Text style={styles.navText}>Cart</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.navItem} 
-          onPress={() => navigation.navigate('Profile')}
-        >
-          <Ionicons name="person-outline" size={24} color="#999" />
-          <Text style={styles.navText}>Profile</Text>
-        </TouchableOpacity>
+        {/* Bottom Navigation */}
+        <View style={styles.bottomNavigation}>
+          <TouchableOpacity 
+            style={styles.navItem} 
+            onPress={() => navigation.navigate('Home')}
+          >
+            <Ionicons name="home" size={24} color="#5D3FD3" />
+            <Text style={[styles.navText, styles.activeNavText]}>Home</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.navItem} 
+            onPress={() => navigation.navigate('Categories')}
+          >
+            <Ionicons name="grid-outline" size={24} color="#999" />
+            <Text style={styles.navText}>Categories</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.navItem} 
+            onPress={() => navigation.navigate('Cart')}
+          >
+            <Ionicons name="cart-outline" size={24} color="#999" />
+            <Text style={styles.navText}>Cart</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.navItem} 
+            onPress={() => navigation.navigate('Profile')}
+          >
+            <Ionicons name="person-outline" size={24} color="#999" />
+            <Text style={styles.navText}>Profile</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  safeArea: {
+    flex: 1,
+    backgroundColor: '#fff',
+    paddingTop: StatusBar.currentHeight || 0, // Add padding for Android StatusBar
+  },
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
@@ -309,8 +319,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: 16, // Increased padding
     backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
   },
   headerContent: {
     flex: 1,

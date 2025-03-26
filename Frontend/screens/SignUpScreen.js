@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, TextInput, ScrollView } from 'react-native';
-import axios from 'axios';
+
+// Add this constant at the top of your file
+const API_URL = 'http://172.20.10.3:5000';
 
 function SignUpScreen({ navigation }) {
   const [userType, setUserType] = useState(null);
@@ -18,20 +20,37 @@ function SignUpScreen({ navigation }) {
         return;
       }
 
-      const response = await axios.post('http://localhost:5000/api/users/register', {
-        ...formData,
-        role: userType
+      const response = await fetch(`${API_URL}/api/users/register`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          ...formData,
+          role: userType
+        }),
       });
 
-      if (response.data.error === 'User already exists') {
-        setError('An account with this email already exists');
-        return;
-      }
+      const data = await response.json();
 
-      // Navigate based on user type after successful signup
-      navigation.navigate(userType === 'seller' ? 'SellerDashboard' : 'BuyerHome');
+      if (response.ok) {
+        // Navigate to login screen after successful signup
+        navigation.navigate('Login');
+      } else {
+        if (data.error === 'User already exists') {
+          setError('An account with this email already exists');
+        } else {
+          setError(data.message || 'Registration failed');
+        }
+      }
     } catch (error) {
-      setError(error.response?.data?.message || 'Something went wrong');
+      console.error('Signup error:', error);
+      if (error.message.includes('Network request failed')) {
+        setError('Unable to connect to server. Please check your internet connection.');
+      } else {
+        setError('Something went wrong. Please try again.');
+      }
     }
   };
 
