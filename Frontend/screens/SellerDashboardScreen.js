@@ -104,14 +104,15 @@ const SellerDashboardScreen = () => {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const token = await AsyncStorage.getItem('token');
+      const token = await AsyncStorage.getItem('userToken'); // Changed from 'token' to 'userToken'
+      
       if (!token) {
-        throw new Error('No authentication token found');
+        throw new Error('Authentication required');
       }
       
       const response = await fetch('http://localhost:5000/api/products/seller', {
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${token}`, // This will now use the correct token
           'Accept': 'application/json'
         }
       });
@@ -130,7 +131,7 @@ const SellerDashboardScreen = () => {
       }
     } catch (error) {
       console.error('Error fetching products:', error);
-      setProducts([]);
+      setProducts([]); // Ensure products is empty on error
       setErrorMessage('Failed to fetch products');
     } finally {
       setLoading(false);
@@ -188,7 +189,7 @@ const SellerDashboardScreen = () => {
 
   const handleDeleteProduct = async (productId) => {
     try {
-      const token = await AsyncStorage.getItem('token');
+      const token = await AsyncStorage.getItem('userToken'); // Changed from 'token' to 'userToken'
       const response = await fetch(`http://localhost:5000/api/products/${productId}`, {
         method: 'DELETE',
         headers: {
@@ -238,7 +239,7 @@ const SellerDashboardScreen = () => {
         return;
       }
       
-      const token = await AsyncStorage.getItem('token');
+      const token = await AsyncStorage.getItem('userToken'); // Changed from 'token' to 'userToken'
       if (!token) {
         throw new Error('Authentication required');
       }
@@ -511,11 +512,11 @@ const SellerDashboardScreen = () => {
                 <MaterialIcons name="add" size={18} color="white" />
               </TouchableOpacity>
             </View>
-            {products && products.length === 0 ? (
+            {products.length === 0 ? (
               <View style={styles.emptyState}>
                 <MaterialIcons name="inventory" size={64} color={colors.textSecondary} />
                 <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>
-                  No products yet. Add your first product!
+                  Welcome! Start by adding your first product.
                 </Text>
                 <TouchableOpacity 
                   style={[styles.emptyStateButton, { backgroundColor: colors.primary }]}

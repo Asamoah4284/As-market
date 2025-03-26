@@ -38,14 +38,17 @@ function LoginScreen({ navigation }) {
           // Store the token in AsyncStorage
           await AsyncStorage.setItem('userToken', data.token);
           
+          // Update this part to match the backend response structure
+          const userData = {
+            id: data._id,
+            name: data.name,
+            email: data.email,
+            phone: data.phone,
+            role: data.role
+          };
+
           // Store user data if needed
-          await AsyncStorage.setItem('userData', JSON.stringify({
-            id: data.user.id || data.id,
-            name: data.user?.name || data.name,
-            email: data.user?.email || data.email,
-            phone: data.user?.phone || data.phone,
-            role: data.user?.role || data.role
-          }));
+          await AsyncStorage.setItem('userData', JSON.stringify(userData));
           
           // Navigate based on role
           const userRole = data.user?.role || data.role;

@@ -6,6 +6,12 @@ const asyncHandler = require('express-async-handler');
 // @route   POST /api/products
 // @access  Private/Seller
 const createProduct = asyncHandler(async (req, res) => {
+  // Check if user exists in the request
+  if (!req.user) {
+    res.status(401);
+    throw new Error('Not authorized, please login');
+  }
+
   const { name, description, price, category, stock, image, additionalImages, isService } = req.body;
 
   // Check if user is a seller
@@ -39,6 +45,13 @@ const createProduct = asyncHandler(async (req, res) => {
 // @route   GET /api/products/seller
 // @access  Private/Seller
 const getSellerProducts = asyncHandler(async (req, res) => {
+  // Check if user exists and is a seller
+  const user = await User.findById(req.user._id);
+  if (!user || user.role !== 'seller') {
+    res.status(403);
+    throw new Error('Not authorized as a seller');
+  }
+
   const products = await Product.find({ seller: req.user._id });
   res.json(products);
 });

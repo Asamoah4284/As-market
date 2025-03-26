@@ -58,7 +58,7 @@ const CATEGORIES = [
 
 const BuyerHomeScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [featuredProducts, setFeaturedProducts] = useState(FEATURED_PRODUCTS);
+  const [featuredProducts, setFeaturedProducts] = useState([]);
   const [categories, setCategories] = useState(CATEGORIES);
   const navigation = useNavigation();
   const [userName, setUserName] = useState('User');
@@ -91,6 +91,23 @@ const BuyerHomeScreen = () => {
     };
 
     getUserData();
+  }, []);
+
+  // Add new useEffect to fetch products
+  useEffect(() => {
+    const fetchProducts = async () => {
+      try {
+        const response = await fetch('http://localhost:5000/api/products');
+        if (response.ok) {
+          const products = await response.json();
+          setFeaturedProducts(products);
+        }
+      } catch (error) {
+        console.error('Error fetching products:', error);
+      }
+    };
+
+    fetchProducts();
   }, []);
 
   const handleSearch = (query) => {
@@ -234,9 +251,9 @@ const BuyerHomeScreen = () => {
             </TouchableOpacity>
           </View>
           <FlatList
-            data={featuredProducts.slice(0, 3)}
+            data={featuredProducts.slice(-3)}
             renderItem={renderFeaturedProduct}
-            keyExtractor={(item) => `new-${item.id}`}
+            keyExtractor={(item) => `new-${item._id}`}
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.productsList}
