@@ -109,10 +109,24 @@ const loginUser = async (req, res) => {
 // Get User Profile
 const getUserProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user.userId).select('-password');
-    res.json(user);
+    // No need to fetch the user again, it's already in req.user from the middleware
+    console.log('User profile accessed:', req.user._id);
+    
+    // Create response with both name and username fields
+    const userResponse = {
+      _id: req.user._id,
+      name: req.user.name,
+      username: req.user.name, // Add username as alias for name
+      email: req.user.email,
+      phone: req.user.phone,
+      role: req.user.role
+    };
+    
+    console.log('Sending user profile response:', userResponse);
+    res.json(userResponse);
   } catch (error) {
-    res.status(500).json({ message: 'Server error' });
+    console.error('Get profile error:', error);
+    res.status(500).json({ message: 'Server error', error: error.message });
   }
 };
 

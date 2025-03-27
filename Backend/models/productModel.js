@@ -52,6 +52,10 @@ const productSchema = new mongoose.Schema(
       type: Number,
       default: 0
     },
+    numReviews: {
+      type: Number,
+      default: 0
+    },
     reviews: [
       {
         user: {
@@ -68,9 +72,18 @@ const productSchema = new mongoose.Schema(
     ]
   },
   {
-    timestamps: true
+    timestamps: true,
+    toJSON: { virtuals: true },
+    toObject: { virtuals: true }
   }
 );
+
+// Virtual for comments
+productSchema.virtual('comments', {
+  ref: 'Comment',
+  localField: '_id',
+  foreignField: 'product'
+});
 
 const Product = mongoose.model('Product', productSchema);
 

@@ -91,22 +91,32 @@ const BuyerHomeScreen = () => {
         const token = await AsyncStorage.getItem('userToken');
         
         if (token) {
-          const response = await fetch('http://172.20.10.3:5000/api/users/me', {
+          console.log('Token found:', token.substring(0, 10) + '...');
+          
+          const response = await fetch('http://172.20.10.3:5000/api/users/profile', {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
             }
           });
 
+          console.log('User data response status:', response.status);
+          
           if (response.ok) {
             const userData = await response.json();
-            setUserName(userData.name);
+            console.log('User data received:', userData);
+            setUserName(userData.username || userData.name || 'User');
           } else {
+            const errorText = await response.text();
+            console.error('Failed to fetch user data. Status:', response.status, 'Error:', errorText);
             setUserName('User');
           }
+        } else {
+          console.log('No user token found');
+          setUserName('Guest');
         }
       } catch (error) {
-        console.error('Error fetching user data:', error);
+        console.error('Error fetching user data:', error.message);
         setUserName('User');
       }
     };
@@ -122,15 +132,32 @@ const BuyerHomeScreen = () => {
   const renderFeaturedProduct = ({ item }) => (
     <TouchableOpacity 
       style={styles.productCard}
-      onPress={() => navigation.navigate('ProductDetails', { productId: item.id })}
+      onPress={() => {
+        console.log('Navigating to product details with ID:', item._id || item.id);
+        navigation.navigate('ProductDetails', { 
+          productId: item._id || item.id // Use _id if available (MongoDB format), otherwise fall back to id
+        });
+      }}
     >
-      <Image source={{ uri: item.image }} style={styles.productImage} />
+      <Image 
+        source={{ 
+          uri: item.image && item.image.startsWith('http') 
+            ? item.image 
+            : `http://172.20.10.3:5000/${item.image}` 
+        }} 
+        style={styles.productImage}
+      />
       <View style={styles.productInfo}>
         <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
-        <Text style={styles.productPrice}>${item.price.toFixed(2)}</Text>
-        <View style={styles.ratingContainer}>
-          <Ionicons name="star" size={16} color="#FFD700" />
-          <Text style={styles.ratingText}>{item.rating}</Text>
+        <View style={styles.productDetails}>
+          <View style={styles.priceContainer}>
+            <Text style={styles.priceLabel}>Price</Text>
+            <Text style={styles.productPrice}>${item.price.toFixed(2)}</Text>
+          </View>
+          <View style={styles.ratingContainer}>
+            <Ionicons name="star" size={16} color="#FFD700" />
+            <Text style={styles.ratingText}>{item.rating}</Text>
+          </View>
         </View>
       </View>
     </TouchableOpacity>
@@ -557,6 +584,21 @@ const styles = StyleSheet.create({
     color: '#5D3FD3',
     fontWeight: '500',
     marginRight: 2,
+  },
+  productDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  priceContainer: {
+    flexDirection: 'column',
+    alignItems: 'flex-start',
+  },
+  priceLabel: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 2,
   },
 });
 
