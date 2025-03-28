@@ -10,6 +10,7 @@ import {
   FlatList,
   StatusBar,
   SafeAreaView,
+  Modal,
 } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -18,7 +19,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 // Mock data - replace with actual API calls
 const FEATURED_PRODUCTS = [
   {
-    id: '1',
+    id: '1',  
     name: 'Premium Headphones',
     price: 129.99,
     image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
@@ -62,22 +63,26 @@ const BuyerHomeScreen = () => {
   const [categories, setCategories] = useState(CATEGORIES);
   const navigation = useNavigation();
   const [userName, setUserName] = useState('User');
+  const [fullScreenImage, setFullScreenImage] = useState(null);
 
   // Add new useEffect to fetch products
   useEffect(() => {
     const fetchProducts = async () => {
       try {
         const response = await fetch('http://172.20.10.3:5000/api/products');
+        console.log('Products API Response Status:', response.status);
+        
         if (response.ok) {
           const products = await response.json();
+          console.log('Fetched products:', products);
           setFeaturedProducts(products);
         } else {
-          // Fallback to mock data if API fails
+          console.log('Using mock data due to API failure');
           setFeaturedProducts(FEATURED_PRODUCTS);
         }
       } catch (error) {
         console.error('Error fetching products:', error);
-        // Fallback to mock data if API fails
+        console.log('Using mock data due to error');
         setFeaturedProducts(FEATURED_PRODUCTS);
       }
     };
@@ -129,39 +134,49 @@ const BuyerHomeScreen = () => {
     // Implement search functionality
   };
 
-  const renderFeaturedProduct = ({ item }) => (
-    <TouchableOpacity 
-      style={styles.productCard}
-      onPress={() => {
-        console.log('Navigating to product details with ID:', item._id || item.id);
-        navigation.navigate('ProductDetails', { 
-          productId: item._id || item.id // Use _id if available (MongoDB format), otherwise fall back to id
-        });
-      }}
-    >
-      <Image 
-        source={{ 
-          uri: item.image && item.image.startsWith('http') 
-            ? item.image 
-            : `http://172.20.10.3:5000/${item.image}` 
-        }} 
-        style={styles.productImage}
-      />
-      <View style={styles.productInfo}>
-        <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
-        <View style={styles.productDetails}>
-          <View style={styles.priceContainer}>
-            <Text style={styles.priceLabel}>Price</Text>
-            <Text style={styles.productPrice}>${item.price.toFixed(2)}</Text>
-          </View>
-          <View style={styles.ratingContainer}>
-            <Ionicons name="star" size={16} color="#FFD700" />
-            <Text style={styles.ratingText}>{item.rating}</Text>
+  const renderFeaturedProduct = ({ item }) => {
+    // Add console logs to debug image URLs
+    const imageUri = item.image && (item.image.startsWith('http') 
+      ? item.image 
+      : `http://172.20.10.3:5000${item.image}`);
+    
+    console.log('Product:', item.name);
+    console.log('Original image path:', item.image);
+    console.log('Constructed image URI:', imageUri);
+
+    return (
+      <TouchableOpacity 
+        style={styles.productCard}
+        onPress={() => {
+          console.log('Navigating to product details with ID:', item._id || item.id);
+          navigation.navigate('ProductDetails', { 
+            productId: item._id || item.id
+          });
+        }}
+      >
+       
+          <Image 
+            source={{ uri: item.image }} 
+            style={styles.productImage}
+            onError={(error) => console.error('Image loading error:', error.nativeEvent.error)}
+            onLoad={() => console.log('Image loaded successfully:', imageUri)}
+          />
+        <View style={styles.productInfo}>
+          <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
+          <View style={styles.productDetails}>
+            <View style={styles.priceContainer}>
+              <Text style={styles.priceLabel}>Price</Text>
+              <Text style={styles.productPrice}>${item.price.toFixed(2)}</Text>
+            </View>
+            <View style={styles.ratingContainer}>
+              <Ionicons name="star" size={16} color="#FFD700" />
+              <Text style={styles.ratingText}>{item.rating}</Text>
+            </View>
           </View>
         </View>
-      </View>
-    </TouchableOpacity>
-  );
+      </TouchableOpacity>
+    );
+  };
 
   const renderCategory = ({ item }) => (
     <TouchableOpacity 
@@ -326,6 +341,30 @@ const BuyerHomeScreen = () => {
             <Text style={styles.navText}>Profile</Text>
           </TouchableOpacity>
         </View>
+        
+        {/* Full Screen Image Modal */}
+        <Modal
+          visible={fullScreenImage !== null}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setFullScreenImage(null)}
+        >
+          <View style={styles.fullScreenContainer}>
+            <TouchableOpacity 
+              style={styles.closeButton}
+              onPress={() => setFullScreenImage(null)}
+            >
+              <Ionicons name="close-circle" size={36} color="#fff" />
+            </TouchableOpacity>
+            {fullScreenImage && (
+              <Image
+                source={{ uri: fullScreenImage }}
+                style={styles.fullScreenImage}
+                resizeMode="contain"
+              />
+            )}
+          </View>
+        </Modal>
       </View>
     </SafeAreaView>
   );
@@ -599,6 +638,22 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: '#666',
     marginBottom: 2,
+  },
+  fullScreenContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  fullScreenImage: {
+    width: '100%',
+    height: '80%',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 40,
+    right: 20,
+    zIndex: 10,
   },
 });
 

@@ -18,6 +18,7 @@ import { MaterialIcons, FontAwesome, Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
 
 const SellerDashboardScreen = () => {
   const navigation = useNavigation();
@@ -321,70 +322,73 @@ const SellerDashboardScreen = () => {
     ));
   };
 
-  const renderProductItem = ({ item }) => (
-    <View style={[styles.card, { backgroundColor: colors.cardBackground }]}>
-      <View style={styles.productImageContainer}>
-        <Image source={{ uri: item.image }} style={styles.productImage} />
-        <View style={styles.productBadge}>
-          <Text style={styles.productBadgeText}>{item.category}</Text>
+  const renderProductItem = ({ item }) => {
+    console.log(item);
+    return (
+      <View style={[styles.card, { backgroundColor: colors.cardBackground }]}>
+        <View style={styles.productImageContainer}>
+          <Image source={{ uri: item.image }} style={styles.productImage} />
+          <View style={styles.productBadge}>
+            <Text style={styles.productBadgeText}>{item.category}</Text>
+          </View>
+          {item.stock < 5 && (
+            <View style={styles.lowStockBadge}>
+              <Text style={styles.lowStockText}>Low Stock</Text>
+            </View>
+          )}
         </View>
-        {item.stock < 5 && (
-          <View style={styles.lowStockBadge}>
-            <Text style={styles.lowStockText}>Low Stock</Text>
+        <View style={styles.productInfo}>
+          <Text style={[styles.productName, { color: colors.text }]}>{item.name}</Text>
+          <View style={styles.productMetrics}>
+            <View style={styles.metricItem}>
+              <Text style={[styles.metricValue, { color: colors.primary }]}>${item.price.toFixed(2)}</Text>
+              <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Price</Text>
+            </View>
+            <View style={styles.metricDivider} />
+            <View style={styles.metricItem}>
+              <Text style={[styles.metricValue, { color: colors.text }]}>{item.stock}</Text>
+              <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>In Stock</Text>
+            </View>
+            <View style={styles.metricDivider} />
+            <View style={styles.metricItem}>
+              <Text style={[styles.metricValue, { color: colors.success }]}>{item.sales || 0}</Text>
+              <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Sold</Text>
+            </View>
           </View>
-        )}
-      </View>
-      <View style={styles.productInfo}>
-        <Text style={[styles.productName, { color: colors.text }]}>{item.name}</Text>
-        <View style={styles.productMetrics}>
-          <View style={styles.metricItem}>
-            <Text style={[styles.metricValue, { color: colors.primary }]}>${item.price.toFixed(2)}</Text>
-            <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Price</Text>
-          </View>
-          <View style={styles.metricDivider} />
-          <View style={styles.metricItem}>
-            <Text style={[styles.metricValue, { color: colors.text }]}>{item.stock}</Text>
-            <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>In Stock</Text>
-          </View>
-          <View style={styles.metricDivider} />
-          <View style={styles.metricItem}>
-            <Text style={[styles.metricValue, { color: colors.success }]}>{item.sales || 0}</Text>
-            <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Sold</Text>
-          </View>
-        </View>
-        <View style={styles.ratingContainer}>
-          <Text style={styles.ratingText}>{item.rating || 0}</Text>
-          <View style={styles.starsContainer}>
-            {[1, 2, 3, 4, 5].map((star) => (
-              <FontAwesome 
-                key={star}
-                name={star <= Math.floor(item.rating || 0) ? "star" : star <= (item.rating || 0) ? "star-half-o" : "star-o"} 
-                size={14} 
-                color={colors.warning} 
-                style={styles.starIcon}
-              />
-            ))}
+          <View style={styles.ratingContainer}>
+            <Text style={styles.ratingText}>{item.rating || 0}</Text>
+            <View style={styles.starsContainer}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <FontAwesome 
+                  key={star}
+                  name={star <= Math.floor(item.rating || 0) ? "star" : star <= (item.rating || 0) ? "star-half-o" : "star-o"} 
+                  size={14} 
+                  color={colors.warning} 
+                  style={styles.starIcon}
+                />
+              ))}
+            </View>
           </View>
         </View>
+        <View style={styles.productActions}>
+          <TouchableOpacity 
+            style={[styles.actionButton, styles.editButton, { backgroundColor: colors.highlight }]}
+            onPress={() => handleEditProduct(item)}
+          >
+            <MaterialIcons name="edit" size={18} color={colors.primary} />
+            <Text style={[styles.actionButtonText, { color: colors.primary }]}>Edit</Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.actionButton, styles.deleteButton, { backgroundColor: colors.danger + '15' }]}
+            onPress={() => handleDeleteProduct(item._id)}
+          >
+            <MaterialIcons name="delete" size={18} color={colors.danger} />
+            <Text style={[styles.actionButtonText, { color: colors.danger }]}>Delete</Text>
+          </TouchableOpacity>
+        </View>
       </View>
-      <View style={styles.productActions}>
-        <TouchableOpacity 
-          style={[styles.actionButton, styles.editButton, { backgroundColor: colors.highlight }]}
-          onPress={() => handleEditProduct(item)}
-        >
-          <MaterialIcons name="edit" size={18} color={colors.primary} />
-          <Text style={[styles.actionButtonText, { color: colors.primary }]}>Edit</Text>
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={[styles.actionButton, styles.deleteButton, { backgroundColor: colors.danger + '15' }]}
-          onPress={() => handleDeleteProduct(item._id)}
-        >
-          <MaterialIcons name="delete" size={18} color={colors.danger} />
-          <Text style={[styles.actionButtonText, { color: colors.danger }]}>Delete</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
+    );
+  };
 
   const renderOrderItem = ({ item }) => (
     <View style={[styles.card, { backgroundColor: colors.cardBackground }]}>
@@ -634,14 +638,12 @@ const SellerDashboardScreen = () => {
 
   const pickImage = async (isMain, index) => {
     try {
-      // Request permissions
       const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
       if (status !== 'granted') {
         alert('Sorry, we need camera roll permissions to make this work!');
         return;
       }
 
-      // Launch image picker
       const result = await ImagePicker.launchImageLibraryAsync({
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
@@ -650,11 +652,13 @@ const SellerDashboardScreen = () => {
       });
 
       if (!result.canceled) {
+        const asset = result.assets[0];
+        const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
         if (isMain) {
-          setProductForm({ ...productForm, image: result.assets[0].uri });
+          setProductForm({ ...productForm, image: `data:image/jpeg;base64,${base64}` });
         } else {
           const newImages = [...productForm.additionalImages];
-          newImages[index] = result.assets[0].uri;
+          newImages[index] = `data:image/jpeg;base64,${base64}`;
           setProductForm({ ...productForm, additionalImages: newImages });
         }
       }
