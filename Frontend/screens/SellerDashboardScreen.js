@@ -81,9 +81,21 @@ const SellerDashboardScreen = () => {
       TECH_SUPPORT: 'Tech Support'
     }
   });
+  const [profileData, setProfileData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    bio: '',
+    location: '',
+    joinDate: '',
+    totalSales: 0,
+    rating: 0,
+    avatar: null
+  });
 
   useEffect(() => {
     fetchData();
+    fetchProfileData();
   }, []);
 
   const fetchData = async () => {
@@ -153,6 +165,27 @@ const SellerDashboardScreen = () => {
       { id: '2', customer: 'Jane Smith', lastMessage: 'Thanks for the quick delivery!', timestamp: 'Yesterday', unread: 0 },
       { id: '3', customer: 'Bob Johnson', lastMessage: 'When will my order ship?', timestamp: 'May 13', unread: 1 },
     ]);
+  };
+
+  const fetchProfileData = async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      // In a real app, you would fetch this from your API
+      // For now, using mock data
+      setProfileData({
+        name: 'John Seller',
+        email: 'john.seller@example.com',
+        phone: '+233 XX XXX XXXX',
+        bio: 'Passionate seller offering quality products to the campus community.',
+        location: 'Campus Area',
+        joinDate: 'May 2023',
+        totalSales: 152,
+        rating: 4.8,
+        avatar: null
+      });
+    } catch (error) {
+      console.error('Error fetching profile data:', error);
+    }
   };
 
   const handleAddProduct = () => {
@@ -564,28 +597,104 @@ const SellerDashboardScreen = () => {
             )}
           </>
         );
-      case 'chats':
+      case 'profile':
         return (
-          <>
-            <View style={styles.tabHeader}>
-              <Text style={[styles.tabTitle, { color: colors.text }]}>Messages</Text>
+          <ScrollView style={styles.profileContainer}>
+            <View style={styles.profileHeader}>
+              <TouchableOpacity style={styles.avatarContainer}>
+                {profileData.avatar ? (
+                  <Image 
+                    source={{ uri: profileData.avatar }} 
+                    style={styles.avatarImage} 
+                  />
+                ) : (
+                  <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary }]}>
+                    <Text style={styles.avatarText}>
+                      {profileData.name.charAt(0)}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.editAvatarButton}>
+                  <MaterialIcons name="camera-alt" size={16} color="white" />
+                </View>
+              </TouchableOpacity>
+              
+              <Text style={[styles.profileName, { color: colors.text }]}>
+                {profileData.name}
+              </Text>
+              <Text style={[styles.profileEmail, { color: colors.textSecondary }]}>
+                {profileData.email}
+              </Text>
+              
+              <View style={styles.statsContainer}>
+                <View style={styles.statItem}>
+                  <Text style={[styles.statValue, { color: colors.primary }]}>
+                    {profileData.totalSales}
+                  </Text>
+                  <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
+                    Total Sales
+                  </Text>
+                </View>
+                <View style={styles.statDivider} />
+                <View style={styles.statItem}>
+                  <View style={styles.ratingValue}>
+                    <Text style={[styles.statValue, { color: colors.warning }]}>
+                      {profileData.rating}
+                    </Text>
+                    <MaterialIcons name="star" size={16} color={colors.warning} />
+                  </View>
+                  <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
+                    Rating
+                  </Text>
+                </View>
+              </View>
             </View>
-            {chats.length === 0 ? (
-              <View style={styles.emptyState}>
-                <MaterialIcons name="chat" size={64} color={colors.textSecondary} />
-                <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>
-                  No messages yet. Conversations with buyers will appear here.
+
+            <View style={styles.profileContent}>
+              <View style={styles.profileSection}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                  Contact Information
+                </Text>
+                <View style={styles.infoItem}>
+                  <MaterialIcons name="phone" size={20} color={colors.primary} />
+                  <Text style={[styles.infoText, { color: colors.text }]}>
+                    {profileData.phone}
+                  </Text>
+                </View>
+                <View style={styles.infoItem}>
+                  <MaterialIcons name="location-on" size={20} color={colors.primary} />
+                  <Text style={[styles.infoText, { color: colors.text }]}>
+                    {profileData.location}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.profileSection}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                  About Me
+                </Text>
+                <Text style={[styles.bioText, { color: colors.text }]}>
+                  {profileData.bio}
                 </Text>
               </View>
-            ) : (
-              <FlatList
-                data={chats}
-                renderItem={renderChatItem}
-                keyExtractor={item => item.id}
-                contentContainerStyle={styles.listContainer}
-              />
-            )}
-          </>
+
+              <TouchableOpacity 
+                style={[styles.editProfileButton, { backgroundColor: colors.primary }]}
+                onPress={() => {/* Handle edit profile */}}
+              >
+                <MaterialIcons name="edit" size={20} color="white" />
+                <Text style={styles.editProfileText}>Edit Profile</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.logoutButton, { backgroundColor: colors.danger }]}
+                onPress={() => {/* Handle logout */}}
+              >
+                <MaterialIcons name="logout" size={20} color="white" />
+                <Text style={styles.logoutButtonText}>Logout</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
         );
       default:
         return null;
@@ -648,17 +757,19 @@ const SellerDashboardScreen = () => {
         mediaTypes: ImagePicker.MediaTypeOptions.Images,
         allowsEditing: true,
         aspect: [4, 3],
-        quality: 1,
+        quality: 0.5,
+        base64: true,
       });
 
       if (!result.canceled) {
         const asset = result.assets[0];
-        const base64 = await FileSystem.readAsStringAsync(asset.uri, { encoding: FileSystem.EncodingType.Base64 });
+        const base64Image = `data:image/jpeg;base64,${asset.base64}`;
+        
         if (isMain) {
-          setProductForm({ ...productForm, image: `data:image/jpeg;base64,${base64}` });
+          setProductForm({ ...productForm, image: base64Image });
         } else {
           const newImages = [...productForm.additionalImages];
-          newImages[index] = `data:image/jpeg;base64,${base64}`;
+          newImages[index] = base64Image;
           setProductForm({ ...productForm, additionalImages: newImages });
         }
       }
@@ -683,7 +794,7 @@ const SellerDashboardScreen = () => {
       
       <View style={[styles.tabBar, { backgroundColor: colors.cardBackground }]}>
         <TouchableOpacity 
-          style={[styles.tab, activeTab === 'products' && [styles.activeTab, { borderTopColor: colors.primary }]]}
+          style={[styles.tab, activeTab === 'products' && styles.activeTab]}
           onPress={() => setActiveTab('products')}
         >
           <MaterialIcons 
@@ -691,18 +802,13 @@ const SellerDashboardScreen = () => {
             size={24} 
             color={activeTab === 'products' ? colors.primary : colors.textSecondary} 
           />
-          <Text 
-            style={[
-              styles.tabText, 
-              { color: activeTab === 'products' ? colors.primary : colors.textSecondary }
-            ]}
-          >
+          <Text style={[styles.tabText, { color: activeTab === 'products' ? colors.primary : colors.textSecondary }]}>
             Products
           </Text>
         </TouchableOpacity>
         
         <TouchableOpacity 
-          style={[styles.tab, activeTab === 'orders' && [styles.activeTab, { borderTopColor: colors.primary }]]}
+          style={[styles.tab, activeTab === 'orders' && styles.activeTab]}
           onPress={() => setActiveTab('orders')}
         >
           <MaterialIcons 
@@ -710,32 +816,22 @@ const SellerDashboardScreen = () => {
             size={24} 
             color={activeTab === 'orders' ? colors.primary : colors.textSecondary} 
           />
-          <Text 
-            style={[
-              styles.tabText, 
-              { color: activeTab === 'orders' ? colors.primary : colors.textSecondary }
-            ]}
-          >
+          <Text style={[styles.tabText, { color: activeTab === 'orders' ? colors.primary : colors.textSecondary }]}>
             Orders
           </Text>
         </TouchableOpacity>
         
         <TouchableOpacity 
-          style={[styles.tab, activeTab === 'chats' && [styles.activeTab, { borderTopColor: colors.primary }]]}
-          onPress={() => setActiveTab('chats')}
+          style={[styles.tab, activeTab === 'profile' && styles.activeTab]}
+          onPress={() => setActiveTab('profile')}
         >
           <MaterialIcons 
-            name="chat" 
+            name="person" 
             size={24} 
-            color={activeTab === 'chats' ? colors.primary : colors.textSecondary} 
+            color={activeTab === 'profile' ? colors.primary : colors.textSecondary} 
           />
-          <Text 
-            style={[
-              styles.tabText, 
-              { color: activeTab === 'chats' ? colors.primary : colors.textSecondary }
-            ]}
-          >
-            Messages
+          <Text style={[styles.tabText, { color: activeTab === 'profile' ? colors.primary : colors.textSecondary }]}>
+            Profile
           </Text>
         </TouchableOpacity>
       </View>
@@ -1577,6 +1673,149 @@ const styles = StyleSheet.create({
     padding: 12,
     fontSize: 16,
     minHeight: 100,
+  },
+  profileContainer: {
+    flex: 1,
+  },
+  profileHeader: {
+    alignItems: 'center',
+    padding: 24,
+    borderRadius: 12,
+    backgroundColor: 'white',
+    marginBottom: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginBottom: 16,
+  },
+  avatarImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+  },
+  avatarPlaceholder: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarText: {
+    fontSize: 36,
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  editAvatarButton: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#4361EE',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'white',
+  },
+  profileName: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  profileEmail: {
+    fontSize: 16,
+    marginBottom: 16,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    width: '100%',
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  statDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: '#E2E8F0',
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  ratingValue: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statLabel: {
+    fontSize: 14,
+  },
+  profileContent: {
+    padding: 16,
+  },
+  profileSection: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  infoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 12,
+  },
+  infoText: {
+    fontSize: 16,
+  },
+  bioText: {
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  editProfileButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    gap: 8,
+  },
+  editProfileText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 12,
+    gap: 8,
+  },
+  logoutButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 

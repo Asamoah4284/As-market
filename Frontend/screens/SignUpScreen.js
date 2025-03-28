@@ -9,6 +9,7 @@ function SignUpScreen({ navigation }) {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
+    phone: '',
     password: '',
   });
   const [error, setError] = useState('');
@@ -17,6 +18,12 @@ function SignUpScreen({ navigation }) {
     try {
       if (!userType) {
         setError('Please select whether you want to buy or sell items');
+        return;
+      }
+
+      // Validate that at least email or phone is provided
+      if (!formData.email && !formData.phone) {
+        setError('Please provide either an email address or phone number');
         return;
       }
 
@@ -108,6 +115,17 @@ function SignUpScreen({ navigation }) {
         </View>
         
         <View style={styles.inputGroup}>
+          <Text style={styles.formLabel}>Phone Number</Text>
+          <TextInput 
+            style={styles.textInput}
+            placeholder="Enter your phone number"
+            keyboardType="phone-pad"
+            value={formData.phone}
+            onChangeText={(text) => setFormData({...formData, phone: text})}
+          />
+        </View>
+        
+        <View style={styles.inputGroup}>
           <Text style={styles.formLabel}>Password</Text>
           <TextInput 
             style={styles.textInput}
@@ -138,30 +156,30 @@ const styles = StyleSheet.create({
     backgroundColor: '#f8f9fa',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 20,
+    padding: 15,
   },
   formContainer: {
     width: '100%',
     maxWidth: 400,
   },
   screenTitle: {
-    fontSize: 24,
+    fontSize: 22,
     fontWeight: 'bold',
-    marginBottom: 30,
+    marginBottom: 20,
     textAlign: 'center',
     color: '#2c3e50',
   },
   userTypeContainer: {
-    marginBottom: 25,
+    marginBottom: 15,
   },
   userTypeButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginTop: 10,
+    marginTop: 8,
   },
   userTypeButton: {
     flex: 1,
-    padding: 15,
+    padding: 12,
     borderRadius: 8,
     alignItems: 'center',
     backgroundColor: '#ecf0f1',
@@ -174,11 +192,11 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   inputGroup: {
-    marginBottom: 20,
+    marginBottom: 15,
   },
   formLabel: {
-    fontSize: 16,
-    marginBottom: 8,
+    fontSize: 15,
+    marginBottom: 6,
     color: '#2c3e50',
     fontWeight: '500',
   },
@@ -187,16 +205,16 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
-    padding: 12,
-    fontSize: 16,
+    padding: 10,
+    fontSize: 15,
   },
   submitButton: {
     backgroundColor: '#3498db',
-    padding: 15,
+    padding: 12,
     borderRadius: 8,
     alignItems: 'center',
-    marginTop: 10,
-    marginBottom: 20,
+    marginTop: 8,
+    marginBottom: 15,
   },
   submitButtonText: {
     color: 'white',
@@ -206,7 +224,7 @@ const styles = StyleSheet.create({
   switchAuthText: {
     textAlign: 'center',
     color: '#7f8c8d',
-    marginBottom: 20,
+    marginBottom: 15,
   },
   switchAuthLink: {
     color: '#3498db',
@@ -215,7 +233,7 @@ const styles = StyleSheet.create({
   errorText: {
     color: 'red',
     textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
   },
 });
 

@@ -15,6 +15,7 @@ import {
   TextInput,
   Modal,
   Pressable,
+  Linking,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
@@ -40,6 +41,9 @@ const ProductDetailsScreen = () => {
 
   // Add new state for fullscreen modal
   const [isFullscreen, setIsFullscreen] = useState(false);
+
+  // Add new state for contact modal
+  const [contactModalVisible, setContactModalVisible] = useState(false);
 
   useEffect(() => {
     const fetchProductDetails = async () => {
@@ -203,6 +207,42 @@ const ProductDetailsScreen = () => {
     setIsFullscreen(true);
   };
 
+  // Add function to handle contact seller
+  const handleContactSeller = () => {
+    setContactModalVisible(true);
+  };
+
+  // Add function to open WhatsApp
+  const contactViaWhatsApp = () => {
+    // You can customize the message or use seller's phone if available
+    const phoneNumber = product.seller?.phone || "1234567890";
+    const message = `Hello, I'm interested in your product: ${product.name}`;
+    const whatsappUrl = `whatsapp://send?phone=${phoneNumber}&text=${encodeURIComponent(message)}`;
+    
+    Linking.canOpenURL(whatsappUrl)
+      .then(supported => {
+        if (supported) {
+          return Linking.openURL(whatsappUrl);
+        } else {
+          Alert.alert("WhatsApp not installed", "Please install WhatsApp to contact the seller.");
+        }
+      })
+      .catch(err => console.error('Error opening WhatsApp:', err));
+    
+    setContactModalVisible(false);
+  };
+
+  // Add function to view seller profile
+  const viewSellerProfile = () => {
+    // Navigate to seller profile screen if available
+    if (product.seller?._id) {
+      navigation.navigate('SellerProfile', { sellerId: product.seller._id });
+    } else {
+      Alert.alert("Seller Profile", "Seller profile is not available.");
+    }
+    setContactModalVisible(false);
+  };
+
   if (loading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
@@ -296,6 +336,48 @@ const ProductDetailsScreen = () => {
             ))}
           </View>
         </View>
+      </Modal>
+
+      {/* Add Contact Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={contactModalVisible}
+        onRequestClose={() => setContactModalVisible(false)}
+      >
+        <TouchableOpacity 
+          style={styles.contactModalOverlay}
+          activeOpacity={1}
+          onPress={() => setContactModalVisible(false)}
+        >
+          <View style={styles.contactModalContainer}>
+            <View style={styles.contactModalContent}>
+              <View style={styles.contactModalHeader}>
+                <Text style={styles.contactModalTitle}>Contact Seller</Text>
+                <TouchableOpacity onPress={() => setContactModalVisible(false)}>
+                  <Ionicons name="close" size={24} color="#333" />
+                </TouchableOpacity>
+              </View>
+              
+              
+              <TouchableOpacity 
+                style={styles.contactOption}
+                onPress={contactViaWhatsApp}
+              >
+                <Ionicons name="logo-whatsapp" size={24} color="#25D366" />
+                <Text style={styles.contactOptionText}>Chat on WhatsApp</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.contactOption}
+                onPress={viewSellerProfile}
+              >
+                <Ionicons name="person" size={24} color="#5D3FD3" />
+                <Text style={styles.contactOptionText}>View Seller's Profile</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
       </Modal>
 
       {/* Header */}
@@ -464,7 +546,10 @@ const ProductDetailsScreen = () => {
                   {product.seller?.rating || "4.8"} Seller Rating
                 </Text>
               </View>
-              <TouchableOpacity style={styles.contactButton}>
+              <TouchableOpacity 
+                style={styles.contactButton}
+                onPress={handleContactSeller}
+              >
                 <Text style={styles.contactButtonText}>Contact</Text>
               </TouchableOpacity>
             </View>
@@ -512,7 +597,7 @@ const ProductDetailsScreen = () => {
                     </Text>
                   </View>
                   <Text style={styles.commentDate}>
-                    {new Date(comment.createdAt).toLocaleDateString()}
+                    {new Date(comment.createdAt).toLocaleString()}
                   </Text>
                 </View>
                 <Text style={styles.commentText}>{comment.text}</Text>
@@ -950,6 +1035,46 @@ const styles = StyleSheet.create({
     width: 10,
     height: 10,
     borderRadius: 5,
+  },
+  contactModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  contactModalContainer: {
+    backgroundColor: '#fff',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: 30,
+  },
+  contactModalContent: {
+    padding: 20,
+  },
+  contactModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 20,
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  contactModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  contactOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
+  },
+  contactOptionText: {
+    fontSize: 16,
+    marginLeft: 15,
+    color: '#333',
   },
 });
 
