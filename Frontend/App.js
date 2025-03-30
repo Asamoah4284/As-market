@@ -13,6 +13,7 @@ import CartScreen from './screens/CartScreen';
 import ProductDetailsScreen from './screens/ProductDetailsScreen';
 import CategoriesScreen from './screens/CategoriesScreen';
 import SellerDashboardScreen from './screens/SellerDashboardScreen';
+import SellerProfileScreen from './screens/SellerProfileScreen';
 
 
 
@@ -31,11 +32,12 @@ export default function App() {
         >
           <Stack.Screen name="Welcome" component={WelcomeScreen} />
           <Stack.Screen name="SignUp" component={SignUpScreen} />
+          <Stack.Screen name="Cart" component={CartScreen} />
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="BuyerHome" component={BuyerHomeScreen} />
 
           <Stack.Screen name="Profile" component={ProfileScreen} />
-          <Stack.Screen name="Cart" component={CartScreen} />
+          {/*  */}
           <Stack.Screen name="SellerDashboard" component={SellerDashboardScreen} />
           <Stack.Screen 
             name="ProductDetails" 
@@ -43,6 +45,7 @@ export default function App() {
             options={{ headerShown: false }}
           />
           <Stack.Screen name="Categories" component={CategoriesScreen} />
+          <Stack.Screen name="SellerProfile" component={SellerProfileScreen} />
         </Stack.Navigator>
         <StatusBar style="auto" />
       </NavigationContainer>

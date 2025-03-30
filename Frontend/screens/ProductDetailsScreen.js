@@ -164,6 +164,7 @@ const ProductDetailsScreen = () => {
         return;
       }
 
+      // Add a local loading state for the button
       const response = await fetch("http://172.20.10.3:5000/api/cart/add", {
         method: "POST",
         headers: {
@@ -177,7 +178,16 @@ const ProductDetailsScreen = () => {
       });
 
       if (response.ok) {
-        Alert.alert("Success", "Product added to cart successfully!");
+        Alert.alert("Success", "Product added to cart successfully!", [
+          { 
+            text: "View Cart", 
+            onPress: () => navigation.navigate("Cart") 
+          },
+          { 
+            text: "Continue Shopping", 
+            style: "cancel" 
+          }
+        ]);
       } else {
         const errorData = await response.json();
         Alert.alert(
@@ -480,7 +490,7 @@ const ProductDetailsScreen = () => {
             </View>
           </View>
 
-          <Text style={styles.productPrice}>${product.price?.toFixed(2)}</Text>
+          <Text style={styles.productPrice}>GH₵{product.price?.toFixed(2)}</Text>
 
           {/* Quantity Selector */}
           <View style={styles.quantityContainer}>
@@ -616,15 +626,22 @@ const ProductDetailsScreen = () => {
         <View style={styles.priceContainer}>
           <Text style={styles.totalLabel}>Total:</Text>
           <Text style={styles.totalPrice}>
-            ${(product.price * quantity).toFixed(2)}
+          GH₵{(product.price * quantity).toFixed(2)}
           </Text>
         </View>
         <TouchableOpacity
           style={styles.addToCartButton}
           onPress={handleAddToCart}
+          disabled={loading}
         >
-          <Ionicons name="cart-outline" size={20} color="#fff" />
-          <Text style={styles.addToCartText}>Add to Cart</Text>
+          {loading ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <>
+              <Ionicons name="cart-outline" size={20} color="#fff" />
+              <Text style={styles.addToCartText}>Add to Cart</Text>
+            </>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>

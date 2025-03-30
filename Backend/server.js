@@ -5,6 +5,7 @@ const connectDB = require('./config/db');
 const userRoutes = require('./routes/userRoutes');
 const productRoutes = require('./routes/productRoutes');
 const commentRoutes = require('./routes/commentRoutes');
+const cartRoutes = require('./routes/cartRoutes');
 const mongoose = require('mongoose');
 
 const app = express();
@@ -21,6 +22,7 @@ app.use(express.urlencoded({limit: '50mb', extended: true}));
 app.use('/api/users', userRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api', commentRoutes);
+app.use('/api/cart', cartRoutes);
 
 app.get('/api/test', async (req, res) => {
   try {

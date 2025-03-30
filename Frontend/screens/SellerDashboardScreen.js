@@ -374,7 +374,7 @@ const SellerDashboardScreen = () => {
           <Text style={[styles.productName, { color: colors.text }]}>{item.name}</Text>
           <View style={styles.productMetrics}>
             <View style={styles.metricItem}>
-              <Text style={[styles.metricValue, { color: colors.primary }]}>${item.price.toFixed(2)}</Text>
+              <Text style={[styles.metricValue, { color: colors.primary }]}>GH₵{item.price.toFixed(2)}</Text>
               <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Price</Text>
             </View>
             <View style={styles.metricDivider} />
