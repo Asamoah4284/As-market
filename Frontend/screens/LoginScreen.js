@@ -1,10 +1,13 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, TextInput, ScrollView, Alert } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useDispatch } from 'react-redux';
+import { setCredentials } from '../store/slices/authSlice';
 
 const API_URL = 'http://172.20.10.3:5000';
 
 function LoginScreen({ navigation }) {
+  const dispatch = useDispatch();
   const [loginMethod, setLoginMethod] = useState('email');
   const [email, setEmail] = useState('');
   const [phoneNumber, setPhoneNumber] = useState('');
@@ -34,7 +37,6 @@ function LoginScreen({ navigation }) {
       });
 
       const data = await response.json();
-      console.log('Login response:', data);
 
       if (response.ok) {
         if (data.token) {
@@ -44,31 +46,24 @@ function LoginScreen({ navigation }) {
             id: data.user?._id || data._id,
             name: data.user?.name || data.name,
             email: data.user?.email || data.email,
-            role: data.user?.role || data.role
+            role: data.user?.role || data.role,
+            phone: data.user?.phone || data.phone
           };
 
-          if (data.user?.phone || data.phone) {
-            userData.phone = data.user?.phone || data.phone;
-          }
+          dispatch(setCredentials({
+            token: data.token,
+            userData: userData
+          }));
 
-          await AsyncStorage.setItem('userData', JSON.stringify(userData));
-          
-          const userRole = userData.role;
-          
-          if (userRole === 'buyer') {
+          if (userData.role === 'buyer') {
             navigation.reset({
               index: 0,
               routes: [{ name: 'BuyerHome' }],
             });
-          } else if (userRole === 'seller') {
+          } else if (userData.role === 'seller') {
             navigation.reset({
               index: 0,
               routes: [{ name: 'SellerDashboard' }],
-            });
-          } else {
-            navigation.reset({
-              index: 0,
-              routes: [{ name: 'Home' }],
             });
           }
         } else {

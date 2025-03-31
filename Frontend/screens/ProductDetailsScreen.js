@@ -20,15 +20,17 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchProductById } from '../store/slices/productSlice';
 
 const ProductDetailsScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { productId } = route.params;
 
-  const [product, setProduct] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const dispatch = useDispatch();
+  const { currentProduct, isLoading, error } = useSelector((state) => state.products);
+
   const [quantity, setQuantity] = useState(1);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const windowWidth = Dimensions.get("window").width;
@@ -46,41 +48,16 @@ const ProductDetailsScreen = () => {
   const [contactModalVisible, setContactModalVisible] = useState(false);
 
   useEffect(() => {
-    const fetchProductDetails = async () => {
-      try {
-        setLoading(true);
-        console.log("Fetching product with ID:", productId);
+    if (productId) {
+      dispatch(fetchProductById(productId));
+    }
+  }, [dispatch, productId]);
 
-        const response = await fetch(
-          `http://172.20.10.3:5000/api/products/${productId}`
-        );
-
-        if (!response.ok) {
-          console.error(
-            "API response not OK:",
-            response.status,
-            response.statusText
-          );
-          throw new Error("Failed to fetch product details");
-        }
-
-        const data = await response.json();
-        // Combine main image with additional images for the carousel
-        const allImages = [data.image, ...(data.additionalImages || [])].filter(Boolean);
-        data.images = allImages;
-        console.log("Product details:", data);
-        setProduct(data);
-      } catch (err) {
-        console.error("Error fetching product details:", err);
-        setError("Could not load product details. Please try again later.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchProductDetails();
-    fetchComments(); // Add this to fetch comments when component loads
-  }, [productId]);
+  useEffect(() => {
+    console.log('Current Product:', currentProduct);
+    console.log('Product Images:', currentProduct?.additionalImages);
+    console.log('Number of Images:', currentProduct?.additionalImages?.length);
+  }, [currentProduct]);
 
   // Add function to fetch comments
   const fetchComments = async () => {
@@ -172,7 +149,7 @@ const ProductDetailsScreen = () => {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          productId: product._id,
+          productId: currentProduct._id,
           quantity: quantity,
         }),
       });
@@ -225,8 +202,8 @@ const ProductDetailsScreen = () => {
   // Add function to open WhatsApp
   const contactViaWhatsApp = () => {
     // You can customize the message or use seller's phone if available
-    const phoneNumber = product.seller?.phone || "1234567890";
-    const message = `Hello, I'm interested in your product: ${product.name}`;
+    const phoneNumber = currentProduct.seller?.phone || "1234567890";
+    const message = `Hello, I'm interested in your product: ${currentProduct.name}`;
     const whatsappUrl = `whatsapp://send?phone=${phoneNumber}&text=${encodeURIComponent(message)}`;
     
     Linking.canOpenURL(whatsappUrl)
@@ -245,15 +222,15 @@ const ProductDetailsScreen = () => {
   // Add function to view seller profile
   const viewSellerProfile = () => {
     // Navigate to seller profile screen if available
-    if (product.seller?._id) {
-      navigation.navigate('SellerProfile', { sellerId: product.seller._id });
+    if (currentProduct.seller?._id) {
+      navigation.navigate('SellerProfile', { sellerId: currentProduct.seller._id });
     } else {
       Alert.alert("Seller Profile", "Seller profile is not available.");
     }
     setContactModalVisible(false);
   };
 
-  if (loading) {
+  if (isLoading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
         <ActivityIndicator size="large" color="#5D3FD3" />
@@ -269,15 +246,15 @@ const ProductDetailsScreen = () => {
         <Text style={styles.errorText}>{error}</Text>
         <TouchableOpacity
           style={styles.retryButton}
-          onPress={() => navigation.goBack()}
+          onPress={() => dispatch(fetchProductById(productId))}
         >
-          <Text style={styles.retryButtonText}>Go Back</Text>
+          <Text style={styles.retryButtonText}>Retry</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
   }
 
-  if (!product) {
+  if (!currentProduct) {
     return (
       <SafeAreaView style={styles.errorContainer}>
         <Text style={styles.errorText}>Product not found</Text>
@@ -293,6 +270,12 @@ const ProductDetailsScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
+      {console.log('Rendering Product Details:', {
+        productId,
+        currentProduct,
+        images: currentProduct?.additionalImages,
+        imageCount: currentProduct?.additionalImages?.length
+      })}
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
 
       {/* Add the Modal component */}
@@ -310,7 +293,7 @@ const ProductDetailsScreen = () => {
             <Ionicons name="close" size={28} color="#fff" />
           </TouchableOpacity>
           <FlatList
-            data={product?.images || []}
+            data={currentProduct?.additionalImages || []}
             horizontal
             pagingEnabled
             initialScrollIndex={activeImageIndex}
@@ -335,7 +318,7 @@ const ProductDetailsScreen = () => {
             )}
           />
           <View style={styles.fullscreenPaginationContainer}>
-            {(product?.images || []).map((_, index) => (
+            {(currentProduct?.additionalImages || []).map((_, index) => (
               <View
                 key={index}
                 style={[
@@ -407,11 +390,11 @@ const ProductDetailsScreen = () => {
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
         {/* Product Image Carousel */}
         <View style={styles.imageContainer}>
-          {product.images && product.images.length > 0 ? (
+          {currentProduct?.additionalImages && Array.isArray(currentProduct.additionalImages) && currentProduct.additionalImages.length > 0 ? (
             <>
               <FlatList
                 ref={flatListRef}
-                data={product.images}
+                data={[currentProduct.image, ...currentProduct.additionalImages]}
                 horizontal
                 pagingEnabled
                 showsHorizontalScrollIndicator={false}
@@ -426,55 +409,56 @@ const ProductDetailsScreen = () => {
                 scrollEventThrottle={16}
                 renderItem={({ item, index }) => (
                   <TouchableOpacity 
-                    style={{ width: windowWidth }}
+                    style={[styles.imageSlide, { width: windowWidth }]}
                     onPress={() => handleImagePress(index)}
                   >
                     <Image
                       source={{ uri: item }}
                       style={styles.productImage}
                       resizeMode="cover"
-                      onError={(e) =>
-                        console.log("Image loading error:", e.nativeEvent.error)
-                      }
+                      onError={(e) => {
+                        console.log('Image loading error:', item);
+                      }}
                     />
                   </TouchableOpacity>
                 )}
               />
-              {/* Pagination Dots */}
-              <View style={styles.paginationContainer}>
-                {product.images.map((_, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    onPress={() => {
-                      flatListRef.current?.scrollToIndex({
-                        index,
-                        animated: true,
-                      });
-                      setActiveImageIndex(index);
-                    }}
-                  >
-                    <View
-                      style={[
-                        styles.paginationDot,
-                        index === activeImageIndex &&
-                          styles.paginationDotActive,
-                      ]}
-                    />
-                  </TouchableOpacity>
-                ))}
-              </View>
+              {/* Only show pagination if there's more than one image */}
+              {(currentProduct.additionalImages.length + 1) > 1 && (
+                <View style={styles.paginationContainer}>
+                  {[currentProduct.image, ...currentProduct.additionalImages].map((_, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      onPress={() => {
+                        flatListRef.current?.scrollToIndex({
+                          index,
+                          animated: true,
+                        });
+                        setActiveImageIndex(index);
+                      }}
+                    >
+                      <View
+                        style={[
+                          styles.paginationDot,
+                          index === activeImageIndex && styles.paginationDotActive,
+                        ]}
+                      />
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
             </>
           ) : (
-            // Fallback to single image if images array is not available
+            // Fallback to single image
             <Image
               source={{
-                uri: product.image || "https://via.placeholder.com/400",
+                uri: currentProduct?.image || "https://via.placeholder.com/400",
               }}
               style={styles.productImage}
               resizeMode="cover"
-              onError={(e) =>
-                console.log("Image loading error:", e.nativeEvent.error)
-              }
+              onError={(e) => {
+                console.log("Image loading error:", e.nativeEvent.error);
+              }}
             />
           )}
         </View>
@@ -482,15 +466,15 @@ const ProductDetailsScreen = () => {
         {/* Product Info */}
         <View style={styles.productInfoContainer}>
           <View style={styles.productHeader}>
-            <Text style={styles.productName}>{product.name}</Text>
+            <Text style={styles.productName}>{currentProduct.name}</Text>
             <View style={styles.ratingContainer}>
               <Ionicons name="star" size={18} color="#FFD700" />
-              <Text style={styles.ratingText}>{product.rating || 4.5}</Text>
+              <Text style={styles.ratingText}>{currentProduct.rating || 4.5}</Text>
               <Text style={styles.reviewsText}>(120 reviews)</Text>
             </View>
           </View>
 
-          <Text style={styles.productPrice}>GH₵{product.price?.toFixed(2)}</Text>
+          <Text style={styles.productPrice}>GH₵{currentProduct.price?.toFixed(2)}</Text>
 
           {/* Quantity Selector */}
           <View style={styles.quantityContainer}>
@@ -516,7 +500,7 @@ const ProductDetailsScreen = () => {
           <View style={styles.descriptionContainer}>
             <Text style={styles.sectionTitle}>Description</Text>
             <Text style={styles.descriptionText}>
-              {product.description ||
+              {currentProduct.description ||
                 "No description available for this product."}
             </Text>
           </View>
@@ -526,18 +510,18 @@ const ProductDetailsScreen = () => {
             <Text style={styles.sectionTitle}>Specifications</Text>
             <View style={styles.specItem}>
               <Text style={styles.specLabel}>Brand</Text>
-              <Text style={styles.specValue}>{product.brand || "Generic"}</Text>
+              <Text style={styles.specValue}>{currentProduct.brand || "Generic"}</Text>
             </View>
             <View style={styles.specItem}>
               <Text style={styles.specLabel}>Category</Text>
               <Text style={styles.specValue}>
-                {product.category || "Electronics"}
+                {currentProduct.category || "Electronics"}
               </Text>
             </View>
             <View style={styles.specItem}>
               <Text style={styles.specLabel}>In Stock</Text>
               <Text style={styles.specValue}>
-                {product.countInStock > 0 ? "Yes" : "No"}
+                {currentProduct.countInStock > 0 ? "Yes" : "No"}
               </Text>
             </View>
           </View>
@@ -549,11 +533,11 @@ const ProductDetailsScreen = () => {
               <Ionicons name="person-circle-outline" size={40} color="#666" />
               <View style={styles.sellerDetails}>
                 <Text style={styles.sellerName}>
-                  {product.seller?.name || "Marketplace Seller"}
+                  {currentProduct.seller?.name || "Marketplace Seller"}
                 </Text>
                 <Text style={styles.sellerRating}>
                   <Ionicons name="star" size={14} color="#FFD700" />
-                  {product.seller?.rating || "4.8"} Seller Rating
+                  {currentProduct.seller?.rating || "4.8"} Seller Rating
                 </Text>
               </View>
               <TouchableOpacity 
@@ -626,22 +610,14 @@ const ProductDetailsScreen = () => {
         <View style={styles.priceContainer}>
           <Text style={styles.totalLabel}>Total:</Text>
           <Text style={styles.totalPrice}>
-          GH₵{(product.price * quantity).toFixed(2)}
+          GH₵{(currentProduct.price * quantity).toFixed(2)}
           </Text>
         </View>
         <TouchableOpacity
           style={styles.addToCartButton}
           onPress={handleAddToCart}
-          disabled={loading}
         >
-          {loading ? (
-            <ActivityIndicator size="small" color="#fff" />
-          ) : (
-            <>
-              <Ionicons name="cart-outline" size={20} color="#fff" />
-              <Text style={styles.addToCartText}>Add to Cart</Text>
-            </>
-          )}
+          <Text style={styles.addToCartText}>Add to Cart</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -1092,6 +1068,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginLeft: 15,
     color: '#333',
+  },
+  imageSlide: {
+    height: 300,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

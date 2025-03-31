@@ -58,5 +58,8 @@ userSchema.pre('save', function(next) {
   next();
 });
 
-// Explicitly set the collection name to 'users'
-module.exports = mongoose.model('User', userSchema, 'users'); 
+// Replace the direct model export with this check
+module.exports = mongoose.models.User || mongoose.model('User', userSchema);
+
+// Instead of just:
+// module.exports = mongoose.model('User', userSchema); 

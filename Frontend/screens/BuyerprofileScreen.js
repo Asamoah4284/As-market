@@ -10,8 +10,9 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const ProfileScreen = () => {
+const BuyerProfileScreen = () => {
   const navigation = useNavigation();
   const [user, setUser] = useState({
     name: 'Alex Johnson',
@@ -29,6 +30,18 @@ const ProfileScreen = () => {
     { id: 2, type: 'achievement', title: 'Earned "Early Bird" badge', date: '1 week ago' },
     { id: 3, type: 'post', title: 'Visited Grand Canyon', date: '2 weeks ago' },
   ];
+
+  const handleLogout = () => {
+    // Clear the token (assuming you store it in AsyncStorage)
+    AsyncStorage.removeItem('userToken')
+      .then(() => {
+        // Navigate to the login page
+        navigation.navigate('Login'); // Adjust the route name as necessary
+      })
+      .catch(error => {
+        console.error('Error clearing token:', error);
+      });
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -123,7 +136,7 @@ const ProfileScreen = () => {
             <Ionicons name="chevron-forward" size={20} color="#ccc" style={styles.settingArrow} />
           </TouchableOpacity>
           
-          <TouchableOpacity style={[styles.settingItem, styles.logoutItem]}>
+          <TouchableOpacity style={[styles.settingItem, styles.logoutItem]} onPress={handleLogout}>
             <Ionicons name="log-out-outline" size={22} color="#FF5757" />
             <Text style={styles.logoutText}>Log Out</Text>
           </TouchableOpacity>
@@ -317,4 +330,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default ProfileScreen;
+export default BuyerProfileScreen;

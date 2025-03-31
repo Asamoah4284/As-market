@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -15,12 +15,19 @@ import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
+import { useDispatch, useSelector } from 'react-redux';
+import { 
+  setCartItems, 
+  setLoading, 
+  setError 
+} from '../store/slices/cartSlice';
 
 const CartScreen = () => {
   const navigation = useNavigation();
-  const [cartItems, setCartItems] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const dispatch = useDispatch();
+  
+  // Replace useState with useSelector
+  const { items: cartItems, loading, error } = useSelector(state => state.cart);
 
   // Fetch cart items whenever the screen is focused
   useFocusEffect(
@@ -29,13 +36,14 @@ const CartScreen = () => {
     }, [])
   );
 
+  // Modify fetchCartItems to use Redux
   const fetchCartItems = async () => {
     try {
-      setLoading(true);
+      dispatch(setLoading(true));
       const token = await AsyncStorage.getItem('userToken');
       
       if (!token) {
-        setError('Please sign in to view your cart');
+        dispatch(setError('Please sign in to view your cart'));
         return;
       }
 
@@ -45,50 +53,39 @@ const CartScreen = () => {
         },
       });
 
-      console.log('Raw cart response:', response.data);
+      const cartData = response.data.map(item => ({
+        ...item,
+        productId: item._id || item.productId,
+        name: item.name || item.productName,
+        price: parseFloat(item.price || 0),
+        image: item.image || item.imageUrl || item.images?.[0],
+        quantity: parseInt(item.quantity || 1),
+      }));
 
-      const cartData = response.data.map(item => {
-        console.log('Processing cart item:', item);
-        
-        // Ensure we have all required product details
-        const processedItem = {
-          ...item,
-          productId: item._id || item.productId,
-          name: item.name || item.productName, // Handle possible name field variations
-          price: parseFloat(item.price || 0),
-          image: item.image || item.imageUrl || item.images?.[0], // Try to get first image if images is an array
-          quantity: parseInt(item.quantity || 1),
-          // Add any other necessary fields
-        };
-        
-        console.log('Processed item:', processedItem);
-        return processedItem;
-      });
-
-      console.log('Final cart data:', cartData);
-      setCartItems(cartData);
-      setError(null);
+      dispatch(setCartItems(cartData));
+      dispatch(setError(null));
     } catch (err) {
       console.error('Error fetching cart:', err);
-      setError('Failed to load cart items');
+      dispatch(setError('Failed to load cart items'));
     } finally {
-      setLoading(false);
+      dispatch(setLoading(false));
     }
   };
 
+  // Modify handleUpdateQuantity to use Redux
   const handleUpdateQuantity = async (productId, newQuantity) => {
     try {
-      // Update locally first
-      setCartItems(prevItems =>
-        prevItems.map(item =>
-          item.productId === productId
-            ? { ...item, quantity: newQuantity, price: item.price / item.quantity * newQuantity }
-            : item
-        )
-      );
-
       const token = await AsyncStorage.getItem('userToken');
       
+      // Update optimistically
+      dispatch(setCartItems(
+        cartItems.map(item =>
+          item.productId === productId
+            ? { ...item, quantity: newQuantity }
+            : item
+        )
+      ));
+
       const response = await axios.put(`http://172.20.10.3:5000/api/cart/${productId}`, {
         quantity: newQuantity,
       }, {
@@ -99,18 +96,18 @@ const CartScreen = () => {
       });
 
       if (response.status !== 200) {
-        // If the server update fails, revert the local change
+        // Revert on failure
         fetchCartItems();
         Alert.alert('Error', 'Failed to update quantity');
       }
     } catch (err) {
       console.error('Error updating quantity:', err);
-      // Revert the local change on error
       fetchCartItems();
       Alert.alert('Error', 'Failed to update quantity');
     }
   };
 
+  // Modify handleRemoveItem to use Redux
   const handleRemoveItem = async (productId) => {
     Alert.alert(
       'Remove Item',
@@ -124,19 +121,23 @@ const CartScreen = () => {
             try {
               const token = await AsyncStorage.getItem('userToken');
               
+              // Remove optimistically
+              dispatch(setCartItems(cartItems.filter(item => item.productId !== productId)));
+
               const response = await axios.delete(`http://172.20.10.3:5000/api/cart/${productId}`, {
                 headers: {
                   Authorization: `Bearer ${token}`,
                 },
               });
 
-              if (response.status === 200) {
-                setCartItems(prevItems => prevItems.filter(item => item.productId !== productId));
-              } else {
+              if (response.status !== 200) {
+                // Revert on failure
+                fetchCartItems();
                 Alert.alert('Error', 'Failed to remove item');
               }
             } catch (err) {
               console.error('Error removing item:', err);
+              fetchCartItems();
               Alert.alert('Error', 'Failed to remove item');
             }
           },
@@ -168,7 +169,7 @@ const CartScreen = () => {
           </TouchableOpacity>
         </View>
         
-        <Text style={styles.itemPrice}>GH₵{item.price.toFixed(2)}</Text>
+        <Text style={styles.itemPrice}>${item.price.toFixed(2)}</Text>
         
         <View style={styles.itemFooter}>
           <View style={styles.quantityContainer}>
@@ -206,9 +207,21 @@ const CartScreen = () => {
 
   if (loading) {
     return (
-      <View style={styles.centerContainer}>
-        <ActivityIndicator size="large" color="#5D3FD3" />
-      </View>
+      <SafeAreaView style={styles.container}>
+        <View style={styles.header}>
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="chevron-back" size={24} color="#333" />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Shopping Cart</Text>
+          <View style={styles.placeholder} />
+        </View>
+        <View style={styles.centerContainer}>
+          <ActivityIndicator size="large" color="#5D3FD3" />
+        </View>
+      </SafeAreaView>
     );
   }
 
@@ -270,7 +283,7 @@ const CartScreen = () => {
         >
           <Ionicons name="chevron-back" size={24} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Bag</Text>
+        <Text style={styles.headerTitle}>My Cart</Text>
         <Text style={styles.itemCount}>{cartItems.length} {cartItems.length === 1 ? 'item' : 'items'}</Text>
       </View>
 
@@ -299,7 +312,7 @@ const CartScreen = () => {
             <Text style={styles.summaryValue}>GH₵{calculateTotal().toFixed(2)}</Text>
           </View>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryText}>Shipping</Text>
+            <Text style={styles.summaryText}>Delivery</Text>
             <Text style={styles.shippingValue}>Free</Text>
           </View>
           <View style={styles.divider} />

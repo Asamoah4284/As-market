@@ -1,6 +1,63 @@
 const Product = require('../models/productModel');
 const User = require('../models/User');
 const asyncHandler = require('express-async-handler');
+const sharp = require('sharp');
+const cloudinary = require('../config/cloudinary');
+
+// Helper function to upload to Cloudinary
+const uploadToCloudinary = async (base64Image) => {
+  try {
+    if (!base64Image) {
+      throw new Error('No image data provided');
+    }
+
+    // Remove the data:image/format;base64, prefix if it exists
+    const base64Data = base64Image.replace(/^data:image\/\w+;base64,/, '');
+    
+    let compressedImageBuffer;
+    try {
+      compressedImageBuffer = await sharp(Buffer.from(base64Data, 'base64'))
+        .resize(800) // Resize to max width of 800px
+        .jpeg({ quality: 80 }) // Convert to JPEG with 80% quality
+        .toBuffer();
+    } catch (sharpError) {
+      console.error('Error compressing image:', sharpError);
+      throw new Error(`Image compression failed: ${sharpError.message}`);
+    }
+
+    // Upload to Cloudinary with timestamp
+    const timestamp = Math.round(new Date().getTime() / 1000);
+    
+    const result = await new Promise((resolve, reject) => {
+      const uploadStream = cloudinary.uploader.upload_stream(
+        {
+          resource_type: 'auto',
+          folder: 'campus-market',
+        },
+        (error, result) => {
+          if (error) {
+            console.error('Cloudinary upload error:', error);
+            reject(new Error(`Cloudinary upload failed: ${error.message}`));
+          } else {
+            resolve(result);
+          }
+        }
+      );
+      
+      uploadStream.end(compressedImageBuffer);
+    });
+
+    if (!result || !result.secure_url) {
+      throw new Error('Cloudinary response is missing secure_url');
+    }
+
+    console.log('Upload successful:', result.secure_url);
+    return result.secure_url;
+  } catch (error) {
+    console.error('Error in uploadToCloudinary:', error);
+    throw error; // Throw the specific error instead of a generic one
+  }
+};
 
 // @desc    Create a new product
 // @route   POST /api/products
@@ -21,14 +78,28 @@ const createProduct = asyncHandler(async (req, res) => {
     throw new Error('Not authorized as a seller');
   }
 
+  // Upload main image to Cloudinary
+  let mainImageUrl;
+  if (image) {
+    mainImageUrl = await uploadToCloudinary(image);
+  }
+
+  // Upload additional images to Cloudinary
+  let additionalImageUrls = [];
+  if (additionalImages && additionalImages.length > 0) {
+    additionalImageUrls = await Promise.all(
+      additionalImages.map(img => uploadToCloudinary(img))
+    );
+  }
+
   const product = await Product.create({
     name,
     description,
     price,
     category,
     stock: isService ? 1 : stock, // Services always have stock of 1
-    image,
-    additionalImages,
+    image: mainImageUrl,
+    additionalImages: additionalImageUrls,
     isService,
     seller: req.user._id
   });
@@ -89,13 +160,31 @@ const updateProduct = asyncHandler(async (req, res) => {
     throw new Error('Not authorized to update this product');
   }
 
+  // Only upload new images if they've changed (they'll be base64 strings if new)
+  let mainImageUrl = product.image;
+  if (image && image.startsWith('data:image')) {
+    mainImageUrl = await uploadToCloudinary(image);
+  }
+
+  let additionalImageUrls = product.additionalImages;
+  if (additionalImages && additionalImages.length > 0) {
+    additionalImageUrls = await Promise.all(
+      additionalImages.map(async (img) => {
+        if (img.startsWith('data:image')) {
+          return await uploadToCloudinary(img);
+        }
+        return img; // Keep existing URL if not a new image
+      })
+    );
+  }
+
   product.name = name || product.name;
   product.description = description || product.description;
   product.price = price || product.price;
   product.category = category || product.category;
   product.stock = isService ? 1 : (stock || product.stock);
-  product.image = image || product.image;
-  product.additionalImages = additionalImages || product.additionalImages;
+  product.image = mainImageUrl;
+  product.additionalImages = additionalImageUrls;
   product.isService = isService !== undefined ? isService : product.isService;
 
   const updatedProduct = await product.save();
@@ -117,6 +206,21 @@ const deleteProduct = asyncHandler(async (req, res) => {
   if (product.seller.toString() !== req.user._id.toString()) {
     res.status(403);
     throw new Error('Not authorized to delete this product');
+  }
+
+  // Delete images from Cloudinary
+  if (product.image) {
+    const publicId = product.image.split('/').pop().split('.')[0];
+    await cloudinary.uploader.destroy(publicId);
+  }
+
+  if (product.additionalImages && product.additionalImages.length > 0) {
+    await Promise.all(
+      product.additionalImages.map(async (img) => {
+        const publicId = img.split('/').pop().split('.')[0];
+        await cloudinary.uploader.destroy(publicId);
+      })
+    );
   }
 
   await product.deleteOne();
