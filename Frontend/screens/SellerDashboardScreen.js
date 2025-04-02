@@ -37,6 +37,9 @@ const SellerDashboardScreen = () => {
     border: '#E2E8F0',
     highlight: '#F0F4FF',
   };
+
+  const API_URL = 'http://172.20.10.3:5000';
+
   const [activeTab, setActiveTab] = useState('products');
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
@@ -123,7 +126,7 @@ const SellerDashboardScreen = () => {
         throw new Error('Authentication required');
       }
       
-      const response = await fetch('http://172.20.10.3:5000/api/products/seller', {
+      const response = await fetch(`${API_URL}/api/products/seller`, {
         headers: {
           'Authorization': `Bearer ${token}`, // This will now use the correct token
           'Accept': 'application/json'
@@ -224,7 +227,7 @@ const SellerDashboardScreen = () => {
   const handleDeleteProduct = async (productId) => {
     try {
       const token = await AsyncStorage.getItem('userToken'); // Changed from 'token' to 'userToken'
-      const response = await fetch(`http://localhost:5000/api/products/${productId}`, {
+      const response = await fetch(`${API_URL}/api/products/${productId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -290,7 +293,7 @@ const SellerDashboardScreen = () => {
       };
       
       // Use the same base URL as fetch products
-      const baseUrl = 'http://172.20.10.3:5000';
+      const baseUrl = `${API_URL}`;
       const url = isEditing 
         ? `${baseUrl}/api/products/${currentProductId}`
         : `${baseUrl}/api/products`;

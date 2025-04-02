@@ -22,6 +22,9 @@ import {
   setError 
 } from '../store/slices/cartSlice';
 
+
+const API_URL = 'http://172.20.10.3:5000';
+
 const CartScreen = () => {
   const navigation = useNavigation();
   const dispatch = useDispatch();
@@ -47,7 +50,7 @@ const CartScreen = () => {
         return;
       }
 
-      const response = await axios.get('http://172.20.10.3:5000/api/cart', {
+      const response = await axios.get(`${API_URL}/api/cart`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -86,7 +89,7 @@ const CartScreen = () => {
         )
       ));
 
-      const response = await axios.put(`http://172.20.10.3:5000/api/cart/${productId}`, {
+      const response = await axios.put(`${API_URL}/api/cart/${productId}`, {
         quantity: newQuantity,
       }, {
         headers: {
@@ -124,7 +127,7 @@ const CartScreen = () => {
               // Remove optimistically
               dispatch(setCartItems(cartItems.filter(item => item.productId !== productId)));
 
-              const response = await axios.delete(`http://172.20.10.3:5000/api/cart/${productId}`, {
+                const response = await axios.delete(`${API_URL}/api/cart/${productId}`, {
                 headers: {
                   Authorization: `Bearer ${token}`,
                 },

@@ -13,7 +13,7 @@ import BuyerHomeScreen from './screens/BuyerHomeScreen';
 import BuyerProfileScreen from './screens/BuyerprofileScreen';
 import CartScreen from './screens/CartScreen';
 import ProductDetailsScreen from './screens/ProductDetailsScreen';
-import CategoriesScreen from './screens/CategoriesScreen';
+import Categories from './screens/Categories';
 import SellerDashboardScreen from './screens/SellerDashboardScreen';
 import SellerProfileScreen from './screens/SellerProfileScreen';
 
@@ -47,7 +47,7 @@ export default function App() {
               component={ProductDetailsScreen} 
               options={{ headerShown: false }}
             />
-            <Stack.Screen name="Categories" component={CategoriesScreen} />
+            <Stack.Screen name="Categories" component={Categories} />
             <Stack.Screen name="SellerProfile" component={SellerProfileScreen} />
           </Stack.Navigator>
           <StatusBar style="auto" />

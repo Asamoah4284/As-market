@@ -136,7 +136,7 @@ const BuyerHomeScreen = () => {
         if (token) {
           console.log('Token found:', token.substring(0, 10) + '...');
           
-          const response = await fetch('http://172.20.10.3:5000/api/users/profile', {
+          const response = await fetch('http://10.10.90.155:5000/api/users/profile', {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
@@ -171,7 +171,7 @@ const BuyerHomeScreen = () => {
   useEffect(() => {
     const fetchServices = async () => {
       try {
-        const response = await fetch('http://172.20.10.3:5000/api/products');
+        const response = await fetch('http://10.10.90.155:5000/api/products');
         console.log('Products API Response Status:', response.status);
         
         if (response.ok) {
@@ -201,7 +201,7 @@ const BuyerHomeScreen = () => {
   const renderFeaturedProduct = ({ item }) => {
     const imageUri = item.image && (item.image.startsWith('http') 
       ? item.image 
-      : `http://172.20.10.3:5000${item.image}`);
+      : `http://10.10.90.155:5000${item.image}`);
     
     console.log('Product:', item.name);
     console.log('Product ID:', item._id);
@@ -258,7 +258,7 @@ const BuyerHomeScreen = () => {
   const renderService = ({ item }) => {
     const imageUri = item.image && (item.image.startsWith('http') 
       ? item.image 
-      : `http://172.20.10.3:5000${item.image}`);
+      : `http://10.10.90.155:5000${item.image}`);
 
     return (
       <TouchableOpacity 
@@ -381,7 +381,10 @@ const BuyerHomeScreen = () => {
           <View style={styles.sectionContainer}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Categories</Text>
-              <TouchableOpacity onPress={() => navigation.navigate('AllCategories')}>
+              
+              
+          
+          <TouchableOpacity onPress={() => navigation.navigate('Categories')}>
                 <Text style={styles.seeAllText}>See All</Text>
               </TouchableOpacity>
             </View>
@@ -404,7 +407,7 @@ const BuyerHomeScreen = () => {
               </View>
               <TouchableOpacity 
                 style={styles.seeAllButton} 
-                onPress={() => navigation.navigate('AllProducts')}
+                onPress={() => navigation.navigate('Categories')}
               >
                 <Text style={styles.seeAllText}>See All</Text>
                 <Ionicons name="chevron-forward" size={16} color="#5D3FD3" />

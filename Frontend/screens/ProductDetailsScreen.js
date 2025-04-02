@@ -23,6 +23,9 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchProductById } from '../store/slices/productSlice';
 
+const API_URL = 'http://172.20.10.3:5000';
+
+
 const ProductDetailsScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
@@ -63,7 +66,7 @@ const ProductDetailsScreen = () => {
   const fetchComments = async () => {
     try {
       const response = await fetch(
-        `http://172.20.10.3:5000/api/products/${productId}/comments`
+        `http://${API_URL}/api/products/${productId}/comments`
       );
 
       if (!response.ok) {
@@ -95,7 +98,7 @@ const ProductDetailsScreen = () => {
       }
 
       const response = await fetch(
-        `http://172.20.10.3:5000/api/products/${productId}/comments`,
+        `http://${API_URL}/api/products/${productId}/comments`,
         {
           method: "POST",
           headers: {
@@ -142,7 +145,7 @@ const ProductDetailsScreen = () => {
       }
 
       // Add a local loading state for the button
-      const response = await fetch("http://172.20.10.3:5000/api/cart/add", {
+        const response = await fetch(`${API_URL}/api/cart/add`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
