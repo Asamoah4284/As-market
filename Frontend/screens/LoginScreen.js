@@ -42,6 +42,8 @@ function LoginScreen({ navigation }) {
         if (data.token) {
           await AsyncStorage.setItem('userToken', data.token);
           
+          console.log('User token:', data.token);
+          
           const userData = {
             id: data.user?._id || data._id,
             name: data.user?.name || data.name,
@@ -50,6 +52,10 @@ function LoginScreen({ navigation }) {
             phone: data.user?.phone || data.phone
           };
 
+          if (data.user?.role === 'admin' || data.role === 'admin') {
+            console.log('Admin logged in with token:', data.token);
+          }
+          
           dispatch(setCredentials({
             token: data.token,
             userData: userData
@@ -64,6 +70,11 @@ function LoginScreen({ navigation }) {
             navigation.reset({
               index: 0,
               routes: [{ name: 'SellerDashboard' }],
+            });
+          } else if (userData.role === 'admin') {
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'Admin' }],
             });
           }
         } else {

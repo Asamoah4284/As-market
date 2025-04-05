@@ -16,6 +16,8 @@ import ProductDetailsScreen from './screens/ProductDetailsScreen';
 import Categories from './screens/Categories';
 import SellerDashboardScreen from './screens/SellerDashboardScreen';
 import SellerProfileScreen from './screens/SellerProfileScreen';
+import CategoriesScreen from './screens/CategoriesScreen';
+import Admin from './screens/Admin';
 
 
 
@@ -38,7 +40,7 @@ export default function App() {
             <Stack.Screen name="Cart" component={CartScreen} />
             <Stack.Screen name="Login" component={LoginScreen} />
             <Stack.Screen name="BuyerHome" component={BuyerHomeScreen} />
-
+            <Stack.Screen name="Admin" component={Admin} />
             <Stack.Screen name="Profile" component={BuyerProfileScreen} />
             {/*  */}
             <Stack.Screen name="SellerDashboard" component={SellerDashboardScreen} />
@@ -48,6 +50,7 @@ export default function App() {
               options={{ headerShown: false }}
             />
             <Stack.Screen name="Categories" component={Categories} />
+            <Stack.Screen name="CategoriesScreen" component={CategoriesScreen} />
             <Stack.Screen name="SellerProfile" component={SellerProfileScreen} />
           </Stack.Navigator>
           <StatusBar style="auto" />

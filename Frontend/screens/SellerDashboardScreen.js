@@ -19,6 +19,7 @@ import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const SellerDashboardScreen = () => {
   const navigation = useNavigation();
@@ -95,6 +96,69 @@ const SellerDashboardScreen = () => {
     rating: 0,
     avatar: null
   });
+  const [profileModalVisible, setProfileModalVisible] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    bio: '',
+    location: '',
+    avatar: null
+  });
+
+  const isTokenExpired = (token) => {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+
+      const { exp } = JSON.parse(jsonPayload);
+      const expired = Date.now() >= exp * 1000;
+      
+      console.log('Token expiration:', new Date(exp * 1000));
+      console.log('Token expired:', expired);
+      
+      return expired;
+    } catch (error) {
+      console.error('Error checking token expiration:', error);
+      return true; // Assume expired if we can't verify
+    }
+  };
+
+  // Add this check before making API calls
+  useEffect(() => {
+    const checkAuthStatus = async () => {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        if (!token) {
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'Login' }],
+          });
+          return;
+        }
+
+        if (isTokenExpired(token)) {
+          console.log('Token is expired, logging out...');
+          await AsyncStorage.removeItem('userToken');
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'Login' }],
+          });
+        }
+      } catch (error) {
+        console.error('Error checking auth status:', error);
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Login' }],
+        });
+      }
+    };
+    
+    checkAuthStatus();
+  }, []);
 
   useEffect(() => {
     fetchData();
@@ -120,35 +184,49 @@ const SellerDashboardScreen = () => {
   const fetchProducts = async () => {
     try {
       setLoading(true);
-      const token = await AsyncStorage.getItem('userToken'); // Changed from 'token' to 'userToken'
+      const token = await AsyncStorage.getItem('userToken');
       
-      if (!token) {
-        throw new Error('Authentication required');
-      }
+    
+
+      // Log the full request details
+      const requestUrl = `${API_URL}/api/products/seller`;
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json'
+      };
       
-      const response = await fetch(`${API_URL}/api/products/seller`, {
-        headers: {
-          'Authorization': `Bearer ${token}`, // This will now use the correct token
-          'Accept': 'application/json'
-        }
+      console.log('Request URL:', requestUrl);
+      console.log('Request headers:', headers);
+
+      const response = await fetch(requestUrl, {
+        method: 'GET', // Explicitly specify method
+        headers: headers
       });
       
+      // Log response status and headers
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Failed to fetch products');
+        const errorData = await response.json().catch(() => null);
+        console.log('Error response data:', errorData);
+        throw new Error(errorData?.message || `HTTP error! status: ${response.status}`);
       }
       
       const data = await response.json();
-      // Check if data is an array and has items
-      if (Array.isArray(data)) {
-        setProducts(data);
-      } else {
-        setProducts([]);
+      console.log('Response data:', data);
+
+      // Validate data structure
+      if (!Array.isArray(data)) {
+        console.log('Invalid data format received:', data);
+        throw new Error('Invalid data format received from server');
       }
+
+      setProducts(data);
     } catch (error) {
-      console.error('Error fetching products:', error);
+      console.error('Detailed fetch error:', error);
       setProducts([]); // Ensure products is empty on error
-      setErrorMessage('Failed to fetch products');
+      setErrorMessage(`Failed to fetch products: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -172,9 +250,27 @@ const SellerDashboardScreen = () => {
 
   const fetchProfileData = async () => {
     try {
+      setLoading(true);
       const token = await AsyncStorage.getItem('userToken');
-      // In a real app, you would fetch this from your API
-      // For now, using mock data
+    
+      
+      const response = await fetch(`${API_URL}/api/seller/profile`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fetch profile data');
+      }
+      
+      const data = await response.json();
+      setProfileData(data);
+    } catch (error) {
+      // console.error('Error fetching profile data:', error); 
+      // Use mock data as fallback
       setProfileData({
         name: 'John Seller',
         email: 'john.seller@example.com',
@@ -184,10 +280,12 @@ const SellerDashboardScreen = () => {
         joinDate: 'May 2023',
         totalSales: 152,
         rating: 4.8,
-        avatar: null
+        avatar: null,
+        followers: 87,
+        isPremium: false
       });
-    } catch (error) {
-      console.error('Error fetching profile data:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -278,7 +376,7 @@ const SellerDashboardScreen = () => {
       
       const token = await AsyncStorage.getItem('userToken');
       if (!token) {
-        throw new Error('Authentication required');
+        // throw new Error('Authentication required');
       }
       
       const productData = {
@@ -603,31 +701,66 @@ const SellerDashboardScreen = () => {
       case 'profile':
         return (
           <ScrollView style={styles.profileContainer}>
-            <View style={styles.profileHeader}>
-              <TouchableOpacity style={styles.avatarContainer}>
-                {profileData.avatar ? (
-                  <Image 
-                    source={{ uri: profileData.avatar }} 
-                    style={styles.avatarImage} 
-                  />
-                ) : (
-                  <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary }]}>
-                    <Text style={styles.avatarText}>
-                      {profileData.name.charAt(0)}
-                    </Text>
+            <View style={[styles.profileHeader, { backgroundColor: colors.cardBackground }]}>
+              <View style={styles.profileCover}>
+                <LinearGradient
+                  colors={[colors.primary, colors.primaryDark]}
+                  style={styles.coverGradient}
+                />
+              </View>
+              
+              <View style={styles.profileAvatarSection}>
+                <TouchableOpacity style={styles.avatarContainer}>
+                  {profileData.avatar ? (
+                    <Image 
+                      source={{ uri: profileData.avatar }} 
+                      style={styles.avatarImage} 
+                    />
+                  ) : (
+                    <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary }]}>
+                      <Text style={styles.avatarText}>
+                        {profileData.name.charAt(0)}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={styles.editAvatarButton}>
+                    <MaterialIcons name="camera-alt" size={16} color="white" />
+                  </View>
+                </TouchableOpacity>
+                
+                {!profileData.isPremium && (
+                  <TouchableOpacity 
+                    style={styles.premiumBadge}
+                    onPress={handlePremiumUpgrade}
+                  >
+                    <MaterialIcons name="workspace-premium" size={16} color={colors.warning} />
+                    <Text style={styles.premiumBadgeText}>Become a Premium Seller</Text>
+                  </TouchableOpacity>
+                )}
+                
+                {profileData.isPremium && (
+                  <View style={styles.premiumSellerBadge}>
+                    <MaterialIcons name="verified" size={16} color="white" />
+                    <Text style={styles.premiumSellerText}>Premium Seller</Text>
                   </View>
                 )}
-                <View style={styles.editAvatarButton}>
-                  <MaterialIcons name="camera-alt" size={16} color="white" />
-                </View>
-              </TouchableOpacity>
+              </View>
               
-              <Text style={[styles.profileName, { color: colors.text }]}>
-                {profileData.name}
-              </Text>
-              <Text style={[styles.profileEmail, { color: colors.textSecondary }]}>
-                {profileData.email}
-              </Text>
+              <View style={styles.profileInfo}>
+                <Text style={[styles.profileName, { color: colors.text }]}>
+                  {profileData.name}
+                </Text>
+                <Text style={[styles.profileEmail, { color: colors.textSecondary }]}>
+                  {profileData.email}
+                </Text>
+                
+                <View style={styles.joinDateContainer}>
+                  <MaterialIcons name="event" size={14} color={colors.textSecondary} />
+                  <Text style={[styles.joinDateText, { color: colors.textSecondary }]}>
+                    Joined {profileData.joinDate}
+                  </Text>
+                </View>
+              </View>
               
               <View style={styles.statsContainer}>
                 <View style={styles.statItem}>
@@ -635,10 +768,12 @@ const SellerDashboardScreen = () => {
                     {profileData.totalSales}
                   </Text>
                   <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
-                    Total Sales
+                    Sales
                   </Text>
                 </View>
+                
                 <View style={styles.statDivider} />
+                
                 <View style={styles.statItem}>
                   <View style={styles.ratingValue}>
                     <Text style={[styles.statValue, { color: colors.warning }]}>
@@ -650,11 +785,22 @@ const SellerDashboardScreen = () => {
                     Rating
                   </Text>
                 </View>
+                
+                <View style={styles.statDivider} />
+                
+                <View style={styles.statItem}>
+                  <Text style={[styles.statValue, { color: colors.text }]}>
+                    {profileData.followers}
+                  </Text>
+                  <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
+                    Followers
+                  </Text>
+                </View>
               </View>
             </View>
 
             <View style={styles.profileContent}>
-              <View style={styles.profileSection}>
+              <View style={[styles.profileSection, { backgroundColor: colors.cardBackground }]}>
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>
                   Contact Information
                 </Text>
@@ -672,7 +818,7 @@ const SellerDashboardScreen = () => {
                 </View>
               </View>
 
-              <View style={styles.profileSection}>
+              <View style={[styles.profileSection, { backgroundColor: colors.cardBackground }]}>
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>
                   About Me
                 </Text>
@@ -680,10 +826,20 @@ const SellerDashboardScreen = () => {
                   {profileData.bio}
                 </Text>
               </View>
+              
+              {!profileData.isPremium && (
+                <TouchableOpacity 
+                  style={[styles.premiumButton, { backgroundColor: colors.warning }]}
+                  onPress={handlePremiumUpgrade}
+                >
+                  <MaterialIcons name="workspace-premium" size={20} color="white" />
+                  <Text style={styles.premiumButtonText}>Become a Premium Seller</Text>
+                </TouchableOpacity>
+              )}
 
               <TouchableOpacity 
                 style={[styles.editProfileButton, { backgroundColor: colors.primary }]}
-                onPress={() => {/* Handle edit profile */}}
+                onPress={handleEditProfile}
               >
                 <MaterialIcons name="edit" size={20} color="white" />
                 <Text style={styles.editProfileText}>Edit Profile</Text>
@@ -691,7 +847,7 @@ const SellerDashboardScreen = () => {
 
               <TouchableOpacity 
                 style={[styles.logoutButton, { backgroundColor: colors.danger }]}
-                onPress={() => {/* Handle logout */}}
+                onPress={handleLogout}
               >
                 <MaterialIcons name="logout" size={20} color="white" />
                 <Text style={styles.logoutButtonText}>Logout</Text>
@@ -779,6 +935,238 @@ const SellerDashboardScreen = () => {
     } catch (error) {
       console.error('Error picking image:', error);
       alert('Error selecting image. Please try again.');
+    }
+  };
+
+  const handleEditProfile = () => {
+    // Initialize form with current profile data
+    setProfileForm({
+      name: profileData.name,
+      email: profileData.email,
+      phone: profileData.phone,
+      bio: profileData.bio,
+      location: profileData.location,
+      avatar: profileData.avatar
+    });
+    setProfileModalVisible(true);
+  };
+
+  const handleSaveProfile = async () => {
+    try {
+      setLoading(true);
+      setErrorMessage('');
+      setSuccessMessage('');
+      
+      const token = await AsyncStorage.getItem('userToken');
+      console.log('Token from storage:', token ? 'Token exists' : 'No token');
+      
+      if (!token) {
+        // throw new Error('Authentication required');
+      }
+
+      // Validate form inputs
+      if (!profileForm.name || !profileForm.email || !profileForm.phone) {
+        setErrorMessage('Please fill in all required fields');
+        setLoading(false);
+        return;
+      }
+
+      // Ensure token is properly formatted
+      const headers = {
+        'Authorization': `Bearer ${token.trim()}`, // Add trim() to remove any whitespace
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      };
+      
+      console.log('Request headers:', headers);
+      console.log('Request URL:', `${API_URL}/api/seller/profile`);
+      
+      const response = await fetch(`${API_URL}/api/seller/profile`, {
+        method: 'PUT',
+        headers: headers,
+        body: JSON.stringify({
+          name: profileForm.name.trim(),
+          email: profileForm.email.trim(),
+          phone: profileForm.phone.trim(),
+          bio: profileForm.bio ? profileForm.bio.trim() : '',
+          location: profileForm.location ? profileForm.location.trim() : '',
+          avatar: profileForm.avatar
+        })
+      });
+
+      // Log the response status and headers for debugging
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.log('Error response:', errorData);
+        
+        // Check if token is expired
+        if (response.status === 401) {
+          // Clear stored token and redirect to login
+          await AsyncStorage.removeItem('userToken');
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'Login' }],
+          });
+          throw new Error('Session expired. Please login again.');
+        }
+        
+        throw new Error(errorData.message || 'Failed to update profile');
+      }
+
+      const updatedProfile = await response.json();
+      console.log('Server response:', updatedProfile);
+      
+      setProfileData(updatedProfile);
+      setSuccessMessage('Profile updated successfully');
+      
+      setTimeout(() => {
+        setProfileModalVisible(false);
+        setSuccessMessage('');
+      }, 1500);
+      
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      setErrorMessage(error.message || 'Failed to update profile');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const pickProfileImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        alert('Sorry, we need camera roll permissions to make this work!');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5,
+        base64: true,
+      });
+
+      if (!result.canceled) {
+        const asset = result.assets[0];
+        const base64Image = `data:image/jpeg;base64,${asset.base64}`;
+        
+        // Option 1: Store the base64 image to send with the profile update
+        setProfileForm({ ...profileForm, avatar: base64Image });
+        
+        // Option 2: Upload the image immediately to get a URL
+        // This is useful if your API doesn't accept base64 images
+        // await uploadProfileImage(asset);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      alert('Error selecting image. Please try again.');
+    }
+  };
+
+  // Optional: Separate function to upload profile image
+  const uploadProfileImage = async (imageAsset) => {
+    try {
+      setLoading(true);
+      const token = await AsyncStorage.getItem('userToken');
+      
+      if (!token) {
+        // throw new Error('Authentication required');
+      }
+      
+      // Create form data for the image upload
+      const formData = new FormData();
+      formData.append('avatar', {
+        uri: imageAsset.uri,
+        type: 'image/jpeg',
+        name: 'profile-image.jpg',
+      });
+      
+      const response = await fetch(`${API_URL}/api/users/profile/avatar`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to upload image');
+      }
+      
+      const data = await response.json();
+      
+      // Update the form with the image URL returned from the server
+      setProfileForm({ ...profileForm, avatar: data.avatarUrl });
+      
+    } catch (error) {
+      console.error('Error uploading profile image:', error);
+      alert('Failed to upload image. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Add a function to handle premium upgrade
+  const handlePremiumUpgrade = async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      
+      if (!token) {
+        // throw new Error('Authentication required');
+      }
+      
+      // Navigate to premium upgrade screen or show payment modal
+      navigation.navigate('PremiumUpgrade');
+      
+      // Alternatively, you could implement the premium upgrade flow directly here
+      // const response = await fetch(`${API_URL}/api/users/premium-upgrade`, {
+      //   method: 'POST',
+      //   headers: {
+      //     'Authorization': `Bearer ${token}`,
+      //     'Content-Type': 'application/json',
+      //   },
+      // });
+      
+      // if (!response.ok) {
+      //   const errorData = await response.json();
+      //   throw new Error(errorData.message || 'Failed to upgrade to premium');
+      // }
+      
+      // const data = await response.json();
+      // setProfileData({ ...profileData, isPremium: true });
+      // alert('Successfully upgraded to Premium Seller!');
+      
+    } catch (error) {
+      console.error('Error upgrading to premium:', error);
+      alert('Failed to upgrade to premium. Please try again.');
+    }
+  };
+
+  // Add a logout function
+  const handleLogout = async () => {
+    try {
+      // Clear all auth-related storage
+      await AsyncStorage.multiRemove(['userToken', 'userId', 'userRole']);
+      
+      // Navigate to login screen
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Login' }],
+      });
+    } catch (error) {
+      console.error('Error during logout:', error);
+      // Force navigation even if storage clear fails
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Login' }],
+      });
     }
   };
 
@@ -1052,6 +1440,131 @@ const SellerDashboardScreen = () => {
                 <Text style={styles.saveButtonText}>
                   {isEditing ? 'Update Product' : 'Create Product'}
                 </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Profile Edit Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={profileModalVisible}
+        onRequestClose={() => setProfileModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.cardBackground }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: colors.text }]}>
+                Edit Profile
+              </Text>
+              <TouchableOpacity onPress={() => setProfileModalVisible(false)}>
+                <MaterialIcons name="close" size={24} color={colors.text} />
+              </TouchableOpacity>
+            </View>
+            
+            {renderMessages()}
+            
+            <ScrollView style={styles.formContainer}>
+              <View style={styles.profileImagePickerContainer}>
+                <TouchableOpacity 
+                  style={styles.profileImagePicker}
+                  onPress={pickProfileImage}
+                >
+                  {profileForm.avatar ? (
+                    <Image 
+                      source={{ uri: profileForm.avatar }} 
+                      style={styles.profileImagePreview} 
+                    />
+                  ) : (
+                    <View style={[styles.profileImagePlaceholder, { backgroundColor: colors.primary }]}>
+                      <Text style={styles.profileImagePlaceholderText}>
+                        {profileForm.name.charAt(0)}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={styles.profileImageOverlay}>
+                    <MaterialIcons name="camera-alt" size={24} color="white" />
+                    <Text style={styles.profileImageOverlayText}>Change Photo</Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+              
+              <View style={styles.formSection}>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>Personal Information</Text>
+                
+                <View style={styles.inputWrapper}>
+                  <Text style={[styles.inputLabel, { color: colors.text }]}>Full Name *</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text }]}
+                    value={profileForm.name}
+                    onChangeText={(text) => setProfileForm({...profileForm, name: text})}
+                    placeholder="Enter your full name"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                </View>
+                
+                <View style={styles.inputWrapper}>
+                  <Text style={[styles.inputLabel, { color: colors.text }]}>Email Address *</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text }]}
+                    value={profileForm.email}
+                    onChangeText={(text) => setProfileForm({...profileForm, email: text})}
+                    placeholder="Enter your email"
+                    placeholderTextColor={colors.textSecondary}
+                    keyboardType="email-address"
+                  />
+                </View>
+                
+                <View style={styles.inputWrapper}>
+                  <Text style={[styles.inputLabel, { color: colors.text }]}>Phone Number *</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text }]}
+                    value={profileForm.phone}
+                    onChangeText={(text) => setProfileForm({...profileForm, phone: text})}
+                    placeholder="Enter your phone number"
+                    placeholderTextColor={colors.textSecondary}
+                    keyboardType="phone-pad"
+                  />
+                </View>
+                
+                <View style={styles.inputWrapper}>
+                  <Text style={[styles.inputLabel, { color: colors.text }]}>Location</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text }]}
+                    value={profileForm.location}
+                    onChangeText={(text) => setProfileForm({...profileForm, location: text})}
+                    placeholder="Enter your location"
+                    placeholderTextColor={colors.textSecondary}
+                  />
+                </View>
+                
+                <View style={styles.inputWrapper}>
+                  <Text style={[styles.inputLabel, { color: colors.text }]}>Bio</Text>
+                  <TextInput
+                    style={[styles.textArea, { backgroundColor: colors.inputBackground, color: colors.text }]}
+                    value={profileForm.bio}
+                    onChangeText={(text) => setProfileForm({...profileForm, bio: text})}
+                    placeholder="Tell buyers about yourself"
+                    placeholderTextColor={colors.textSecondary}
+                    multiline
+                    numberOfLines={4}
+                    textAlignVertical="top"
+                  />
+                </View>
+              </View>
+              
+              <TouchableOpacity 
+                style={[styles.saveButton, { backgroundColor: colors.primary }]}
+                onPress={handleSaveProfile}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color="white" size="small" />
+                ) : (
+                  <Text style={styles.saveButtonText}>Save Changes</Text>
+                )}
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -1681,25 +2194,42 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   profileHeader: {
-    alignItems: 'center',
-    padding: 24,
     borderRadius: 12,
-    backgroundColor: 'white',
     marginBottom: 16,
-    elevation: 2,
+    overflow: 'hidden',
+    elevation: 3,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },
+  profileCover: {
+    height: 100,
+    width: '100%',
+    position: 'relative',
+  },
+  coverGradient: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    height: '100%',
+  },
+  profileAvatarSection: {
+    alignItems: 'center',
+    marginTop: -50,
+    marginBottom: 10,
+  },
   avatarContainer: {
     position: 'relative',
-    marginBottom: 16,
+    marginBottom: 8,
   },
   avatarImage: {
     width: 100,
     height: 100,
     borderRadius: 50,
+    borderWidth: 4,
+    borderColor: 'white',
   },
   avatarPlaceholder: {
     width: 100,
@@ -1707,6 +2237,8 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     justifyContent: 'center',
     alignItems: 'center',
+    borderWidth: 4,
+    borderColor: 'white',
   },
   avatarText: {
     fontSize: 36,
@@ -1726,6 +2258,40 @@ const styles = StyleSheet.create({
     borderWidth: 2,
     borderColor: 'white',
   },
+  premiumBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 159, 28, 0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginTop: 8,
+  },
+  premiumBadgeText: {
+    color: '#FF9F1C',
+    fontWeight: '600',
+    marginLeft: 4,
+    fontSize: 12,
+  },
+  premiumSellerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FF9F1C',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginTop: 8,
+  },
+  premiumSellerText: {
+    color: 'white',
+    fontWeight: '600',
+    marginLeft: 4,
+    fontSize: 12,
+  },
+  profileInfo: {
+    alignItems: 'center',
+    padding: 16,
+  },
   profileName: {
     fontSize: 24,
     fontWeight: 'bold',
@@ -1733,19 +2299,26 @@ const styles = StyleSheet.create({
   },
   profileEmail: {
     fontSize: 16,
-    marginBottom: 16,
+    marginBottom: 8,
+  },
+  joinDateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  joinDateText: {
+    fontSize: 14,
+    marginLeft: 4,
   },
   statsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
+    justifyContent: 'space-around',
     width: '100%',
-    paddingTop: 16,
+    paddingVertical: 16,
     borderTopWidth: 1,
     borderTopColor: '#E2E8F0',
   },
   statItem: {
-    flex: 1,
     alignItems: 'center',
   },
   statDivider: {
@@ -1770,7 +2343,6 @@ const styles = StyleSheet.create({
     padding: 16,
   },
   profileSection: {
-    backgroundColor: 'white',
     borderRadius: 12,
     padding: 16,
     marginBottom: 16,
@@ -1792,6 +2364,20 @@ const styles = StyleSheet.create({
   bioText: {
     fontSize: 16,
     lineHeight: 24,
+  },
+  premiumButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    gap: 8,
+  },
+  premiumButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
   editProfileButton: {
     flexDirection: 'row',
@@ -1819,6 +2405,44 @@ const styles = StyleSheet.create({
     color: 'white',
     fontSize: 16,
     fontWeight: 'bold',
+  },
+  profileImagePickerContainer: {
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  profileImagePicker: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  profileImagePreview: {
+    width: '100%',
+    height: '100%',
+  },
+  profileImagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileImagePlaceholderText: {
+    fontSize: 48,
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  profileImageOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileImageOverlayText: {
+    color: 'white',
+    marginTop: 8,
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

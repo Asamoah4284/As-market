@@ -13,59 +13,77 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 
 // Mock data - replace with your actual API call
-const CATEGORIES = [
-  { id: '1', name: 'Electronics', icon: 'phone-portrait-outline', items: 120 },
-  { id: '2', name: 'Clothing', icon: 'shirt-outline', items: 85 },
-  { id: '3', name: 'Home & Kitchen', icon: 'home-outline', items: 64 },
-  { id: '4', name: 'Beauty', icon: 'color-palette-outline', items: 42 },
-  { id: '5', name: 'Sports', icon: 'football-outline', items: 38 },
-  { id: '6', name: 'Books', icon: 'book-outline', items: 93 },
-  { id: '7', name: 'Toys', icon: 'game-controller-outline', items: 27 },
-  { id: '8', name: 'Automotive', icon: 'car-outline', items: 19 },
-];
+const PRODUCTS = {
+  '1': [
+    { id: 'e1', name: 'Smartphone X', price: 799.99, image: 'https://via.placeholder.com/150' },
+    { id: 'e2', name: 'Wireless Earbuds', price: 129.99, image: 'https://via.placeholder.com/150' },
+    { id: 'e3', name: 'Smart Watch', price: 249.99, image: 'https://via.placeholder.com/150' },
+    { id: 'e4', name: 'Laptop Pro', price: 1299.99, image: 'https://via.placeholder.com/150' },
+    { id: 'e5', name: 'Bluetooth Speaker', price: 79.99, image: 'https://via.placeholder.com/150' },
+  ],
+  '2': [
+    { id: 'c1', name: 'Casual T-Shirt', price: 24.99, image: 'https://via.placeholder.com/150' },
+    { id: 'c2', name: 'Denim Jeans', price: 49.99, image: 'https://via.placeholder.com/150' },
+    { id: 'c3', name: 'Winter Jacket', price: 89.99, image: 'https://via.placeholder.com/150' },
+  ],
+  // Add more categories as needed
+};
 
-const CategoriesScreen = ({ navigation }) => {
-  const [categories, setCategories] = useState([]);
+const CategoryScreen = ({ route, navigation }) => {
+  // Add default values to prevent undefined errors
+  const { categoryId = '1', categoryName = 'Products', featuredOnly = false } = route?.params || {};
+  const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [featuredCategory, setFeaturedCategory] = useState(null);
 
   useEffect(() => {
-    // Simulate API fetch
-    setTimeout(() => {
-      setCategories(CATEGORIES);
-      setFeaturedCategory(CATEGORIES[0]);
-      setLoading(false);
-    }, 1000);
+    const fetchProducts = async () => {
+      try {
+        let endpoint;
+        
+        if (featuredOnly) {
+          // Endpoint for featured products
+          endpoint = 'http://172.20.10.3:5000/api/products/featured';
+        } else {
+          // Endpoint for category products
+          endpoint = `http://172.20.10.3:5000/api/products/category/${categoryId}`;
+        }
+        
+        console.log('Fetching products from:', endpoint);
+        
+        const response = await fetch(endpoint);
+        
+        if (response.ok) {
+          const data = await response.json();
+          console.log('Fetched products:', data);
+          setProducts(data);
+        } else {
+          console.error('Error response:', response.status);
+          // Fallback to mock data if API fails
+          setProducts(PRODUCTS[categoryId] || []);
+        }
+      } catch (error) {
+        console.error('Error fetching products:', error);
+        // Fallback to mock data if API fails
+        setProducts(PRODUCTS[categoryId] || []);
+      } finally {
+        setLoading(false);
+      }
+    };
     
-    // In a real app, replace with:
-    // const fetchCategories = async () => {
-    //   try {
-    //     const response = await fetch('your-api-endpoint');
-    //     const data = await response.json();
-    //     setCategories(data);
-    //     setFeaturedCategory(data[0]);
-    //     setLoading(false);
-    //   } catch (error) {
-    //     console.error('Error fetching categories:', error);
-    //     setLoading(false);
-    //   }
-    // };
-    // fetchCategories();
-  }, []);
+    fetchProducts();
+  }, [categoryId, featuredOnly]);
 
-  const renderCategoryItem = ({ item }) => (
+  const renderProductItem = ({ item }) => (
     <TouchableOpacity 
-      style={styles.categoryItem}
-      onPress={() => navigation.navigate('ProductList', { categoryId: item.id, categoryName: item.name })}
+      style={styles.productItem}
+      onPress={() => navigation.navigate('ProductDetail', { productId: item.id })}
     >
-      <View style={styles.categoryIconContainer}>
-        <Ionicons name={item.icon} size={28} color="#3498db" />
-      </View>
-      <View style={styles.categoryTextContainer}>
-        <Text style={styles.categoryName}>{item.name}</Text>
-        <Text style={styles.categoryCount}>{item.items} products</Text>
-      </View>
-      <Ionicons name="chevron-forward" size={20} color="#bbb" />
+      <Image source={{ uri: item.image }} style={styles.productImage} />
+      <Text style={styles.productName}>{item.name}</Text>
+      <Text style={styles.productPrice}>${item.price.toFixed(2)}</Text>
+      <TouchableOpacity style={styles.addToCartButton}>
+        <Ionicons name="add-circle" size={24} color="#3498db" />
+      </TouchableOpacity>
     </TouchableOpacity>
   );
 
@@ -85,42 +103,31 @@ const CategoriesScreen = ({ navigation }) => {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Categories</Text>
+        <Text style={styles.headerTitle}>
+          {featuredOnly ? "Featured Products" : categoryName}
+        </Text>
         <TouchableOpacity onPress={() => navigation.navigate('Search')}>
           <Ionicons name="search-outline" size={24} color="#333" />
         </TouchableOpacity>
       </View>
 
-      {featuredCategory && (
-        <TouchableOpacity 
-          style={styles.featuredCategory}
-          onPress={() => navigation.navigate('ProductList', { 
-            categoryId: featuredCategory.id, 
-            categoryName: featuredCategory.name 
-          })}
-        >
-          <View style={styles.featuredContent}>
-            <Text style={styles.featuredLabel}>Featured Category</Text>
-            <Text style={styles.featuredName}>{featuredCategory.name}</Text>
-            <View style={styles.featuredButton}>
-              <Text style={styles.featuredButtonText}>Shop Now</Text>
-            </View>
-          </View>
-          <View style={styles.featuredImageContainer}>
-            <Ionicons name={featuredCategory.icon} size={60} color="#fff" />
-          </View>
-        </TouchableOpacity>
+      {products.length === 0 ? (
+        <View style={styles.emptyState}>
+          <Ionicons name="alert-circle-outline" size={50} color="#ccc" />
+          <Text style={styles.emptyStateText}>No products found in this category</Text>
+        </View>
+      ) : (
+        <FlatList
+          key="two-column-grid"
+          data={products}
+          keyExtractor={(item) => item.id}
+          renderItem={renderProductItem}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.listContainer}
+          numColumns={2}
+          columnWrapperStyle={styles.columnWrapper}
+        />
       )}
-
-      <Text style={styles.sectionTitle}>All Categories</Text>
-      
-      <FlatList
-        data={categories}
-        keyExtractor={(item) => item.id}
-        renderItem={renderCategoryItem}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.listContainer}
-      />
     </SafeAreaView>
   );
 };
@@ -153,91 +160,63 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
-  featuredCategory: {
-    flexDirection: 'row',
-    backgroundColor: '#3498db',
-    borderRadius: 12,
-    marginHorizontal: 20,
-    marginTop: 20,
-    padding: 20,
-    overflow: 'hidden',
-  },
-  featuredContent: {
-    flex: 1,
-  },
-  featuredLabel: {
-    color: '#e0f0ff',
-    fontSize: 14,
-    marginBottom: 5,
-  },
-  featuredName: {
-    color: '#fff',
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 15,
-  },
-  featuredButton: {
-    backgroundColor: '#fff',
-    paddingVertical: 8,
-    paddingHorizontal: 15,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-  },
-  featuredButtonText: {
-    color: '#3498db',
-    fontWeight: 'bold',
-  },
-  featuredImageContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginHorizontal: 20,
-    marginTop: 25,
-    marginBottom: 15,
-    color: '#333',
-  },
   listContainer: {
-    paddingHorizontal: 20,
-    paddingBottom: 20,
+    padding: 10,
   },
-  categoryItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  columnWrapper: {
+    justifyContent: 'space-between',
+  },
+  productItem: {
+    width: '48%',
     backgroundColor: '#fff',
     borderRadius: 10,
-    marginBottom: 12,
-    padding: 15,
+    marginBottom: 15,
+    padding: 10,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
     elevation: 2,
-  },
-  categoryIconContainer: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#f0f8ff',
-    justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 15,
   },
-  categoryTextContainer: {
+  productImage: {
+    width: '100%',
+    height: 120,
+    borderRadius: 8,
+    marginBottom: 10,
+  },
+  productInfo: {
     flex: 1,
   },
-  categoryName: {
-    fontSize: 16,
+  productName: {
+    fontSize: 14,
     fontWeight: '600',
     color: '#333',
+    marginBottom: 5,
+    textAlign: 'center',
   },
-  categoryCount: {
-    fontSize: 13,
+  productPrice: {
+    fontSize: 15,
+    fontWeight: 'bold',
+    color: '#3498db',
+    marginBottom: 5,
+    textAlign: 'center',
+  },
+  addToCartButton: {
+    marginTop: 5,
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  emptyStateText: {
+    fontSize: 16,
     color: '#888',
-    marginTop: 3,
+    textAlign: 'center',
+    marginTop: 10,
   },
 });
 
-export default CategoriesScreen;
+export default CategoryScreen;

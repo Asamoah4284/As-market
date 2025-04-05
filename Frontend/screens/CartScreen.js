@@ -35,6 +35,8 @@ const CartScreen = () => {
   // Fetch cart items whenever the screen is focused
   useFocusEffect(
     React.useCallback(() => {
+      // Set loading to true immediately when screen is focused
+      dispatch(setLoading(true));
       fetchCartItems();
     }, [])
   );
@@ -42,11 +44,11 @@ const CartScreen = () => {
   // Modify fetchCartItems to use Redux
   const fetchCartItems = async () => {
     try {
-      dispatch(setLoading(true));
       const token = await AsyncStorage.getItem('userToken');
       
       if (!token) {
         dispatch(setError('Please sign in to view your cart'));
+        dispatch(setLoading(false));
         return;
       }
 

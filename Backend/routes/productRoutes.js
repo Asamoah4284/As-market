@@ -39,6 +39,52 @@ router.get('/', async (req, res) => {
   }
 });
 
+// Route for featured collections and special categories
+router.get('/featured', async (req, res) => {
+  try {
+    const { type } = req.query;
+    let query = {};
+    let limit = 10; // Default limit
+    
+    switch(type) {
+      case 'new-arrivals':
+        query.featuredType = 'new-arrivals';
+        break;
+      case 'featured':
+        query.featuredType = 'featured';
+        break;
+      case 'services':
+        query.isService = true;
+        query.featuredType = 'featured-service';
+        break;
+      case 'trending':
+        query.featuredType = 'trending';
+        break;
+      case 'special-offers':
+        query.featuredType = 'special-offers';
+        break;
+      case 'new-season':
+        query.featuredType = 'new-season';
+        break;
+      case 'premium':
+        query.featuredType = 'premium';
+        break;
+      default:
+        // Return all featured items if no specific type requested
+        query.featuredType = { $exists: true, $ne: null };
+    }
+    
+    const products = await Product.find(query)
+      .sort({ featuredRank: 1 }) // Sort by admin-defined ranking
+      .limit(limit);
+      
+    res.json(products);
+  } catch (error) {
+    console.error(`Error fetching ${req.query.type || 'featured'} products:`, error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // Protected routes
 router.post('/', protect, createProduct);
 router.get('/seller', protect, getSellerProducts);

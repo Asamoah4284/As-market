@@ -54,7 +54,7 @@ const CATEGORIES = [
   { id: '2', name: 'Fashion', icon: 'checkroom', color: '#4ECDC4' },
   { id: '3', name: 'Home', icon: 'home', color: '#FFD166' },
   { id: '4', name: 'Beauty', icon: 'spa', color: '#FF9F9F' },
-  { id: '5', name: 'Sports', icon: 'sports-basketball', color: '#6A0572' },
+  { id: '5', name: 'Sneakers', icon: 'sports-basketball', color: '#6A0572' },
   { id: '6', name: 'Books', icon: 'menu-book', color: '#1A535C' },
 ];
 
@@ -78,6 +78,8 @@ const BANNER_DATA = [
     subtitle: 'Limited time deals',
   },
 ];
+
+let url = 'http://172.20.10.3:5000/api/products';
 
 const BuyerHomeScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -113,7 +115,9 @@ const BuyerHomeScreen = () => {
         if (response.ok) {
           const products = await response.json();
           console.log('Fetched products:', products);
-          setFeaturedProducts(products);
+          // Filter out products that have isService set to true
+          const nonServiceProducts = products.filter(product => product.isService !== true);
+          setFeaturedProducts(nonServiceProducts);
         } else {
           console.log('Using mock data due to API failure');
           setFeaturedProducts(FEATURED_PRODUCTS);
@@ -136,7 +140,7 @@ const BuyerHomeScreen = () => {
         if (token) {
           console.log('Token found:', token.substring(0, 10) + '...');
           
-          const response = await fetch('http://10.10.90.155:5000/api/users/profile', {
+          const response = await fetch('http://172.20.10.3:5000/api/users/profile', {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
@@ -148,7 +152,7 @@ const BuyerHomeScreen = () => {
           if (response.ok) {
             const userData = await response.json();
             console.log('User data received:', userData);
-            setUserName(userData.username || userData.name || 'User');
+            setUserName(userData.username || userData.name || userData.firstName || 'User');
           } else {
             const errorText = await response.text();
             console.error('Failed to fetch user data. Status:', response.status, 'Error:', errorText);
@@ -201,7 +205,7 @@ const BuyerHomeScreen = () => {
   const renderFeaturedProduct = ({ item }) => {
     const imageUri = item.image && (item.image.startsWith('http') 
       ? item.image 
-      : `http://10.10.90.155:5000${item.image}`);
+      : `http://172.20.10.3:5000${item.image}`);
     
     console.log('Product:', item.name);
     console.log('Product ID:', item._id);
@@ -245,7 +249,10 @@ const BuyerHomeScreen = () => {
   const renderCategory = ({ item }) => (
     <TouchableOpacity 
       style={styles.categoryCard}
-      onPress={() => navigation.navigate('CategoryProducts', { categoryId: item.id })}
+      onPress={() => navigation.navigate('CategoryProducts', { 
+        categoryId: item.id,
+        categoryName: item.name 
+      })}
     >
       <View style={[styles.categoryIconContainer, { backgroundColor: `${item.color}20` }]}>
         <MaterialIcons name={item.icon} size={28} color={item.color} />
@@ -258,7 +265,7 @@ const BuyerHomeScreen = () => {
   const renderService = ({ item }) => {
     const imageUri = item.image && (item.image.startsWith('http') 
       ? item.image 
-      : `http://10.10.90.155:5000${item.image}`);
+      : `http://172.20.10.3:5000${item.image}`);
 
     return (
       <TouchableOpacity 
@@ -384,7 +391,7 @@ const BuyerHomeScreen = () => {
               
               
           
-          <TouchableOpacity onPress={() => navigation.navigate('Categories')}>
+          <TouchableOpacity onPress={() => navigation.navigate('AllCategories')}>
                 <Text style={styles.seeAllText}>See All</Text>
               </TouchableOpacity>
             </View>
@@ -407,9 +414,9 @@ const BuyerHomeScreen = () => {
               </View>
               <TouchableOpacity 
                 style={styles.seeAllButton} 
-                onPress={() => navigation.navigate('Categories')}
+                onPress={() => navigation.navigate('CategoriesScreen')}
               >
-                <Text style={styles.seeAllText}>See All</Text>
+                <Text style={styles.seeAllText}>See This</Text>
                 <Ionicons name="chevron-forward" size={16} color="#5D3FD3" />
               </TouchableOpacity>
             </View>
@@ -707,7 +714,7 @@ const BuyerHomeScreen = () => {
               <TouchableOpacity style={styles.collectionCard}>
                 <Image 
                   source={{ uri: 'https://images.unsplash.com/photo-1556906781-9a412961c28c?ixlib=rb-4.0.3' }}
-                  style={styles.collectionImage}
+                    style={styles.collectionImage}
                 />
                 <View style={styles.collectionOverlay}>
                   <Text style={styles.collectionTitle}>Premium Collection</Text>
@@ -718,7 +725,7 @@ const BuyerHomeScreen = () => {
               <TouchableOpacity style={styles.collectionCard}>
                 <Image 
                   source={{ uri: 'https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?ixlib=rb-4.0.3' }}
-                  style={styles.collectionImage}
+                    style={styles.collectionImage}
                 />
                 <View style={styles.collectionOverlay}>
                   <Text style={styles.collectionTitle}>New Season</Text>

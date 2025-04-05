@@ -69,7 +69,35 @@ const productSchema = new mongoose.Schema(
           default: Date.now
         }
       }
-    ]
+    ],
+    featuredType: {
+      type: String,
+      enum: [
+        'new-arrivals',
+        'featured',
+        'featured-service',
+        'trending',
+        'special-offers',
+        'new-season',
+        'premium',
+        null
+      ],
+      default: null
+    },
+    featuredRank: {
+      type: Number,
+      default: 999
+    },
+    discountPercentage: {
+      type: Number,
+      min: 0,
+      max: 100,
+      default: 0
+    },
+    onSale: {
+      type: Boolean,
+      default: false
+    }
   },
   {
     timestamps: true,

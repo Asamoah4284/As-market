@@ -56,10 +56,12 @@ const Categories = () => {
   };
   
   useEffect(() => {
+    console.log('useEffect triggered with selectedCategory:', selectedCategory);
     fetchProducts();
-  }, [categoryId, selectedCategory]);
+  }, [selectedCategory, showingProductCategories]);
   
   const handleCategorySelect = (category) => {
+    console.log('Selected category:', category);
     setSelectedCategory(category);
     // No need to fetch products here as the useEffect will handle it
   };
@@ -119,17 +121,25 @@ const Categories = () => {
       
       // If a specific category is selected (not 'all')
       if (selectedCategory && selectedCategory !== 'all') {
-        params.append('category', selectedCategory);
+        // Convert the category key to the display name that's stored in the database
+        const categoryDisplayName = showingProductCategories 
+          ? categories.PRODUCTS[selectedCategory] 
+          : categories.SERVICES[selectedCategory];
+        
+        params.append('category', categoryDisplayName);
       }
       // If categoryId is provided from route params, it takes precedence
       else if (categoryId) {
-        params.append('category', categoryId);
+        // If categoryId is a key, convert it to display name
+        const categoryDisplayName = showingProductCategories 
+          ? categories.PRODUCTS[categoryId] || categoryId
+          : categories.SERVICES[categoryId] || categoryId;
+        
+        params.append('category', categoryDisplayName);
         setSelectedCategory(categoryId);
       }
       
-      // Fix the isService parameter - it was still reversed
-      // When showing products, we want isService=false
-      // When showing services, we want isService=true
+      // Fix the isService parameter
       params.append('isService', !showingProductCategories ? 'true' : 'false');
       
       // Append the query string to the URL if we have parameters
