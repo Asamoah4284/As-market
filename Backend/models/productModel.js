@@ -80,6 +80,9 @@ const productSchema = new mongoose.Schema(
         'special-offers',
         'new-season',
         'premium',
+        'men',
+        'women',
+        'watches',
         null
       ],
       default: null
@@ -97,6 +100,15 @@ const productSchema = new mongoose.Schema(
     onSale: {
       type: Boolean,
       default: false
+    },
+    status: {
+      type: String,
+      enum: ['pending', 'approved', 'rejected'],
+      default: 'pending'
+    },
+    rejectionReason: {
+      type: String,
+      default: null
     }
   },
   {

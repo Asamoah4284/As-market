@@ -35,7 +35,7 @@ const AllProducts = ({ navigation }) => {
     >
       <View style={styles.cardContent}>
         <Image 
-          source={{ uri: item.imageUrl || 'https://via.placeholder.com/150' }} 
+          source={{ uri: item.image || 'https://via.placeholder.com/150' }} 
           style={styles.productImage} 
         />
         <View style={styles.productInfo}>
@@ -70,7 +70,6 @@ const AllProducts = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <Text style={styles.welcomeText}>All Products</Text>
       {products.length === 0 ? (
         <Text style={styles.noProductsText}>No products available</Text>
       ) : (
@@ -109,13 +108,12 @@ const styles = StyleSheet.create({
   },
   productCard: {
     backgroundColor: 'white',
-    borderRadius: 10,
-    marginHorizontal: 10,
-    marginBottom: 16,
+    borderRadius: 5,
+    marginBottom: 12,
     overflow: 'hidden',
     elevation: 3,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    // shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
   },

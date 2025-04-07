@@ -13,6 +13,7 @@ import {
   ScrollView,
   Picker,
   Switch,
+  Alert,
 } from 'react-native';
 import { MaterialIcons, FontAwesome, Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -43,6 +44,7 @@ const SellerDashboardScreen = () => {
 
   const [activeTab, setActiveTab] = useState('products');
   const [products, setProducts] = useState([]);
+  const [pendingProducts, setPendingProducts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [chats, setChats] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -55,12 +57,14 @@ const SellerDashboardScreen = () => {
     stock: '',
     image: 'https://via.placeholder.com/150',
     additionalImages: [],
-    isService: false
+    isService: false,
+    status: 'pending' // Add default status as pending
   });
   const [isEditing, setIsEditing] = useState(false);
   const [currentProductId, setCurrentProductId] = useState(null);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
+  const [showStatusGuide, setShowStatusGuide] = useState(true);
   const [categories, setCategories] = useState({
     PRODUCTS: {
       CLOTHING_FASHION: 'Clothing & Fashion',
@@ -163,6 +167,15 @@ const SellerDashboardScreen = () => {
   useEffect(() => {
     fetchData();
     fetchProfileData();
+  }, []);
+
+  // Add timer to hide status guide after 30 seconds
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowStatusGuide(false);
+    }, 30000); // 30 seconds
+
+    return () => clearTimeout(timer);
   }, []);
 
   const fetchData = async () => {
@@ -301,12 +314,39 @@ const SellerDashboardScreen = () => {
       stock: '',
       image: 'https://via.placeholder.com/150',
       additionalImages: [],
-      isService: false
+      isService: false,
+      status: 'pending' // Add default status as pending
     });
     setModalVisible(true);
   };
 
   const handleEditProduct = (product) => {
+    // Prevent editing approved products
+    if (product.status === 'approved') {
+      Alert.alert(
+        'Cannot Edit Approved Product',
+        'This product has been approved and is live on the marketplace. To make changes, you would need to create a new product.',
+        [{ text: 'OK', style: 'default' }]
+      );
+      return;
+    }
+
+    // For rejected products, show rejection reason in an alert first
+    if (product.status === 'rejected' && product.rejectionReason) {
+      Alert.alert(
+        'Product Rejected',
+        `Your product was rejected for the following reason:\n\n${product.rejectionReason}\n\nYou can edit and resubmit your product.`,
+        [{ text: 'Edit Product', style: 'default', onPress: () => proceedToEdit(product) }]
+      );
+      return;
+    }
+
+    // If not rejected or no rejection reason, proceed to edit directly
+    proceedToEdit(product);
+  };
+
+  // Helper function to set up the edit form
+  const proceedToEdit = (product) => {
     setIsEditing(true);
     setCurrentProductId(product._id);
     setProductForm({
@@ -317,7 +357,8 @@ const SellerDashboardScreen = () => {
       stock: product.stock.toString(),
       image: product.image,
       additionalImages: product.additionalImages || [],
-      isService: product.isService || false
+      isService: product.isService || false,
+      rejectionReason: product.rejectionReason || null // Store rejection reason if it exists
     });
     setModalVisible(true);
   };
@@ -387,7 +428,9 @@ const SellerDashboardScreen = () => {
         stock: productForm.isService ? 1 : parseInt(productForm.stock),
         image: productForm.image,
         additionalImages: productForm.additionalImages.filter(img => img),
-        isService: productForm.isService
+        isService: productForm.isService,
+        status: 'pending', // Always set status to pending for new/edited products
+        rejectionReason: null // Clear any previous rejection reason
       };
       
       // Use the same base URL as fetch products
@@ -436,7 +479,8 @@ const SellerDashboardScreen = () => {
         stock: '',
         image: '',
         additionalImages: [],
-        isService: false
+        isService: false,
+        status: 'pending' // Add default status as pending
       });
       setIsEditing(false);
       setCurrentProductId(null);
@@ -465,7 +509,26 @@ const SellerDashboardScreen = () => {
           <View style={styles.productBadge}>
             <Text style={styles.productBadgeText}>{item.category}</Text>
           </View>
-          {item.stock < 5 && (
+          
+          {/* Display appropriate badge based on product status */}
+          {item.status === 'pending' && (
+            <View style={styles.pendingBadge}>
+              <Text style={styles.pendingText}>Pending Approval</Text>
+            </View>
+          )}
+          {item.status === 'approved' && (
+            <View style={styles.approvedBadge}>
+              <Text style={styles.approvedText}>Approved</Text>
+            </View>
+          )}
+          {item.status === 'rejected' && (
+            <View style={styles.rejectedBadge}>
+              <Text style={styles.rejectedText}>Rejected (Click Edit)</Text>
+            </View>
+          )}
+          
+          {/* Only show low stock badge for approved products */}
+          {item.stock < 5 && item.status === 'approved' && !item.isService && (
             <View style={styles.lowStockBadge}>
               <Text style={styles.lowStockText}>Low Stock</Text>
             </View>
@@ -480,13 +543,19 @@ const SellerDashboardScreen = () => {
             </View>
             <View style={styles.metricDivider} />
             <View style={styles.metricItem}>
-              <Text style={[styles.metricValue, { color: colors.text }]}>{item.stock}</Text>
-              <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>In Stock</Text>
+              <Text style={[styles.metricValue, { color: colors.text }]}>
+                {item.isService ? 'Yes' : item.stock}
+              </Text>
+              <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
+                {item.isService ? 'Availability' : 'In Stock'}
+              </Text>
             </View>
             <View style={styles.metricDivider} />
             <View style={styles.metricItem}>
               <Text style={[styles.metricValue, { color: colors.success }]}>{item.sales || 0}</Text>
-              <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Sold</Text>
+              <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
+                {item.isService ? 'Bookings' : 'Sold'}
+              </Text>
             </View>
           </View>
           <View style={styles.ratingContainer}>
@@ -505,12 +574,18 @@ const SellerDashboardScreen = () => {
           </View>
         </View>
         <View style={styles.productActions}>
+          {/* Only allow editing if product is not approved yet */}
           <TouchableOpacity 
             style={[styles.actionButton, styles.editButton, { backgroundColor: colors.highlight }]}
             onPress={() => handleEditProduct(item)}
+            disabled={item.status === 'approved'}
           >
-            <MaterialIcons name="edit" size={18} color={colors.primary} />
-            <Text style={[styles.actionButtonText, { color: colors.primary }]}>Edit</Text>
+            <MaterialIcons name="edit" size={18} color={item.status === 'approved' ? colors.textSecondary : colors.primary} />
+            <Text style={[styles.actionButtonText, { color: item.status === 'approved' ? colors.textSecondary : colors.primary }]}>
+              {item.status === 'approved' 
+                ? 'Approved' 
+                : (item.status === 'rejected' ? 'View Reason' : 'Edit')}
+            </Text>
           </TouchableOpacity>
           <TouchableOpacity 
             style={[styles.actionButton, styles.deleteButton, { backgroundColor: colors.danger + '15' }]}
@@ -651,11 +726,43 @@ const SellerDashboardScreen = () => {
                 <MaterialIcons name="add" size={18} color="white" />
               </TouchableOpacity>
             </View>
+            
+            {/* Status info section */}
+            {showStatusGuide && (
+              <View style={[styles.statusInfoContainer, { 
+                backgroundColor: colors.cardBackground,
+                borderLeftColor: colors.primary 
+              }]}>
+                <Text style={[styles.statusInfoTitle, { color: colors.text }]}>Product Status Guide:</Text>
+                <View style={styles.statusRow}>
+                  <View style={[styles.statusDot, { backgroundColor: 'rgba(255, 159, 28, 0.9)' }]} />
+                  <Text style={[styles.statusText, { color: colors.textSecondary }]}>
+                    <Text style={[styles.statusBold, { color: colors.text }]}>Pending:</Text> Your product is awaiting admin approval.
+                  </Text>
+                </View>
+                <View style={styles.statusRow}>
+                  <View style={[styles.statusDot, { backgroundColor: 'rgba(46, 196, 182, 0.9)' }]} />
+                  <Text style={[styles.statusText, { color: colors.textSecondary }]}>
+                    <Text style={[styles.statusBold, { color: colors.text }]}>Approved:</Text> Product is live on the marketplace.
+                  </Text>
+                </View>
+                <View style={styles.statusRow}>
+                  <View style={[styles.statusDot, { backgroundColor: 'rgba(230, 57, 70, 0.9)' }]} />
+                  <Text style={[styles.statusText, { color: colors.textSecondary }]}>
+                    <Text style={[styles.statusBold, { color: colors.text }]}>Rejected:</Text> Product didn't meet marketplace requirements.
+                  </Text>
+                </View>
+              </View>
+            )}
+            
             {products.length === 0 ? (
               <View style={styles.emptyState}>
                 <MaterialIcons name="inventory" size={64} color={colors.textSecondary} />
                 <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>
                   Welcome! Start by adding your first product.
+                </Text>
+                <Text style={[styles.emptyStateSubText, { color: colors.textSecondary }]}>
+                  All products will be reviewed by an admin before appearing in the marketplace.
                 </Text>
                 <TouchableOpacity 
                   style={[styles.emptyStateButton, { backgroundColor: colors.primary }]}
@@ -1247,7 +1354,24 @@ const SellerDashboardScreen = () => {
             
             {renderMessages()}
             
-            <ScrollView style={styles.formContainer}>
+            <ScrollView style={styles.formScrollView}>
+              {/* Render rejection reason if editing a rejected product */}
+              {isEditing && productForm.rejectionReason && (
+                <View style={styles.rejectionReasonContainer}>
+                  <Text style={[styles.sectionTitle, { color: colors.danger }]}>
+                    Rejection Reason:
+                  </Text>
+                  <View style={styles.rejectionReasonBox}>
+                    <Text style={styles.rejectionReasonText}>
+                      {productForm.rejectionReason}
+                    </Text>
+                  </View>
+                  <Text style={styles.rejectionInstructions}>
+                    Please address the issues above, then resubmit your product.
+                  </Text>
+                </View>
+              )}
+
               <View style={styles.formSection}>
                 <Text style={[styles.sectionTitle, { color: colors.text }]}>Type</Text>
                 <View style={styles.typeSelector}>
@@ -1307,7 +1431,7 @@ const SellerDashboardScreen = () => {
                       style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text }]}
                       value={productForm.name}
                       onChangeText={(text) => setProductForm({...productForm, name: text})}
-                      placeholder="Enter product name"
+                      placeholder={productForm.isService ? "Enter service name (e.g. Graphic Design)" : "Enter product name"}
                       placeholderTextColor={colors.textSecondary}
                     />
                   </View>
@@ -1318,7 +1442,7 @@ const SellerDashboardScreen = () => {
                       style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text }]}
                       value={productForm.price}
                       onChangeText={(text) => setProductForm({...productForm, price: text})}
-                      placeholder="Enter price"
+                      placeholder={productForm.isService ? "Enter service fee (e.g. 50 for hourly rate)" : "Enter price"}
                       placeholderTextColor={colors.textSecondary}
                       keyboardType="numeric"
                     />
@@ -1344,7 +1468,9 @@ const SellerDashboardScreen = () => {
                       style={[styles.textArea, { backgroundColor: colors.inputBackground, color: colors.text }]}
                       value={productForm.description}
                       onChangeText={(text) => setProductForm({...productForm, description: text})}
-                      placeholder="Enter product description"
+                      placeholder={productForm.isService ? 
+                        "Describe your service in detail (e.g. I offer professional graphic design services including logo design, brand identity, and social media graphics. 3-day turnaround time.)" : 
+                        "Enter product description"}
                       placeholderTextColor={colors.textSecondary}
                       multiline
                       numberOfLines={4}
@@ -1355,7 +1481,9 @@ const SellerDashboardScreen = () => {
               </View>
 
               <View style={styles.formSection}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Product Images</Text>
+                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                  {productForm.isService ? 'Service Images' : 'Product Images'}
+                </Text>
                 
                 {/* Main Image */}
                 <View style={styles.mainImageContainer}>
@@ -1375,7 +1503,7 @@ const SellerDashboardScreen = () => {
                       <View style={styles.mainImagePlaceholder}>
                         <MaterialIcons name="add-photo-alternate" size={40} color={colors.primary} />
                         <Text style={[styles.placeholderText, { color: colors.textSecondary }]}>
-                          Add Main Product Image
+                          {productForm.isService ? 'Add Service Image' : 'Add Main Product Image'}
                         </Text>
                       </View>
                     )}
@@ -1688,7 +1816,7 @@ const styles = StyleSheet.create({
   },
   lowStockBadge: {
     position: 'absolute',
-    top: 12,
+    top: 52, // Position below the status badge
     right: 12,
     backgroundColor: 'rgba(230, 57, 70, 0.8)',
     paddingHorizontal: 10,
@@ -1944,6 +2072,13 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 16,
   },
+  emptyStateSubText: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 8,
+    fontStyle: 'italic',
+  },
   emptyStateButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1990,7 +2125,7 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
   },
-  formContainer: {
+  formScrollView: {
     maxHeight: '90%',
   },
   formSection: {
@@ -2443,6 +2578,99 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontSize: 14,
     fontWeight: '600',
+  },
+  pendingBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(255, 159, 28, 0.9)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+  },
+  pendingText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  rejectedBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(230, 57, 70, 0.9)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+  },
+  rejectedText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  approvedBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(46, 196, 182, 0.9)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+  },
+  approvedText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  statusInfoContainer: {
+    borderRadius: 12,
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    borderLeftWidth: 3
+  },
+  statusInfoTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 12
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8
+  },
+  statusDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 8
+  },
+  statusText: {
+    fontSize: 14,
+    flex: 1
+  },
+  statusBold: {
+    fontWeight: 'bold'
+  },
+  rejectionReasonContainer: {
+    marginBottom: 24,
+  },
+  rejectionReasonBox: {
+    backgroundColor: '#FFEBEE',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+  },
+  rejectionReasonText: {
+    color: '#B71C1C',
+  },
+  rejectionInstructions: {
+    color: '#6c757d',
+    fontSize: 14,
   },
 });
 

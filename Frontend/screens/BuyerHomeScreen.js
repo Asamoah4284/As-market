@@ -175,13 +175,15 @@ const BuyerHomeScreen = () => {
   useEffect(() => {
     const fetchServices = async () => {
       try {
-        const response = await fetch('http://10.10.90.155:5000/api/products');
+        const response = await fetch('http://172.20.10.3:5000/api/products');
         console.log('Products API Response Status:', response.status);
         
         if (response.ok) {
           const products = await response.json();
-          // Filter products to get only services using isService field
-          const serviceProducts = products.filter(product => product.isService === true);
+          // Filter products to get services using isService field OR featuredType field
+          const serviceProducts = products.filter(product => 
+            product.isService === true || product.featuredType === 'featured-service'
+          );
           console.log('Filtered services:', serviceProducts);
           setServices(serviceProducts);
         } else {
@@ -249,7 +251,7 @@ const BuyerHomeScreen = () => {
   const renderCategory = ({ item }) => (
     <TouchableOpacity 
       style={styles.categoryCard}
-      onPress={() => navigation.navigate('CategoryProducts', { 
+      onPress={() => navigation.navigate('CategoriesScreen', { 
         categoryId: item.id,
         categoryName: item.name 
       })}
@@ -267,6 +269,11 @@ const BuyerHomeScreen = () => {
       ? item.image 
       : `http://172.20.10.3:5000${item.image}`);
 
+    console.log('Service:', item.name);
+    console.log('Service ID:', item._id);
+    console.log('Original image path:', item.image);
+    console.log('Constructed image URI:', imageUri);
+
     return (
       <TouchableOpacity 
         style={styles.productCard}
@@ -278,9 +285,10 @@ const BuyerHomeScreen = () => {
         }}
       >
         <Image 
-          source={{ uri: imageUri }} 
+          source={{ uri: item.image }} 
           style={styles.productImage}
           onError={(error) => console.error('Image loading error:', error.nativeEvent.error)}
+          onLoad={() => console.log('Image loaded successfully:', imageUri)}
         />
         <View style={styles.productInfo}>
           <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
@@ -391,7 +399,7 @@ const BuyerHomeScreen = () => {
               
               
           
-          <TouchableOpacity onPress={() => navigation.navigate('AllCategories')}>
+          <TouchableOpacity onPress={() => navigation.navigate('CategoriesScreen')}>
                 <Text style={styles.seeAllText}>See All</Text>
               </TouchableOpacity>
             </View>
@@ -414,9 +422,9 @@ const BuyerHomeScreen = () => {
               </View>
               <TouchableOpacity 
                 style={styles.seeAllButton} 
-                onPress={() => navigation.navigate('CategoriesScreen')}
+                onPress={() => navigation.navigate('CategoriesScreen', { featuredOnly: true })}
               >
-                <Text style={styles.seeAllText}>See This</Text>
+                <Text style={styles.seeAllText}>See All</Text>
                 <Ionicons name="chevron-forward" size={16} color="#5D3FD3" />
               </TouchableOpacity>
             </View>
@@ -439,7 +447,7 @@ const BuyerHomeScreen = () => {
               </View>
               <TouchableOpacity 
                 style={styles.seeAllButton} 
-                onPress={() => navigation.navigate('NewArrivals')}
+                onPress={() => navigation.navigate('CategoriesScreen', { newArrivals: true })}
               >
                 <Text style={styles.seeAllText}>See All</Text>
                 <Ionicons name="chevron-forward" size={16} color="#5D3FD3" />
@@ -464,7 +472,7 @@ const BuyerHomeScreen = () => {
               </View>
               <TouchableOpacity 
                 style={styles.seeAllButton} 
-                onPress={() => navigation.navigate('Services')}
+                onPress={() => navigation.navigate('CategoriesScreen', { services: true })}
               >
                 <Text style={styles.seeAllText}>See All</Text>
                 <Ionicons name="chevron-forward" size={16} color="#5D3FD3" />
@@ -498,7 +506,7 @@ const BuyerHomeScreen = () => {
               <View style={styles.gridRow}>
                 <TouchableOpacity 
                   style={styles.gridItem}
-                  onPress={() => navigation.navigate('CategoryProducts', { category: 'new' })}
+                  onPress={() => navigation.navigate('CategoriesScreen', { categoryName: 'New', categoryId: 'new' })}
                 >
                   <Image 
                     source={{ uri: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?ixlib=rb-4.0.3' }} 
@@ -511,7 +519,7 @@ const BuyerHomeScreen = () => {
                 
                 <TouchableOpacity 
                   style={styles.gridItem}
-                  onPress={() => navigation.navigate('CategoryProducts', { category: 'women' })}
+                  onPress={() => navigation.navigate('CategoriesScreen', { categoryName: 'Women', categoryId: 'women' })}
                 >
                   <Image 
                     source={{ uri: 'https://images.unsplash.com/photo-1535043934128-cf0b28d52f95?ixlib=rb-4.0.3' }} 
@@ -524,7 +532,7 @@ const BuyerHomeScreen = () => {
 
                 <TouchableOpacity 
                   style={styles.gridItem}
-                  onPress={() => navigation.navigate('CategoryProducts', { category: 'men' })}
+                  onPress={() => navigation.navigate('CategoriesScreen', { categoryName: 'Men', categoryId: 'men' })}
                 >
                   <Image 
                     source={{ uri: 'https://images.unsplash.com/photo-1550246140-29f40b909e5a?ixlib=rb-4.0.3' }} 
@@ -537,7 +545,7 @@ const BuyerHomeScreen = () => {
 
                 <TouchableOpacity 
                   style={styles.gridItem}
-                  onPress={() => navigation.navigate('CategoryProducts', { category: 'kids' })}
+                  onPress={() => navigation.navigate('CategoriesScreen', { categoryName: 'Kids', categoryId: 'kids' })}
                 >
                   <Image 
                     source={{ uri: 'https://images.unsplash.com/photo-1622290291468-a28f7a7dc6a8?ixlib=rb-4.0.3' }} 
@@ -553,7 +561,7 @@ const BuyerHomeScreen = () => {
               <View style={styles.gridRow}>
                 <TouchableOpacity 
                   style={styles.gridItem}
-                  onPress={() => navigation.navigate('CategoryProducts', { category: 'shoes' })}
+                  onPress={() => navigation.navigate('CategoriesScreen', { categoryName: 'Shoes', categoryId: 'shoes' })}
                 >
                   <Image 
                     source={{ uri: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?ixlib=rb-4.0.3' }} 
@@ -566,7 +574,7 @@ const BuyerHomeScreen = () => {
 
                 <TouchableOpacity 
                   style={styles.gridItem}
-                  onPress={() => navigation.navigate('CategoryProducts', { category: 'watches' })}
+                  onPress={() => navigation.navigate('CategoriesScreen', { categoryName: 'Watches', categoryId: 'watches' })}
                 >
                   <Image 
                     source={{ uri: 'https://images.unsplash.com/photo-1524592094714-0f0654e20314?ixlib=rb-4.0.3' }} 
@@ -579,7 +587,7 @@ const BuyerHomeScreen = () => {
 
                 <TouchableOpacity 
                   style={styles.gridItem}
-                  onPress={() => navigation.navigate('CategoryProducts', { category: 'bags' })}
+                  onPress={() => navigation.navigate('CategoriesScreen', { categoryName: 'Bags', categoryId: 'bags' })}
                 >
                   <Image 
                     source={{ uri: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?ixlib=rb-4.0.3' }} 
@@ -592,7 +600,7 @@ const BuyerHomeScreen = () => {
 
                 <TouchableOpacity 
                   style={styles.gridItem}
-                  onPress={() => navigation.navigate('CategoryProducts', { category: 'accessories' })}
+                  onPress={() => navigation.navigate('CategoriesScreen', { categoryName: 'Crop Tops', categoryId: 'crop-tops' })}
                 >
                   <Image 
                     source={{ uri: 'https://images.unsplash.com/photo-1583292650898-7d22cd27ca6f?ixlib=rb-4.0.3' }} 

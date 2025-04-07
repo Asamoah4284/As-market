@@ -101,7 +101,8 @@ const createProduct = asyncHandler(async (req, res) => {
     image: mainImageUrl,
     additionalImages: additionalImageUrls,
     isService,
-    seller: req.user._id
+    seller: req.user._id,
+    status: 'pending' // Always start as pending
   });
 
   if (product) {
@@ -235,11 +236,68 @@ const getProducts = asyncHandler(async (req, res) => {
   res.json(products);
 });
 
+// @desc    Admin approve or reject a product and set featured status
+// @route   PUT /api/products/admin-update/:id
+// @access  Private/Admin
+const adminUpdateProduct = asyncHandler(async (req, res) => {
+  const { 
+    status, 
+    rejectionReason, 
+    featuredType, 
+    featuredRank,
+    onSale,
+    discountPercentage
+  } = req.body;
+
+  // Check if user is admin
+  if (req.user.role !== 'admin') {
+    res.status(403);
+    throw new Error('Not authorized as an admin');
+  }
+
+  const product = await Product.findById(req.params.id);
+  if (!product) {
+    res.status(404);
+    throw new Error('Product not found');
+  }
+
+  // Update status related fields
+  if (status) {
+    product.status = status;
+    
+    if (status === 'rejected' && rejectionReason) {
+      product.rejectionReason = rejectionReason;
+    }
+  }
+
+  // Update featured related fields
+  if (featuredType !== undefined) {
+    product.featuredType = featuredType;
+  }
+
+  if (featuredRank !== undefined) {
+    product.featuredRank = featuredRank;
+  }
+
+  // Update sale related fields
+  if (onSale !== undefined) {
+    product.onSale = onSale;
+  }
+
+  if (discountPercentage !== undefined) {
+    product.discountPercentage = discountPercentage;
+  }
+
+  const updatedProduct = await product.save();
+  res.json(updatedProduct);
+});
+
 module.exports = {
   createProduct,
   getSellerProducts,
   getProductById,
   updateProduct,
   deleteProduct,
-  getProducts
+  getProducts,
+  adminUpdateProduct
 }; 
