@@ -6,7 +6,7 @@ import { setCredentials } from '../store/slices/authSlice';
 
 const API_URL = 'http://172.20.10.3:5000';
 
-function LoginScreen({ navigation }) {
+function LoginScreen({ navigation, route }) {
   const dispatch = useDispatch();
   const [loginMethod, setLoginMethod] = useState('email');
   const [email, setEmail] = useState('');
@@ -61,22 +61,7 @@ function LoginScreen({ navigation }) {
             userData: userData
           }));
 
-          if (userData.role === 'buyer') {
-            navigation.reset({
-              index: 0,
-              routes: [{ name: 'BuyerHome' }],
-            });
-          } else if (userData.role === 'seller') {
-            navigation.reset({
-              index: 0,
-              routes: [{ name: 'SellerDashboard' }],
-            });
-          } else if (userData.role === 'admin') {
-            navigation.reset({
-              index: 0,
-              routes: [{ name: 'Admin' }],
-            });
-          }
+          await handleLoginSuccess(data.token, userData);
         } else {
           setError('Login failed. Please try again.');
         }
@@ -90,6 +75,48 @@ function LoginScreen({ navigation }) {
       } else {
         setError('Something went wrong. Please try again.');
       }
+    }
+  };
+
+  const handleLoginSuccess = async (token, userData) => {
+    try {
+      await AsyncStorage.setItem('userToken', token);
+      await AsyncStorage.setItem('userData', JSON.stringify(userData));
+      
+      // Check if we need to redirect somewhere specific
+      const redirectTo = route.params?.redirectTo;
+
+      // Navigate based on user role
+      if (userData.role === 'seller') {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'SellerDashboard' }],
+        });
+      } else if (userData.role === 'admin') {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Admin' }],
+        });
+      } else {
+        // For buyers or if role is not specified
+        if (redirectTo) {
+          navigation.reset({
+            index: 1,
+            routes: [
+              { name: 'BuyerHome' },
+              { name: redirectTo }
+            ],
+          });
+        } else {
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'BuyerHome' }],
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error saving auth data:', error);
+      Alert.alert('Error', 'Failed to save login information');
     }
   };
 

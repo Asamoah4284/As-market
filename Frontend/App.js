@@ -18,11 +18,10 @@ import SellerDashboardScreen from './screens/SellerDashboardScreen';
 import SellerProfileScreen from './screens/SellerProfileScreen';
 import CategoriesScreen from './screens/CategoriesScreen';
 import Admin from './screens/Admin';
-
-
+import PaymentScreen from './screens/PaymentScreen';
+import PaymentSuccessScreen from './screens/PaymentSuccessScreen';
 
 const Stack = createStackNavigator();
-
 
 export default function App() {
   return (
@@ -42,7 +41,6 @@ export default function App() {
             <Stack.Screen name="BuyerHome" component={BuyerHomeScreen} />
             <Stack.Screen name="Admin" component={Admin} />
             <Stack.Screen name="Profile" component={BuyerProfileScreen} />
-            {/*  */}
             <Stack.Screen name="SellerDashboard" component={SellerDashboardScreen} />
             <Stack.Screen 
               name="ProductDetails" 
@@ -52,6 +50,8 @@ export default function App() {
             <Stack.Screen name="Categories" component={Categories} />
             <Stack.Screen name="CategoriesScreen" component={CategoriesScreen} />
             <Stack.Screen name="SellerProfile" component={SellerProfileScreen} />
+            <Stack.Screen name="Payment" component={PaymentScreen} />
+            <Stack.Screen name="PaymentSuccess" component={PaymentSuccessScreen} options={{ gestureEnabled: false }} />
           </Stack.Navigator>
           <StatusBar style="auto" />
         </NavigationContainer>

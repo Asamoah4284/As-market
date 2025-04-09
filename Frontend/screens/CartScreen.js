@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { 
   View, 
   Text, 
@@ -21,16 +21,18 @@ import {
   setLoading, 
   setError 
 } from '../store/slices/cartSlice';
+import PaystackPayment from '../components/PaystackPayment';
 
 
 const API_URL = 'http://172.20.10.3:5000';
 
-const CartScreen = () => {
-  const navigation = useNavigation();
+const CartScreen = ({ navigation }) => {
   const dispatch = useDispatch();
   
   // Replace useState with useSelector
   const { items: cartItems, loading, error } = useSelector(state => state.cart);
+  const [showPayment, setShowPayment] = useState(false);
+  const [userEmail, setUserEmail] = useState(''); // You should get this from user profile/auth
 
   // Fetch cart items whenever the screen is focused
   useFocusEffect(
@@ -40,6 +42,23 @@ const CartScreen = () => {
       fetchCartItems();
     }, [])
   );
+
+  // Add user email fetch
+  useEffect(() => {
+    const getUserEmail = async () => {
+      try {
+        const userDataString = await AsyncStorage.getItem('userData');
+        if (userDataString) {
+          const userData = JSON.parse(userDataString);
+          setUserEmail(userData.email);
+        }
+      } catch (error) {
+        console.error('Error fetching user email:', error);
+      }
+    };
+
+    getUserEmail();
+  }, []);
 
   // Modify fetchCartItems to use Redux
   const fetchCartItems = async () => {
@@ -155,6 +174,130 @@ const CartScreen = () => {
     return cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
   };
 
+  // Update handlePaymentSuccess
+  const handlePaymentSuccess = async (response) => {
+    setShowPayment(false);
+    console.log('Payment successful, response:', response);
+    
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const paymentReference = response?.data?.transactionRef?.reference || response?.transactionRef?.reference || response?.reference;
+      
+      if (!paymentReference) {
+        console.error('Payment response structure:', response);
+        throw new Error('No payment reference received from Paystack');
+      }
+
+      console.log('Creating order with reference:', paymentReference);
+      
+      // Send payment details to your backend
+      const orderResponse = await axios.post(`${API_URL}/api/orders`, {
+        paymentReference: paymentReference,
+        items: cartItems,
+        totalAmount: calculateTotal(),
+        paymentStatus: 'success'
+      }, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (orderResponse.status === 201) {
+        // Clear cart on backend
+        await axios.delete(`${API_URL}/api/cart`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        // Clear cart in Redux
+        dispatch(setCartItems([]));
+
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'PaymentSuccess' }],
+        });
+      }
+    } catch (error) {
+      console.error('Error processing order:', error);
+      Alert.alert(
+        'Error',
+        'Payment was successful but there was an error processing your order. Please contact support.',
+        [
+          {
+            text: 'OK',
+            onPress: () => navigation.navigate('Profile', { initialTab: 'orders' })
+          }
+        ]
+      );
+    }
+  };
+
+  // Update handleCheckout
+  const handleCheckout = async () => {
+    try {
+      // Check if cart is empty
+      if (cartItems.length === 0) {
+        Alert.alert('Empty Cart', 'Please add items to your cart before checking out.');
+        return;
+      }
+
+      // Check if user is logged in
+      const token = await AsyncStorage.getItem('userToken');
+      const userData = await AsyncStorage.getItem('userData');
+
+      if (!token || !userData) {
+        Alert.alert(
+          'Login Required',
+          'Please login to proceed with checkout',
+          [
+            {
+              text: 'Cancel',
+              style: 'cancel'
+            },
+            {
+              text: 'Login',
+              onPress: () => {
+                // Save the cart state and redirect to login
+                navigation.navigate('Login', {
+                  redirectTo: 'Cart' // This will help us return to cart after login
+                });
+              }
+            }
+          ]
+        );
+        return;
+      }
+
+      // Calculate total amount
+      const totalAmount = cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+      
+      // Get user email from userData
+      const user = JSON.parse(userData);
+      if (!user.email) {
+        Alert.alert('Error', 'Unable to proceed. Please update your profile with an email address.');
+        return;
+      }
+
+      // Navigate to Payment screen with required data
+      navigation.navigate('Payment', {
+        amount: totalAmount, // Convert to pesewas here, since this is the entry point
+        email: user.email
+      });
+
+    } catch (error) {
+      console.error('Checkout error:', error);
+      Alert.alert('Error', 'Something went wrong. Please try again.');
+    }
+  };
+
+  // Handle payment cancellation
+  const handlePaymentCancel = () => {
+    setShowPayment(false);
+    Alert.alert('Payment Cancelled', 'You have cancelled the payment');
+  };
+
   const renderItem = ({ item }) => (
     <View style={styles.cartItem}>
       <View style={styles.imageContainer}>
@@ -174,7 +317,7 @@ const CartScreen = () => {
           </TouchableOpacity>
         </View>
         
-        <Text style={styles.itemPrice}>${item.price.toFixed(2)}</Text>
+        <Text style={styles.itemPrice}>GH₵{item.price.toFixed(2)}</Text>
         
         <View style={styles.itemFooter}>
           <View style={styles.quantityContainer}>
@@ -330,13 +473,22 @@ const CartScreen = () => {
           </View>
         </View>
         
-        <TouchableOpacity
+        <TouchableOpacity 
           style={styles.checkoutButton}
-          onPress={() => navigation.navigate('Checkout')}
+          onPress={handleCheckout}
         >
           <Text style={styles.checkoutButtonText}>Proceed to Checkout</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Add the PaystackPayment component */}
+      <PaystackPayment
+        isVisible={showPayment}
+        amount={calculateTotal()}
+        email={userEmail}
+        onCancel={handlePaymentCancel}
+        onSuccess={handlePaymentSuccess}
+      />
     </SafeAreaView>
   );
 };

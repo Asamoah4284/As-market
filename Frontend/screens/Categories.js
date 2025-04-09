@@ -208,17 +208,58 @@ const Categories = () => {
         style={styles.productCard}
         onPress={() => navigation.navigate('ProductDetails', { productId: item._id })}
       >
-        <Image 
-          source={{ uri: imageUri }} 
-          style={styles.productImage}
-          onError={(e) => console.log('Image error:', e.nativeEvent.error)}
-        />
+        <View style={styles.productImageContainer}>
+          <Image 
+            source={{ uri: imageUri }} 
+            style={styles.productImage}
+            resizeMode="cover"
+          />
+          {item.isNew && (
+            <View style={styles.productBadge}>
+              <Text style={styles.productBadgeText}>New</Text>
+            </View>
+          )}
+          <TouchableOpacity 
+            style={styles.favoriteButton}
+            onPress={() => console.log('Add to favorites')}
+          >
+            <Ionicons name="heart-outline" size={20} color="#fff" />
+          </TouchableOpacity>
+        </View>
         <View style={styles.productInfo}>
           <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
-          <Text style={styles.productPrice}>${item.price.toFixed(2)}</Text>
+          <View style={styles.productDetails}>
+            <View style={styles.priceContainer}>
+              <Text style={styles.productPrice}>${item.price.toFixed(2)}</Text>
+              {item.originalPrice && item.originalPrice > item.price && (
+                <Text style={styles.originalPrice}>${item.originalPrice.toFixed(2)}</Text>
+              )}
+            </View>
+          </View>
           <View style={styles.ratingContainer}>
-            <Ionicons name="star" size={14} color="#FFD700" />
-            <Text style={styles.ratingText}>{item.rating || '4.5'}</Text>
+            <View style={styles.starsContainer}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Ionicons 
+                  key={star} 
+                  name={star <= (item.rating || 0) ? "star" : "star-outline"} 
+                  size={14} 
+                  color="#FFD700" 
+                />
+              ))}
+            </View>
+            <Text style={styles.ratingCount}>({item.numReviews || 0})</Text>
+          </View>
+          <View style={styles.productFooter}>
+            <View style={styles.sellerInfo}>
+              <Ionicons name="person-outline" size={12} color="#666" />
+              <Text style={styles.sellerText} numberOfLines={1}>{item.seller?.name || 'Unknown Seller'}</Text>
+            </View>
+            <TouchableOpacity 
+              style={styles.addToCartButton}
+              onPress={() => console.log('Add to cart')}
+            >
+              <Ionicons name="cart-outline" size={20} color="#3498db" />
+            </TouchableOpacity>
           </View>
         </View>
       </TouchableOpacity>
@@ -634,41 +675,111 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 12,
     overflow: 'hidden',
-    elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowRadius: 4,
+    elevation: 3,
     maxWidth: '47%',
+  },
+  productImageContainer: {
+    position: 'relative',
+    height: 160,
+    backgroundColor: '#f8f8f8',
   },
   productImage: {
     width: '100%',
-    height: 150,
-    resizeMode: 'cover',
+    height: '100%',
+  },
+  productBadge: {
+    position: 'absolute',
+    top: 8,
+    left: 8,
+    backgroundColor: '#FF6B6B',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  productBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  favoriteButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   productInfo: {
     padding: 12,
   },
   productName: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#333',
-    marginBottom: 6,
+    marginBottom: 8,
+    // height: 40,
+  },
+  productDetails: {
+    marginBottom: 8,
+  },
+  priceContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
   },
   productPrice: {
     fontSize: 16,
     fontWeight: 'bold',
-    color: '#5D3FD3',
-    marginBottom: 6,
+    color: '#3498db',
+  },
+  originalPrice: {
+    fontSize: 12,
+    color: '#999',
+    textDecorationLine: 'line-through',
+    marginLeft: 4,
   },
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 8,
   },
-  ratingText: {
+  starsContainer: {
+    flexDirection: 'row',
+    marginRight: 4,
+  },
+  ratingCount: {
+    fontSize: 12,
+    color: '#666',
+  },
+  productFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  sellerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  sellerText: {
     fontSize: 12,
     color: '#666',
     marginLeft: 4,
+    flex: 1,
+  },
+  addToCartButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f0f0f0',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   loadingContainer: {
     flex: 1,

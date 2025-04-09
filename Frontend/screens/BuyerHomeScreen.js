@@ -61,13 +61,13 @@ const CATEGORIES = [
 const BANNER_DATA = [
   {
     id: '1',
-    image: 'https://images.unsplash.com/photo-1526178613552-2b45c6c302f0?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2000&q=80',
+    image: 'https://i.pinimg.com/736x/76/4d/1b/764d1b00c7719b5791c2d7d692a47264.jpg',
     title: 'Special Offers',
     subtitle: 'Up to 50% off',
   },
   {
     id: '2',
-    image: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2000&q=80',
+    image: require('../assets/images/asb.png'),
     title: 'New Arrivals',
     subtitle: 'Check out the latest',
   },
@@ -224,24 +224,50 @@ const BuyerHomeScreen = () => {
           });
         }}
       >
-       
+        <View style={styles.productImageContainer}>
           <Image 
             source={{ uri: item.image }} 
             style={styles.productImage}
             onError={(error) => console.error('Image loading error:', error.nativeEvent.error)}
             onLoad={() => console.log('Image loaded successfully:', imageUri)}
           />
+          <View style={styles.productBadge}>
+            <Text style={styles.productBadgeText}>New</Text>
+          </View>
+          <TouchableOpacity style={styles.favoriteButton}>
+            <Ionicons name="heart-outline" size={20} color="#fff" />
+          </TouchableOpacity>
+        </View>
         <View style={styles.productInfo}>
-          <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
+          <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
           <View style={styles.productDetails}>
             <View style={styles.priceContainer}>
-              <Text style={styles.priceLabel}>Price</Text>
               <Text style={styles.productPrice}>${item.price.toFixed(2)}</Text>
+              {item.originalPrice && (
+                <Text style={styles.originalPrice}>${item.originalPrice.toFixed(2)}</Text>
+              )}
             </View>
             <View style={styles.ratingContainer}>
-              <Ionicons name="star" size={16} color="#FFD700" />
-              <Text style={styles.ratingText}>{item.rating}</Text>
+              <View style={styles.starsContainer}>
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Ionicons 
+                    key={star} 
+                    name={star <= 4 ? "star" : "star-outline"} 
+                    size={14} 
+                    color="#FFD700" 
+                  />
+                ))}
+              </View>
             </View>
+          </View>
+          <View style={styles.productFooter}>
+            <View style={styles.sellerInfo}>
+              <Ionicons name="car-outline" size={12} color="#666" />
+              <Text style={styles.sellerText}>15% off delivery</Text>
+            </View>
+            <TouchableOpacity style={styles.addToCartButton}>
+              <Ionicons name="add-circle" size={20} color="#3498db" />
+            </TouchableOpacity>
           </View>
         </View>
       </TouchableOpacity>
@@ -284,25 +310,49 @@ const BuyerHomeScreen = () => {
           });
         }}
       >
-        <Image 
-          source={{ uri: item.image }} 
-          style={styles.productImage}
-          onError={(error) => console.error('Image loading error:', error.nativeEvent.error)}
-          onLoad={() => console.log('Image loaded successfully:', imageUri)}
-        />
+        <View style={styles.productImageContainer}>
+          <Image 
+            source={{ uri: item.image }} 
+            style={styles.productImage}
+            onError={(error) => console.error('Image loading error:', error.nativeEvent.error)}
+            onLoad={() => console.log('Image loaded successfully:', imageUri)}
+          />
+          <View style={[styles.productBadge, { backgroundColor: '#4ECDC4' }]}>
+            <Text style={styles.productBadgeText}>Service</Text>
+          </View>
+          <TouchableOpacity style={styles.favoriteButton}>
+            <Ionicons name="heart-outline" size={20} color="#fff" />
+          </TouchableOpacity>
+        </View>
         <View style={styles.productInfo}>
-          <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
+          <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
           <View style={styles.productDetails}>
             <View style={styles.priceContainer}>
-              <Text style={styles.priceLabel}>Starting from</Text>
               <Text style={styles.productPrice}>${item.price.toFixed(2)}</Text>
             </View>
             {item.rating && (
               <View style={styles.ratingContainer}>
-                <Ionicons name="star" size={16} color="#FFD700" />
-                <Text style={styles.ratingText}>{item.rating}</Text>
+                <View style={styles.starsContainer}>
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <Ionicons 
+                      key={star} 
+                      name={star <= 4 ? "star" : "star-outline"} 
+                      size={14} 
+                      color="#FFD700" 
+                    />
+                  ))}
+                </View>
               </View>
             )}
+          </View>
+          <View style={styles.productFooter}>
+            <View style={styles.sellerInfo}>
+              <Ionicons name="time-outline" size={12} color="#666" />
+              <Text style={styles.sellerText}>Available Now</Text>
+            </View>
+            <TouchableOpacity style={styles.addToCartButton}>
+              <Ionicons name="add-circle" size={20} color="#3498db" />
+            </TouchableOpacity>
           </View>
         </View>
       </TouchableOpacity>
@@ -349,7 +399,7 @@ const BuyerHomeScreen = () => {
               renderItem={({ item }) => (
                 <View style={styles.bannerSlide}>
                   <Image 
-                    source={{ uri: item.image }} 
+                    source={typeof item.image === 'string' ? { uri: item.image } : item.image}
                     style={styles.banner}
                     resizeMode="cover"
                   />
@@ -545,14 +595,14 @@ const BuyerHomeScreen = () => {
 
                 <TouchableOpacity 
                   style={styles.gridItem}
-                  onPress={() => navigation.navigate('CategoriesScreen', { categoryName: 'Kids', categoryId: 'kids' })}
+                  onPress={() => navigation.navigate('CategoriesScreen', { categoryName: 'Asarion', categoryId: 'Asarion' })}
                 >
                   <Image 
-                    source={{ uri: 'https://images.unsplash.com/photo-1622290291468-a28f7a7dc6a8?ixlib=rb-4.0.3' }} 
+                    source={require('../assets/images/Asarion2.png')} 
                     style={styles.gridImage}
                   />
                   <View style={styles.gridOverlay}>
-                    <Text style={styles.gridTitle}>Kids</Text>
+                    <Text style={styles.gridTitle}>Asarion</Text>
                   </View>
                 </TouchableOpacity>
               </View>
@@ -590,7 +640,7 @@ const BuyerHomeScreen = () => {
                   onPress={() => navigation.navigate('CategoriesScreen', { categoryName: 'Bags', categoryId: 'bags' })}
                 >
                   <Image 
-                    source={{ uri: 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?ixlib=rb-4.0.3' }} 
+                    source={{ uri: 'https://images.unsplash.com/photo-1584917865442-a4155224a1ad' }} 
                     style={styles.gridImage}
                   />
                   <View style={styles.gridOverlay}>
@@ -958,45 +1008,123 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
   },
   productCard: {
-    width: 160,
+    width: 180,
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 16,
     marginHorizontal: 8,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    shadowRadius: 8,
+    elevation: 4,
+    marginBottom: 8,
+  },
+  productImageContainer: {
+    position: 'relative',
+    height: 140,
   },
   productImage: {
     width: '100%',
-    height: 120,
+    height: '100%',
     backgroundColor: '#f0f0f0',
+    resizeMode: 'cover',
+  },
+  productBadge: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    backgroundColor: '#FF6B6B',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  productBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  favoriteButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   productInfo: {
     padding: 12,
   },
   productName: {
     fontSize: 14,
-    fontWeight: '500',
+    fontWeight: '600',
     color: '#333',
-    marginBottom: 4,
+    marginBottom: 6,
+  },
+  productDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  priceContainer: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
   },
   productPrice: {
     fontSize: 16,
     fontWeight: 'bold',
     color: '#3498db',
-    marginBottom: 4,
+  },
+  originalPrice: {
+    fontSize: 12,
+    color: '#999',
+    textDecorationLine: 'line-through',
+    marginLeft: 4,
   },
   ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 215, 0, 0.1)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+  },
+  starsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   ratingText: {
     fontSize: 12,
     color: '#666',
-    marginLeft: 4,
+    marginLeft: 2,
+    fontWeight: '500',
+  },
+  productFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  sellerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  sellerText: {
+    fontSize: 10,
+    color: '#666',
+    marginLeft: 2,
+  },
+  addToCartButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(52, 152, 219, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   scrollContent: {
     flex: 1,
@@ -1055,21 +1183,6 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 16,
   },
-  productDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 8,
-  },
-  priceContainer: {
-    flexDirection: 'column',
-    alignItems: 'flex-start',
-  },
-  priceLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 2,
-  },
   fullScreenContainer: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.9)',
@@ -1116,12 +1229,18 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   gridItem: {
-    width: '22%',
-    height: 70,
-    borderRadius: 8,
+    width: (Dimensions.get('window').width - 56) / 4,
+    height: (Dimensions.get('window').width - 56) / 4,
+    borderRadius: 16,
     overflow: 'hidden',
     position: 'relative',
     marginHorizontal: 2,
+    backgroundColor: '#fff',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   gridImage: {
     width: '100%',
@@ -1133,12 +1252,14 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    backgroundColor: 'rgba(0,0,0,0.4)',
-    padding: 6,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    padding: 8,
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
   },
   gridTitle: {
     color: '#fff',
-    fontSize: 12, // Reduced font size to fit smaller boxes
+    fontSize: 12,
     fontWeight: 'bold',
     textAlign: 'center',
   },
@@ -1158,22 +1279,19 @@ const styles = StyleSheet.create({
     width: 200,
     height: 250,
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 16,
     marginRight: 16,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 8,
+    elevation: 4,
   },
   dealBadge: {
     position: 'absolute',
     top: 12,
-    right: 12,
+    left: 12,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
@@ -1186,7 +1304,7 @@ const styles = StyleSheet.create({
   },
   dealImage: {
     width: '100%',
-    height: 160,
+    height: 150,
     resizeMode: 'cover',
   },
   dealInfo: {
@@ -1207,34 +1325,48 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   brandCircle: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: '#fff',
+    marginRight: 16,
+    justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
   },
   brandLogo: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: '#fff',
-    marginBottom: 8,
-    borderWidth: 2,
-    borderColor: '#e0e0e0',
+    width: 50,
+    height: 50,
+    borderRadius: 25,
   },
   brandName: {
+    marginTop: 8,
     fontSize: 12,
     color: '#333',
     fontWeight: '500',
   },
   collectionsContainer: {
-    paddingHorizontal: 16,
     flexDirection: 'row',
     justifyContent: 'space-between',
+    marginTop: 16,
   },
   collectionCard: {
-    width: '48%',
-    height: 180,
-    borderRadius: 12,
+    width: (Dimensions.get('window').width - 48) / 2,
+    height: 200,
+    borderRadius: 16,
     overflow: 'hidden',
     position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
   },
   collectionImage: {
     width: '100%',
@@ -1247,18 +1379,24 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     padding: 16,
-    backgroundColor: 'rgba(0,0,0,0.4)',
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    borderBottomLeftRadius: 16,
+    borderBottomRightRadius: 16,
   },
   collectionTitle: {
-    color: '#fff',
     fontSize: 16,
     fontWeight: 'bold',
+    color: '#fff',
     marginBottom: 4,
   },
   collectionSubtitle: {
-    color: '#fff',
+    fontSize: 14,
+    color: 'rgba(255,255,255,0.8)',
+  },
+  serviceLabel: {
     fontSize: 12,
-    opacity: 0.8,
+    color: '#666',
+    marginLeft: 2,
   },
 });
 
