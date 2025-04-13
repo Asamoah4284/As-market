@@ -208,6 +208,7 @@ const PendingProducts = () => {
     );
   }
 
+
   if (error) {
     return (
       <View style={styles.centeredContainer}>
@@ -223,7 +224,6 @@ const PendingProducts = () => {
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Pending Products</Text>
         <TouchableOpacity style={styles.refreshButton} onPress={handleRefresh}>
           <MaterialIcons name="refresh" size={24} color="#0066cc" />
         </TouchableOpacity>

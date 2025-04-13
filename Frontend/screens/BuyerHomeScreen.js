@@ -11,6 +11,7 @@ import {
   SafeAreaView,
   Modal,
   Dimensions,
+  Platform,
 } from 'react-native';
 import { useState, useEffect, useRef } from 'react';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
@@ -363,7 +364,7 @@ const BuyerHomeScreen = () => {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
       <View style={styles.container}>
-        {/* Header */}
+        {/* Header with extra padding for Android */}
         <View style={styles.header}>
           <View style={styles.headerContent}>
             <Text style={styles.greeting}>Hello, {userName}!</Text>
@@ -800,7 +801,7 @@ const BuyerHomeScreen = () => {
             style={styles.navItem} 
             onPress={() => navigation.navigate('Home')}
           >
-            <Ionicons name="home" size={24} color="#5D3FD3" />
+            <Ionicons name="home" size={22} color="#5D3FD3" />
             <Text style={[styles.navText, styles.activeNavText]}>Home</Text>
           </TouchableOpacity>
           
@@ -808,23 +809,35 @@ const BuyerHomeScreen = () => {
             style={styles.navItem} 
             onPress={() => navigation.navigate('Categories')}
           >
-            <Ionicons name="grid-outline" size={24} color="#999" />
+            <Ionicons name="grid-outline" size={22} color="#999" />
             <Text style={styles.navText}>Categories</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
-            style={styles.navItem} 
+            style={styles.centerButton}
             onPress={() => navigation.navigate('Cart')}
           >
-            <Ionicons name="cart-outline" size={24} color="#999" />
-            <Text style={styles.navText}>Cart</Text>
+            <View style={styles.centerButtonInner}>
+              <Ionicons name="cart" size={24} color="#fff" />
+              <View style={styles.cartBadge}>
+                <Text style={styles.cartBadgeText}>+5</Text>
+              </View>
+            </View>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.navItem} 
+            onPress={() => navigation.navigate('Favorites')}
+          >
+            <Ionicons name="heart-outline" size={22} color="#999" />
+            <Text style={styles.navText}>Favorites</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
             style={styles.navItem} 
             onPress={() => navigation.navigate('Profile')}
           >
-            <Ionicons name="person-outline" size={24} color="#999" />
+            <Ionicons name="person-outline" size={22} color="#999" />
             <Text style={styles.navText}>Profile</Text>
           </TouchableOpacity>
         </View>
@@ -861,7 +874,7 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: '#fff',
-    paddingTop: StatusBar.currentHeight || 0, // Add padding for Android StatusBar
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
   },
   container: {
     flex: 1,
@@ -872,10 +885,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingVertical: Platform.OS === 'android' ? 16 : 16,
+    paddingTop: Platform.OS === 'android' ? 24 : 16,
     backgroundColor: '#f8f9fa',
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
+    height: Platform.OS === 'android' ? 80 : 60,
   },
   headerContent: {
     flex: 1,
@@ -987,8 +1002,8 @@ const styles = StyleSheet.create({
   },
   categoryCard: {
     alignItems: 'center',
-    marginHorizontal: 8,
-    width: 80,
+    marginHorizontal: 12,
+    width: 50,
   },
   categoryIconContainer: {
     width: 60,
@@ -1000,7 +1015,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   categoryName: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#333',
     textAlign: 'center',
   },
@@ -1010,19 +1025,14 @@ const styles = StyleSheet.create({
   productCard: {
     width: 180,
     backgroundColor: '#fff',
-    borderRadius: 16,
     marginHorizontal: 8,
     overflow: 'hidden',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
+   
     marginBottom: 8,
   },
   productImageContainer: {
     position: 'relative',
-    height: 140,
+    height: 100,
   },
   productImage: {
     width: '100%',
@@ -1135,20 +1145,21 @@ const styles = StyleSheet.create({
     height: 60,
     backgroundColor: '#fff',
     borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
+    borderTopColor: '#e9e9e9',
     position: 'absolute',
     bottom: 0,
     left: 0,
     right: 0,
-    paddingVertical: 6,
+    paddingVertical: 8,
     paddingHorizontal: 10,
     justifyContent: 'space-between',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     elevation: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
+    zIndex: 999,
   },
   navItem: {
     flex: 1,
@@ -1156,8 +1167,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   navText: {
-    fontSize: 12,
-    marginTop: 2,
+    fontSize: 10,
+    marginTop: 4,
     color: '#999',
   },
   activeNavText: {
@@ -1276,10 +1287,10 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   dealCard: {
-    width: 200,
-    height: 250,
+    width: 180,
+    height: 180,
     backgroundColor: '#fff',
-    borderRadius: 16,
+    // borderRadius: 16,
     marginRight: 16,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -1304,7 +1315,7 @@ const styles = StyleSheet.create({
   },
   dealImage: {
     width: '100%',
-    height: 150,
+    height: 100,
     resizeMode: 'cover',
   },
   dealInfo: {
@@ -1321,24 +1332,23 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   brandContainer: {
-    paddingHorizontal: 16,
+    // paddingHorizontal: 16,
     marginBottom: 20,
   },
   brandCircle: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: '#fff',
+    // backgroundColor: '#fff',
     marginRight: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 2,
-    borderWidth: 1,
-    borderColor: 'rgba(0,0,0,0.05)',
+    // borderWidth: 1,
+    // borderColor: 'rgba(0,0,0,0.05)',
   },
   brandLogo: {
     width: 50,
@@ -1358,14 +1368,11 @@ const styles = StyleSheet.create({
   },
   collectionCard: {
     width: (Dimensions.get('window').width - 48) / 2,
-    height: 200,
-    borderRadius: 16,
+    height: 150,
     overflow: 'hidden',
     position: 'relative',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
+  
     elevation: 4,
   },
   collectionImage: {
@@ -1398,9 +1405,51 @@ const styles = StyleSheet.create({
     color: '#666',
     marginLeft: 2,
   },
+  centerButton: {
+    top: -30,
+    width: 58,
+    height: 58,
+    borderRadius: 29,
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+  },
+  centerButtonInner: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#5D3FD3',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  cartBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#f9004d',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#fff',
+  },
+  cartBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+    paddingHorizontal: 3,
+  },
 });
 
 export default BuyerHomeScreen;
+
 
 
 

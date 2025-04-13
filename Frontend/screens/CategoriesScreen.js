@@ -243,9 +243,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: 16,
-    backgroundColor: '#3498db',
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    backgroundColor: '#5D3FD3',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -279,10 +277,10 @@ const styles = StyleSheet.create({
   productItem: {
     width: '48%',
     backgroundColor: '#fff',
-    borderRadius: 14,
+    // borderRadius: 14,
     marginBottom: 15,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 6,
     elevation: 3,
@@ -291,7 +289,7 @@ const styles = StyleSheet.create({
   imageContainer: {
     position: 'relative',
     width: '100%',
-    height: 150,
+    height: 100,
   },
   productImage: {
     width: '100%',
@@ -327,13 +325,13 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 5,
-    height: 40, // Fixed height for two lines
+    marginBottom: 3,
+    // Fixed height for two lines
   },
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 5,
+    marginBottom: 3,
   },
   ratingText: {
     fontSize: 12,
@@ -351,7 +349,7 @@ const styles = StyleSheet.create({
     marginBottom: 5,
   },
   productPrice: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#3498db',
     marginRight: 5,
@@ -385,7 +383,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 6,
-    borderRadius: 10,
+    // borderRadius: 10,
     marginTop: 4,
   },
   addToCartText: {

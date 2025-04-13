@@ -2,6 +2,7 @@ const Order = require('../models/Order');
 const Cart = require('../models/cartModel');
 const https = require('https');
 const asyncHandler = require('express-async-handler');
+const Product = require('../models/productModel');
 
 // Paystack secret key
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
@@ -295,11 +296,105 @@ const updateOrderStatus = asyncHandler(async (req, res) => {
   res.json(updatedOrder);
 });
 
+// @desc    Get all orders (Admin only)
+// @route   GET /api/orders
+// @access  Private/Admin
+const getAllOrders = asyncHandler(async (req, res) => {
+  try {
+    const orders = await Order.find({})
+      .populate('user', 'id name email')
+      .sort({ createdAt: -1 });
+
+    res.json(orders);
+  } catch (error) {
+    console.error('Error fetching all orders:', error);
+    res.status(500).json({ message: 'Error fetching orders' });
+  }
+});
+
+// @desc    Get seller's orders
+// @route   GET /api/orders/seller
+// @access  Private/Seller
+const getSellerOrders = asyncHandler(async (req, res) => {
+  try {
+    const sellerId = req.user._id;
+    console.log('Fetching orders for seller:', sellerId);
+
+    // First, find all products belonging to the seller
+    const sellerProducts = await Product.find({ seller: sellerId });
+    console.log('Found seller products:', sellerProducts.length);
+
+    if (!sellerProducts.length) {
+      console.log('No products found for seller');
+      return res.json([]);
+    }
+
+    const productIds = sellerProducts.map(product => product._id);
+    console.log('Product IDs to search for:', productIds);
+
+    // Find orders containing any of the seller's products
+    const orders = await Order.find({
+      'items': {
+        $elemMatch: {
+          'product': { $in: productIds }
+        }
+      }
+    })
+    .populate({
+      path: 'user',
+      select: 'name email phone'
+    })
+    .populate({
+      path: 'items.product',
+      select: 'name price seller'
+    })
+    .sort('-createdAt');
+
+    console.log('Found orders:', orders.length);
+
+    // Transform orders to include only the seller's products
+    const transformedOrders = orders.map(order => {
+      // Filter items to only include products from this seller
+      const sellerItems = order.items.filter(item => 
+        item.product && 
+        item.product.seller && 
+        item.product.seller.toString() === sellerId.toString()
+      );
+
+      if (sellerItems.length === 0) return null;
+
+      // Calculate total amount for seller's items
+      const totalAmount = sellerItems.reduce((sum, item) => 
+        sum + (item.price * item.quantity), 0
+      );
+
+      return {
+        _id: order._id,
+        user: order.user,
+        items: sellerItems,
+        totalAmount,
+        orderStatus: order.orderStatus,
+        createdAt: order.createdAt,
+        shippingAddress: order.shippingAddress
+      };
+    }).filter(Boolean); // Remove any null orders
+
+    console.log('Transformed orders:', transformedOrders.length);
+    res.json(transformedOrders);
+  } catch (error) {
+    console.error('Error in getSellerOrders:', error);
+    res.status(500);
+    throw new Error('Failed to fetch seller orders: ' + error.message);
+  }
+});
+
 module.exports = {
   createOrder,
   getOrderById,
   getMyOrders,
   updateOrderStatus,
   testPaystackConnection,
-  initializePayment
+  initializePayment,
+  getAllOrders,
+  getSellerOrders
 }; 

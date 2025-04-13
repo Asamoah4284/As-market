@@ -199,6 +199,7 @@ const Categories = () => {
     });
   
   const renderProduct = ({ item }) => {
+    console.log('Product item:', item);
     const imageUri = item.image && (item.image.startsWith('http') 
       ? item.image 
       : `http://10.10.90.155:5000${item.image}`);
@@ -230,9 +231,9 @@ const Categories = () => {
           <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
           <View style={styles.productDetails}>
             <View style={styles.priceContainer}>
-              <Text style={styles.productPrice}>${item.price.toFixed(2)}</Text>
+              <Text style={styles.productPrice}>GHC{item.price.toFixed(2)}</Text>
               {item.originalPrice && item.originalPrice > item.price && (
-                <Text style={styles.originalPrice}>${item.originalPrice.toFixed(2)}</Text>
+                <Text style={styles.originalPrice}>GHC{item.originalPrice.toFixed(2)}</Text>
               )}
             </View>
           </View>
@@ -673,10 +674,9 @@ const styles = StyleSheet.create({
     flex: 1,
     margin: 8,
     backgroundColor: '#fff',
-    borderRadius: 12,
     overflow: 'hidden',
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
@@ -684,7 +684,7 @@ const styles = StyleSheet.create({
   },
   productImageContainer: {
     position: 'relative',
-    height: 160,
+    height: 100,
     backgroundColor: '#f8f8f8',
   },
   productImage: {
@@ -717,24 +717,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   productInfo: {
-    padding: 12,
+    padding: 10,
   },
   productName: {
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 8,
+    marginBottom: 2,
     // height: 40,
   },
   productDetails: {
-    marginBottom: 8,
+    marginBottom: 4,
   },
   priceContainer: {
     flexDirection: 'row',
     alignItems: 'baseline',
   },
   productPrice: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: 'bold',
     color: '#3498db',
   },
@@ -747,7 +747,7 @@ const styles = StyleSheet.create({
   ratingContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   starsContainer: {
     flexDirection: 'row',
@@ -768,7 +768,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   sellerText: {
-    fontSize: 12,
+    fontSize: 10,
     color: '#666',
     marginLeft: 4,
     flex: 1,

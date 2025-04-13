@@ -7,7 +7,9 @@ const {
   getMyOrders,
   updateOrderStatus,
   testPaystackConnection,
-  initializePayment
+  initializePayment,
+  getAllOrders,
+  getSellerOrders
 } = require('../controllers/orderController');
 
 // Test routes
@@ -16,10 +18,14 @@ router.post('/initialize-payment', protect, initializePayment);
 
 // Order routes
 router.route('/')
-  .post(protect, createOrder);
+  .post(protect, createOrder)
+  .get(protect, getAllOrders);
 
 router.route('/myorders')
   .get(protect, getMyOrders);
+
+router.route('/seller')
+  .get(protect, getSellerOrders);
 
 router.route('/:id')
   .get(protect, getOrderById);

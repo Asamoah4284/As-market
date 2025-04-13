@@ -13,6 +13,9 @@ import FeaturedServices from './FeaturedServices';
 import TrendingProducts from './TrendingProducts';
 import SpecialOffers from './SpecialOffers';
 import PremiumProducts from './PremiumProducts';
+import AllOrders from './AllOrders';
+import PendingOrders from './PendingOrders';
+import CompletedOrders from './CompletedOrders';
 // Ignore specific SVG-related warnings
 LogBox.ignoreLogs([
   'Invariant Violation: Tried to register two views with the same name RNSVGFeFlood',
@@ -108,10 +111,9 @@ const Admin = () => {
       section: 'orders',
       description: 'Track and process orders',
       subItems: [
-        { title: 'All Orders', screen: 'OrderManagement', params: { filter: 'All Orders' } },
-        
-        { title: 'Delivered', screen: 'OrderManagement', params: { filter: 'Delivered' } },
-        { title: 'Cancelled', screen: 'OrderManagement', params: { filter: 'Cancelled' } }
+        { title: 'All Orders', params: { filter: 'All Orders' } },
+        { title: 'Pending Orders', params: { filter: 'Pending Orders' } },
+        { title: 'Completed Orders', params: { filter: 'Completed Orders' } }
       ]
     },
     {
@@ -457,92 +459,14 @@ const Admin = () => {
         }
       case 'orders':
         return (
-          <ScrollView>
-            <View>
-              <TouchableOpacity 
-                style={styles.sectionHeader}
-                onPress={() => setShowOrderDropdowns(!showOrderDropdowns)}
-              >
-                <Text style={styles.sectionTitle}>Order Management</Text>
-                <MaterialIcons 
-                  name={showOrderDropdowns ? "keyboard-arrow-up" : "keyboard-arrow-down"} 
-                  size={24} 
-                  color="#333" 
-                />
-              </TouchableOpacity>
-              
-              {showOrderDropdowns && (
-                <View style={styles.orderCategoriesContainer}>
-                  <TouchableOpacity 
-                    style={styles.categoryDropdown} 
-                    onPress={() => navigation.navigate('OrderManagement', { filter: 'All Orders' })}
-                  >
-                    <Text style={styles.categoryText}>All Orders</Text>
-                    <MaterialIcons name="keyboard-arrow-right" size={24} color="#0066cc" />
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity 
-                    style={styles.categoryDropdown} 
-                    onPress={() => navigation.navigate('OrderManagement', { filter: 'Pending' })}
-                  >
-                    <Text style={styles.categoryText}>Pending</Text>
-                    <MaterialIcons name="keyboard-arrow-right" size={24} color="#0066cc" />
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity 
-                    style={styles.categoryDropdown} 
-                    onPress={() => navigation.navigate('OrderManagement', { filter: 'Processing' })}
-                  >
-                    <Text style={styles.categoryText}>Processing</Text>
-                    <MaterialIcons name="keyboard-arrow-right" size={24} color="#0066cc" />
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity 
-                    style={styles.categoryDropdown} 
-                    onPress={() => navigation.navigate('OrderManagement', { filter: 'Shipped' })}
-                  >
-                    <Text style={styles.categoryText}>Shipped</Text>
-                    <MaterialIcons name="keyboard-arrow-right" size={24} color="#0066cc" />
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity 
-                    style={styles.categoryDropdown} 
-                    onPress={() => navigation.navigate('OrderManagement', { filter: 'Delivered' })}
-                  >
-                    <Text style={styles.categoryText}>Delivered</Text>
-                    <MaterialIcons name="keyboard-arrow-right" size={24} color="#0066cc" />
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity 
-                    style={styles.categoryDropdown} 
-                    onPress={() => navigation.navigate('OrderManagement', { filter: 'Cancelled' })}
-                  >
-                    <Text style={styles.categoryText}>Cancelled</Text>
-                    <MaterialIcons name="keyboard-arrow-right" size={24} color="#0066cc" />
-                  </TouchableOpacity>
-                </View>
-              )}
-              
-              <View style={styles.orderStatsContainer}>
-                <View style={styles.productStatCard}>
-                  <Text style={styles.productStatValue}>42</Text>
-                  <Text style={styles.productStatLabel}>Pending</Text>
-                </View>
-                <View style={styles.productStatCard}>
-                  <Text style={styles.productStatValue}>78</Text>
-                  <Text style={styles.productStatLabel}>Processing</Text>
-                </View>
-                <View style={styles.productStatCard}>
-                  <Text style={styles.productStatValue}>156</Text>
-                  <Text style={styles.productStatLabel}>Completed</Text>
-                </View>
-              </View>
-              
-              {!showOrderDropdowns && (
-                <Text style={styles.placeholderText}>Tap on Order Management to view categories</Text>
-              )}
+          <View style={[styles.sectionContainer, {flex: 1, padding: 0}]}>
+            <Text style={styles.sectionTitle}>Order Management</Text>
+            <View style={styles.componentContainer}>
+              {route.params?.filter === 'All Orders' && <AllOrders />}
+              {route.params?.filter === 'Pending Orders' && <PendingOrders />}
+              {route.params?.filter === 'Completed Orders' && <CompletedOrders />}
             </View>
-          </ScrollView>
+          </View>
         );
       case 'settings':
         return (

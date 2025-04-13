@@ -41,6 +41,7 @@ const SellerDashboardScreen = () => {
   };
 
   const API_URL = 'http://172.20.10.3:5000';
+  const API_BASE_URL = 'http://172.20.10.3:5000';
 
   const [activeTab, setActiveTab] = useState('products');
   const [products, setProducts] = useState([]);
@@ -178,19 +179,40 @@ const SellerDashboardScreen = () => {
     return () => clearTimeout(timer);
   }, []);
 
+  // Add useEffect for orders
+  useEffect(() => {
+    if (activeTab === 'orders') {
+      fetchOrders();
+    }
+  }, [activeTab]);
+
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      const fetchedOrders = await mockFetchOrders();
+      console.log('Fetched orders:', fetchedOrders);
+      setOrders(fetchedOrders);
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      Alert.alert('Error', 'Failed to fetch orders');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const fetchData = async () => {
     try {
-      // Only fetch products from API, remove mock data
-      await fetchProducts();
-      const ordersResponse = await mockFetchOrders();
-      const chatsResponse = await mockFetchChats();
-      
-      setOrders(ordersResponse);
-      setChats(chatsResponse);
+      setLoading(true);
+      await Promise.all([
+        fetchProducts(),
+        fetchProfileData(),
+        fetchOrders() // Add orders to initial fetch
+      ]);
     } catch (error) {
       console.error('Error fetching data:', error);
-      // Ensure products is set to empty array if there's an error
-      setProducts([]);
+      Alert.alert('Error', 'Failed to fetch data');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -245,12 +267,36 @@ const SellerDashboardScreen = () => {
     }
   };
 
-  const mockFetchOrders = () => {
-    return Promise.resolve([
-      { id: '1', customer: 'John Doe', date: '2023-05-15', status: 'Pending', total: 99.99, items: [{ productId: '1', quantity: 1 }] },
-      { id: '2', customer: 'Jane Smith', date: '2023-05-14', status: 'Shipped', total: 149.97, items: [{ productId: '2', quantity: 3 }] },
-      { id: '3', customer: 'Bob Johnson', date: '2023-05-13', status: 'Delivered', total: 29.99, items: [{ productId: '3', quantity: 1 }] },
-    ]);
+  const mockFetchOrders = async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        console.log('No token found');
+        return [];
+      }
+
+      const response = await fetch('http://172.20.10.3:5000/api/orders/seller', {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      console.log('Orders API Response Status:', response.status);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Fetched orders:', data);
+        return data;
+      } else {
+        console.error('Failed to fetch orders:', response.status);
+        return [];
+      }
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      return [];
+    }
   };
 
   const mockFetchChats = () => {
@@ -493,11 +539,34 @@ const SellerDashboardScreen = () => {
     }
   };
 
-  const handleUpdateOrderStatus = (orderId, newStatus) => {
-    // In a real app, this would be an API call
-    setOrders(orders.map(order => 
-      order.id === orderId ? { ...order, status: newStatus } : order
-    ));
+  const handleUpdateOrderStatus = async (orderId, newStatus) => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        Alert.alert('Error', 'Authentication required');
+        return;
+      }
+
+      const response = await fetch(`${API_URL}/api/orders/${orderId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update order status');
+      }
+
+      // Refresh orders after successful update
+      await mockFetchOrders();
+      Alert.alert('Success', 'Order status updated successfully');
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      Alert.alert('Error', 'Failed to update order status. Please try again later.');
+    }
   };
 
   const renderProductItem = ({ item }) => {
@@ -599,62 +668,69 @@ const SellerDashboardScreen = () => {
     );
   };
 
-  const renderOrderItem = ({ item }) => (
-    <View style={[styles.card, { backgroundColor: colors.cardBackground }]}>
-      <View style={styles.orderHeader}>
-        <View style={styles.orderCustomerInfo}>
-          <View style={styles.orderAvatar}>
-            <Text style={styles.orderAvatarText}>{item.customer.charAt(0)}</Text>
+  const renderOrderItem = ({ item }) => {
+    // Add null check for item
+    if (!item) return null;
+
+    return (
+      <View style={styles.orderCard}>
+        <View style={styles.orderHeader}>
+          <Text style={styles.orderId}>Order #{item._id || 'N/A'}</Text>
+          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status || 'pending') }]}>
+            <Text style={styles.statusText}>{item.status || 'Pending'}</Text>
           </View>
-          <View>
-            <Text style={[styles.orderCustomer, { color: colors.text }]}>{item.customer}</Text>
-            <Text style={[styles.orderDate, { color: colors.textSecondary }]}>{item.date}</Text>
-          </View>
         </View>
-        <View style={[styles.orderStatus, { backgroundColor: getStatusColor(item.status).bg }]}>
-          <Text style={[styles.orderStatusText, { color: getStatusColor(item.status).text }]}>{item.status}</Text>
+        
+        <View style={styles.orderDetails}>
+          <Text style={styles.customerName}>Customer: {item.user?.name || 'Unknown'}</Text>
+          <Text style={styles.orderDate}>Date: {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'N/A'}</Text>
+          <Text style={styles.orderTotal}>Total: ${item.totalAmount?.toFixed(2) || '0.00'}</Text>
         </View>
-      </View>
-      <View style={styles.orderDivider} />
-      <View style={styles.orderDetails}>
-        <View style={styles.orderItemCount}>
-          <MaterialIcons name="shopping-bag" size={16} color={colors.textSecondary} />
-          <Text style={[styles.orderItemCountText, { color: colors.textSecondary }]}>
-            {item.items.reduce((sum, item) => sum + item.quantity, 0)} items
-          </Text>
+
+        <View style={styles.orderItems}>
+          {(item.orderItems || []).map((orderItem, index) => (
+            <View key={index} style={styles.orderItem}>
+              <Image 
+                source={{ uri: orderItem.product?.image || 'https://via.placeholder.com/50' }} 
+                style={styles.orderItemImage} 
+              />
+              <View style={styles.orderItemDetails}>
+                <Text style={styles.orderItemName}>{orderItem.product?.name || 'Unknown Product'}</Text>
+                <Text style={styles.orderItemPrice}>${orderItem.price?.toFixed(2) || '0.00'} x {orderItem.quantity || 1}</Text>
+              </View>
+            </View>
+          ))}
         </View>
-        <Text style={[styles.orderTotal, { color: colors.primary }]}>
-          ${item.total.toFixed(2)}
-        </Text>
-      </View>
-      <View style={styles.orderActions}>
-        {item.status === 'Pending' && (
+
+        <View style={styles.orderActions}>
           <TouchableOpacity 
-            style={[styles.statusButton, { backgroundColor: colors.primary }]}
-            onPress={() => handleUpdateOrderStatus(item.id, 'Shipped')}
+            style={[styles.actionButton, styles.viewButton]}
+            onPress={() => navigation.navigate('OrderDetails', { orderId: item._id })}
           >
-            <MaterialIcons name="local-shipping" size={16} color="white" />
-            <Text style={styles.statusButtonText}>Ship Order</Text>
+            <Text style={styles.actionButtonText}>View Details</Text>
           </TouchableOpacity>
-        )}
-        {item.status === 'Shipped' && (
-          <TouchableOpacity 
-            style={[styles.statusButton, { backgroundColor: colors.success }]}
-            onPress={() => handleUpdateOrderStatus(item.id, 'Delivered')}
-          >
-            <MaterialIcons name="check-circle" size={16} color="white" />
-            <Text style={styles.statusButtonText}>Mark Delivered</Text>
-          </TouchableOpacity>
-        )}
-        <TouchableOpacity 
-          style={[styles.viewButton, { backgroundColor: colors.background, borderColor: colors.border }]}
-          onPress={() => navigation.navigate('OrderDetails', { orderId: item.id })}
-        >
-          <Text style={[styles.viewButtonText, { color: colors.text }]}>View Details</Text>
-        </TouchableOpacity>
+          
+          {(item.status === 'pending' || !item.status) && (
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.acceptButton]}
+              onPress={() => handleUpdateOrderStatus(item._id, 'processing')}
+            >
+              <Text style={styles.actionButtonText}>Accept Order</Text>
+            </TouchableOpacity>
+          )}
+          
+          {item.status === 'processing' && (
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.completeButton]}
+              onPress={() => handleUpdateOrderStatus(item._id, 'completed')}
+            >
+              <Text style={styles.actionButtonText}>Mark as Completed</Text>
+            </TouchableOpacity>
+          )}
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
 
   const renderChatItem = ({ item }) => (
     <TouchableOpacity 
@@ -704,106 +780,40 @@ const SellerDashboardScreen = () => {
   };
 
   const renderTabContent = () => {
-    if (loading) {
-      return (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.primary} />
-        </View>
-      );
-    }
-
     switch (activeTab) {
-      case 'products':
-        return (
-          <>
-            <View style={styles.tabHeader}>
-              <Text style={[styles.tabTitle, { color: colors.text }]}>My Products</Text>
-              <TouchableOpacity 
-                style={[styles.addButton, { backgroundColor: colors.primary }]}
-                onPress={handleAddProduct}
-              >
-                <Text style={styles.addButtonText}>Add Product</Text>
-                <MaterialIcons name="add" size={18} color="white" />
-              </TouchableOpacity>
-            </View>
-            
-            {/* Status info section */}
-            {showStatusGuide && (
-              <View style={[styles.statusInfoContainer, { 
-                backgroundColor: colors.cardBackground,
-                borderLeftColor: colors.primary 
-              }]}>
-                <Text style={[styles.statusInfoTitle, { color: colors.text }]}>Product Status Guide:</Text>
-                <View style={styles.statusRow}>
-                  <View style={[styles.statusDot, { backgroundColor: 'rgba(255, 159, 28, 0.9)' }]} />
-                  <Text style={[styles.statusText, { color: colors.textSecondary }]}>
-                    <Text style={[styles.statusBold, { color: colors.text }]}>Pending:</Text> Your product is awaiting admin approval.
-                  </Text>
-                </View>
-                <View style={styles.statusRow}>
-                  <View style={[styles.statusDot, { backgroundColor: 'rgba(46, 196, 182, 0.9)' }]} />
-                  <Text style={[styles.statusText, { color: colors.textSecondary }]}>
-                    <Text style={[styles.statusBold, { color: colors.text }]}>Approved:</Text> Product is live on the marketplace.
-                  </Text>
-                </View>
-                <View style={styles.statusRow}>
-                  <View style={[styles.statusDot, { backgroundColor: 'rgba(230, 57, 70, 0.9)' }]} />
-                  <Text style={[styles.statusText, { color: colors.textSecondary }]}>
-                    <Text style={[styles.statusBold, { color: colors.text }]}>Rejected:</Text> Product didn't meet marketplace requirements.
-                  </Text>
-                </View>
-              </View>
-            )}
-            
-            {products.length === 0 ? (
-              <View style={styles.emptyState}>
-                <MaterialIcons name="inventory" size={64} color={colors.textSecondary} />
-                <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>
-                  Welcome! Start by adding your first product.
-                </Text>
-                <Text style={[styles.emptyStateSubText, { color: colors.textSecondary }]}>
-                  All products will be reviewed by an admin before appearing in the marketplace.
-                </Text>
-                <TouchableOpacity 
-                  style={[styles.emptyStateButton, { backgroundColor: colors.primary }]}
-                  onPress={handleAddProduct}
-                >
-                  <Text style={styles.emptyStateButtonText}>Add New Product</Text>
-                  <MaterialIcons name="add" size={18} color="white" />
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <FlatList
-                data={products}
-                renderItem={renderProductItem}
-                keyExtractor={item => item._id || item.id}
-                contentContainerStyle={styles.listContainer}
-              />
-            )}
-          </>
-        );
       case 'orders':
         return (
-          <>
-            <View style={styles.tabHeader}>
-              <Text style={[styles.tabTitle, { color: colors.text }]}>Orders</Text>
-            </View>
+          <View style={styles.tabContent}>
             {orders.length === 0 ? (
               <View style={styles.emptyState}>
-                <MaterialIcons name="shopping-bag" size={64} color={colors.textSecondary} />
+                <MaterialIcons name="receipt" size={64} color={colors.textSecondary} />
                 <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>
-                  No orders yet. They'll appear here when customers make purchases.
+                  No orders yet
+                </Text>
+                <Text style={[styles.emptyStateSubText, { color: colors.textSecondary }]}>
+                  When customers purchase your products, their orders will appear here.
+                </Text>
+                <Text style={[styles.emptyStateSubText, { color: colors.textSecondary }]}>
+                  Make sure your products are visible and well-priced to attract buyers.
                 </Text>
               </View>
             ) : (
               <FlatList
                 data={orders}
                 renderItem={renderOrderItem}
-                keyExtractor={item => item.id}
-                contentContainerStyle={styles.listContainer}
+                keyExtractor={(item) => item._id}
+                contentContainerStyle={styles.listContent}
+                ListEmptyComponent={() => (
+                  <View style={styles.emptyState}>
+                    <MaterialIcons name="receipt" size={64} color={colors.textSecondary} />
+                    <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>
+                      No orders found
+                    </Text>
+                  </View>
+                )}
               />
             )}
-          </>
+          </View>
         );
       case 'profile':
         return (
@@ -963,7 +973,74 @@ const SellerDashboardScreen = () => {
           </ScrollView>
         );
       default:
-        return null;
+        return (
+          <>
+            <View style={styles.tabHeader}>
+              <Text style={[styles.tabTitle, { color: colors.text }]}>My Products</Text>
+              <TouchableOpacity 
+                style={[styles.addButton, { backgroundColor: colors.primary }]}
+                onPress={handleAddProduct}
+              >
+                <Text style={styles.addButtonText}>Add Product</Text>
+                <MaterialIcons name="add" size={18} color="white" />
+              </TouchableOpacity>
+            </View>
+            
+            {/* Status info section */}
+            {showStatusGuide && (
+              <View style={[styles.statusInfoContainer, { 
+                backgroundColor: colors.cardBackground,
+                borderLeftColor: colors.primary 
+              }]}>
+                <Text style={[styles.statusInfoTitle, { color: colors.text }]}>Product Status Guide:</Text>
+                <View style={styles.statusRow}>
+                  <View style={[styles.statusDot, { backgroundColor: 'rgba(255, 159, 28, 0.9)' }]} />
+                  <Text style={[styles.statusText, { color: colors.textSecondary }]}>
+                    <Text style={[styles.statusBold, { color: colors.text }]}>Pending:</Text> Your product is awaiting admin approval.
+                  </Text>
+                </View>
+                <View style={styles.statusRow}>
+                  <View style={[styles.statusDot, { backgroundColor: 'rgba(46, 196, 182, 0.9)' }]} />
+                  <Text style={[styles.statusText, { color: colors.textSecondary }]}>
+                    <Text style={[styles.statusBold, { color: colors.text }]}>Approved:</Text> Product is live on the marketplace.
+                  </Text>
+                </View>
+                <View style={styles.statusRow}>
+                  <View style={[styles.statusDot, { backgroundColor: 'rgba(230, 57, 70, 0.9)' }]} />
+                  <Text style={[styles.statusText, { color: colors.textSecondary }]}>
+                    <Text style={[styles.statusBold, { color: colors.text }]}>Rejected:</Text> Product didn't meet marketplace requirements.
+                  </Text>
+                </View>
+              </View>
+            )}
+            
+            {products.length === 0 ? (
+              <View style={styles.emptyState}>
+                <MaterialIcons name="inventory" size={64} color={colors.textSecondary} />
+                <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>
+                  Welcome! Start by adding your first product.
+                </Text>
+                <Text style={[styles.emptyStateSubText, { color: colors.textSecondary }]}>
+                  All products will be reviewed by an admin before appearing in the marketplace.
+                </Text>
+                <TouchableOpacity 
+                  style={[styles.emptyStateButton, { backgroundColor: colors.primary }]}
+                  onPress={handleAddProduct}
+                >
+                  <Text style={styles.emptyStateButtonText}>Add New Product</Text>
+                  <MaterialIcons name="add" size={18} color="white" />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <FlatList
+                data={products}
+                renderItem={renderProductItem}
+                keyExtractor={item => item._id || item.id}
+                contentContainerStyle={styles.listContainer}
+              />
+            )}
+          </>
+        );
     }
   };
 
@@ -2671,6 +2748,63 @@ const styles = StyleSheet.create({
   rejectionInstructions: {
     color: '#6c757d',
     fontSize: 14,
+  },
+  orderCard: {
+    borderRadius: 12,
+    marginBottom: 16,
+    overflow: 'hidden',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  orderId: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  orderItems: {
+    marginBottom: 16,
+  },
+  orderItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  orderItemImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
+    marginRight: 12,
+  },
+  orderItemDetails: {
+    flex: 1,
+  },
+  orderItemName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  orderItemPrice: {
+    fontSize: 14,
+    color: '#6c757d',
+  },
+  acceptButton: {
+    backgroundColor: '#2EC4B6',
+  },
+  completeButton: {
+    backgroundColor: '#1B5E20',
+  },
+  tabContent: {
+    flex: 1,
+  },
+  listContent: {
+    paddingBottom: 16,
   },
 });
 
