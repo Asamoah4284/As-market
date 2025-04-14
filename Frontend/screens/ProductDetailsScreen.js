@@ -16,15 +16,16 @@ import {
   Modal,
   Pressable,
   Linking,
+  Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchProductById } from '../store/slices/productSlice';
+import * as Location from 'expo-location';
 
 const API_URL = 'http://172.20.10.3:5000';
-
 
 const ProductDetailsScreen = () => {
   const navigation = useNavigation();
@@ -49,6 +50,18 @@ const ProductDetailsScreen = () => {
 
   // Add new state for contact modal
   const [contactModalVisible, setContactModalVisible] = useState(false);
+  
+  // Add state for similar products
+  const [similarProducts, setSimilarProducts] = useState([]);
+  const [loadingSimilar, setLoadingSimilar] = useState(false);
+
+  // Add state for location
+  const [location, setLocation] = useState(null);
+  const [errorMsg, setErrorMsg] = useState(null);
+  const [loadingLocation, setLoadingLocation] = useState(true);
+
+  // Add animation for pulsing location marker
+  const [pulseAnim] = useState(new Animated.Value(0));
 
   useEffect(() => {
     if (productId) {
@@ -56,17 +69,157 @@ const ProductDetailsScreen = () => {
     }
   }, [dispatch, productId]);
 
+  // Add effect to fetch comments on component mount
+  useEffect(() => {
+    if (productId) {
+      fetchComments();
+    }
+  }, [productId]);
+
+  // Add effect to get user location
+  useEffect(() => {
+    let locationSubscription = null;
+    
+    (async () => {
+      try {
+        setLoadingLocation(true);
+        
+        // First request permission
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+          setErrorMsg('Permission to access location was denied. Please enable location services to see delivery options.');
+          setLoadingLocation(false);
+          return;
+        }
+
+        // Get last known location first for faster response
+        let lastKnownLocation = await Location.getLastKnownPositionAsync({});
+        if (lastKnownLocation) {
+          setLocation(lastKnownLocation);
+        }
+
+        // Then get current location with better accuracy
+        let currentLocation = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+          timeInterval: 5000,
+        });
+        
+        setLocation(currentLocation);
+        console.log('Location:', currentLocation);
+        
+        // Subscribe to location updates
+        locationSubscription = await Location.watchPositionAsync(
+          {
+            accuracy: Location.Accuracy.Balanced,
+            distanceInterval: 10, // update if moved by 10 meters
+            timeInterval: 30000, // or every 30 seconds
+          },
+          (newLocation) => {
+            console.log('Location updated:', newLocation);
+            setLocation(newLocation);
+          }
+        );
+      } catch (error) {
+        console.error('Error getting location:', error);
+        setErrorMsg('Could not retrieve your location. Please check your device settings.');
+      } finally {
+        setLoadingLocation(false);
+      }
+    })();
+    
+    // Cleanup subscription when component unmounts
+    return () => {
+      if (locationSubscription) {
+        locationSubscription.remove();
+      }
+    };
+  }, []);
+
+  // Add animation for pulsing location marker
+  useEffect(() => {
+    // Only start animation when we have a location
+    if (location) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 1500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 0,
+            duration: 1500,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    }
+  }, [location, pulseAnim]);
+
   useEffect(() => {
     console.log('Current Product:', currentProduct);
     console.log('Product Images:', currentProduct?.additionalImages);
     console.log('Number of Images:', currentProduct?.additionalImages?.length);
   }, [currentProduct]);
 
+  // Add effect to fetch similar products when current product changes
+  useEffect(() => {
+    if (currentProduct && currentProduct.category) {
+      fetchSimilarProducts();
+    }
+  }, [currentProduct]);
+
+  // Function to fetch similar products
+  const fetchSimilarProducts = async () => {
+    if (!currentProduct || !currentProduct.category) {
+      console.log("Cannot fetch similar products: no current product or category");
+      return;
+    }
+    
+    try {
+      setLoadingSimilar(true);
+      console.log("Fetching similar products for category:", currentProduct.category);
+      
+      // Use the original API endpoint format
+      const apiUrl = API_URL.startsWith('http') ? API_URL : `http://${API_URL}`;
+      const response = await fetch(`${apiUrl}/api/products`);
+      
+      if (!response.ok) {
+        console.error("Failed to fetch products:", response.status);
+        return;
+      }
+
+      const data = await response.json();
+      
+      // Handle different response formats
+      let productsArray = Array.isArray(data) ? data : 
+                         (data.products && Array.isArray(data.products)) ? data.products :
+                         (data.data && Array.isArray(data.data)) ? data.data : [];
+      
+      // Filter by the same category and exclude current product
+      const filteredProducts = productsArray.filter(product => 
+        product.category === currentProduct.category && 
+        product._id !== currentProduct._id
+      );
+      
+      console.log(`Found ${filteredProducts.length} similar products`);
+      setSimilarProducts(filteredProducts.slice(0, 10)); // Limit to 10 items
+    } catch (err) {
+      console.error("Error fetching similar products:", err);
+    } finally {
+      setLoadingSimilar(false);
+    }
+  };
+
   // Add function to fetch comments
   const fetchComments = async () => {
     try {
+      console.log("Fetching comments for product:", productId);
+      
+      // Use the consistent API URL pattern that works
+      const apiUrl = API_URL.startsWith('http') ? API_URL : `http://${API_URL}`;
       const response = await fetch(
-        `http://${API_URL}/api/products/${productId}/comments`
+        `${apiUrl}/api/products/${productId}/comments`
       );
 
       if (!response.ok) {
@@ -75,9 +228,15 @@ const ProductDetailsScreen = () => {
       }
 
       const data = await response.json();
-      setComments(data);
+      console.log("Comments data:", data);
+      setComments(Array.isArray(data) ? data : []);
     } catch (err) {
       console.error("Error fetching comments:", err);
+      // Show a message to the user
+      Alert.alert(
+        "Comments Unavailable",
+        "Couldn't load comments at this time. Please try again later."
+      );
     }
   };
 
@@ -97,8 +256,10 @@ const ProductDetailsScreen = () => {
         return;
       }
 
+      // Use the consistent API URL pattern
+      const apiUrl = API_URL.startsWith('http') ? API_URL : `http://${API_URL}`;
       const response = await fetch(
-        `http://${API_URL}/api/products/${productId}/comments`,
+        `${apiUrl}/api/products/${productId}/comments`,
         {
           method: "POST",
           headers: {
@@ -116,6 +277,8 @@ const ProductDetailsScreen = () => {
         setComments([...comments, newCommentData]);
         setNewComment("");
         Alert.alert("Success", "Your comment has been posted!");
+        // Refresh comments to ensure we have the latest
+        fetchComments();
       } else {
         const errorData = await response.json();
         Alert.alert("Error", errorData.message || "Failed to post comment");
@@ -145,7 +308,9 @@ const ProductDetailsScreen = () => {
       }
 
       // Add a local loading state for the button
-        const response = await fetch(`${API_URL}/api/cart/add`, {
+      // Use the consistent API URL pattern
+      const apiUrl = API_URL.startsWith('http') ? API_URL : `http://${API_URL}`;
+      const response = await fetch(`${apiUrl}/api/cart/add`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -231,6 +396,68 @@ const ProductDetailsScreen = () => {
       Alert.alert("Seller Profile", "Seller profile is not available.");
     }
     setContactModalVisible(false);
+  };
+
+  // Add utility functions for delivery estimation
+  const calculateDeliveryCost = (location) => {
+    // Simple example calculation - could be more complex with real data
+    // For this example, we'll use the distance from a fixed point (e.g., store location)
+    const storeLatitude = 5.6037; // Example store location in Ghana
+    const storeLongitude = -0.1870;
+    
+    // Calculate rough distance using Haversine formula
+    const distance = calculateDistance(
+      storeLatitude, 
+      storeLongitude,
+      location.coords.latitude,
+      location.coords.longitude
+    );
+    
+    // Base delivery fee GH₵5
+    let deliveryFee = 5;
+    
+    // Add GH₵1 for each additional km after first 2 km
+    if (distance > 2) {
+      deliveryFee += Math.ceil(distance - 2);
+    }
+    
+    // Cap the delivery fee at GH₵10
+    deliveryFee = Math.min(deliveryFee, 10);
+    
+    return deliveryFee.toFixed(2);
+  };
+  
+  const estimateDeliveryTime = (location) => {
+    // Simple calculation - 15 min base time + 5 min per km
+    const storeLatitude = 5.6037;
+    const storeLongitude = -0.1870;
+    
+    const distance = calculateDistance(
+      storeLatitude, 
+      storeLongitude,
+      location.coords.latitude,
+      location.coords.longitude
+    );
+    
+    return Math.ceil(15 + (distance * 5));
+  };
+  
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371; // Radius of the earth in km
+    const dLat = deg2rad(lat2 - lat1);
+    const dLon = deg2rad(lon2 - lon1);
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2)
+    ; 
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+    const distance = R * c; // Distance in km
+    return distance;
+  };
+  
+  const deg2rad = (deg) => {
+    return deg * (Math.PI/180);
   };
 
   if (isLoading) {
@@ -470,33 +697,71 @@ const ProductDetailsScreen = () => {
         <View style={styles.productInfoContainer}>
           <View style={styles.productHeader}>
             <Text style={styles.productName}>{currentProduct.name}</Text>
-            <View style={styles.ratingContainer}>
-              <Ionicons name="star" size={18} color="#FFD700" />
-              <Text style={styles.ratingText}>{currentProduct.rating || 4.5}</Text>
-              <Text style={styles.reviewsText}>(120 reviews)</Text>
+          </View>
+          
+          {/* Stock Status Indicator */}
+          <View style={styles.stockStatusContainer}>
+            {currentProduct.countInStock > 5 ? (
+              <View style={styles.stockStatusIndicator}>
+                <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+                <Text style={[styles.stockStatusText, styles.inStockText]}>In Stock</Text>
+              </View>
+            ) : currentProduct.countInStock > 0 ? (
+              <View style={styles.stockStatusIndicator}>
+                <Ionicons name="alert-circle" size={16} color="#FFC107" />
+                <Text style={[styles.stockStatusText, styles.lowStockText]}>Low Stock</Text>
+              </View>
+            ) : (
+              <View style={styles.stockStatusIndicator}>
+                <Ionicons name="close-circle" size={16} color="#F44336" />
+                <Text style={[styles.stockStatusText, styles.outOfStockText]}>Out of Stock</Text>
+              </View>
+            )}
+          </View>
+          
+          {/* Price and Quantity Row */}
+          <View style={styles.priceQuantityRow}>
+            <View style={styles.productPriceContainer}>
+              <Text style={styles.productPrice}>GH₵{currentProduct.price?.toFixed(2)}</Text>
+            </View>
+            
+            <View style={styles.quantityContainer}>
+              <Text style={styles.quantityLabel}>Quantity:</Text>
+              <View style={styles.quantitySelector}>
+                <TouchableOpacity
+                  style={styles.quantityButton}
+                  onPress={decreaseQuantity}
+                >
+                  <Ionicons name="remove" size={20} color="#5D3FD3" />
+                </TouchableOpacity>
+                <Text style={styles.quantityValue}>{quantity}</Text>
+                <TouchableOpacity
+                  style={styles.quantityButton}
+                  onPress={increaseQuantity}
+                >
+                  <Ionicons name="add" size={20} color="#5D3FD3" />
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
+          
+          {/* Rating Stars Row */}
+          <View style={styles.ratingStarsContainer}>
+            <Ionicons name="star" size={18} color="#FFD700" style={styles.starIcon} />
+            <Ionicons name="star" size={18} color="#FFD700" style={styles.starIcon} />
+            <Ionicons name="star" size={18} color="#FFD700" style={styles.starIcon} />
+            <Ionicons name="star" size={18} color="#FFD700" style={styles.starIcon} />
+            <Ionicons name="star" size={18} color="#FFD700" style={styles.starIcon} />
+            <Text style={styles.reviewsText}>(120 reviews)</Text>
+          </View>
 
-          <Text style={styles.productPrice}>GH₵{currentProduct.price?.toFixed(2)}</Text>
-
-          {/* Quantity Selector */}
-          <View style={styles.quantityContainer}>
-            <Text style={styles.quantityLabel}>Quantity:</Text>
-            <View style={styles.quantitySelector}>
-              <TouchableOpacity
-                style={styles.quantityButton}
-                onPress={decreaseQuantity}
-              >
-                <Ionicons name="remove" size={20} color="#5D3FD3" />
-              </TouchableOpacity>
-              <Text style={styles.quantityValue}>{quantity}</Text>
-              <TouchableOpacity
-                style={styles.quantityButton}
-                onPress={increaseQuantity}
-              >
-                <Ionicons name="add" size={20} color="#5D3FD3" />
-              </TouchableOpacity>
-            </View>
+          {/* Delivery Information */}
+          <View style={styles.deliveryInfoContainer}>
+            <Ionicons name="bicycle-outline" size={20} color="#5D3FD3" style={styles.deliveryIcon} />
+            <Text style={styles.deliveryInfoText}>
+              <Text style={styles.deliveryHighlight}>Free Delivery</Text> for orders below GH₵50 {"\n"}
+              <Text style={styles.deliveryHighlight}>GH₵5 and above Delivery Fee</Text> for orders  above GH₵50 given your precise location
+            </Text>
           </View>
 
           {/* Description */}
@@ -527,6 +792,245 @@ const ProductDetailsScreen = () => {
                 {currentProduct.countInStock > 0 ? "Yes" : "No"}
               </Text>
             </View>
+          </View>
+
+          {/* Similar Products */}
+          <View style={styles.similarProductsContainer}>
+            <View style={styles.sectionTitleRow}>
+              <Text style={styles.sectionTitle}>You May Also Like</Text>
+              {loadingSimilar ? null : (
+                <TouchableOpacity onPress={fetchSimilarProducts}>
+                  <Ionicons name="refresh" size={18} color="#5D3FD3" />
+                </TouchableOpacity>
+              )}
+            </View>
+            {loadingSimilar ? (
+              <ActivityIndicator size="small" color="#5D3FD3" style={styles.similarProductsLoader} />
+            ) : similarProducts.length > 0 ? (
+              <FlatList
+                data={similarProducts}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                keyExtractor={(item) => item._id}
+                renderItem={({ item }) => (
+                  <TouchableOpacity 
+                    style={styles.similarProductItem}
+                    onPress={() => {
+                      navigation.push('ProductDetails', { productId: item._id });
+                    }}
+                  >
+                    <Image
+                      source={{ uri: item.image || "https://via.placeholder.com/150" }}
+                      style={styles.similarProductImage}
+                      resizeMode="cover"
+                    />
+                    <View style={styles.similarProductInfo}>
+                      <Text style={styles.similarProductName} numberOfLines={2}>
+                        {item.name}
+                      </Text>
+                      <Text style={styles.similarProductPrice}>GH₵{item.price?.toFixed(2)}</Text>
+                    </View>
+                  </TouchableOpacity>
+                )}
+              />
+            ) : (
+              <View style={styles.noSimilarProductsContainer}>
+                <Text style={styles.noSimilarProductsText}>No similar products found</Text>
+                <TouchableOpacity 
+                  style={styles.findSimilarButton}
+                  onPress={fetchSimilarProducts}
+                >
+                  <Text style={styles.findSimilarButtonText}>Find Similar Products</Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+
+          {/* Location Map */}
+          <View style={styles.mapContainer}>
+            <View style={styles.sectionTitleRow}>
+              <Text style={styles.sectionTitle}>Delivery Location</Text>
+              {location && (
+                <TouchableOpacity
+                  style={styles.locationRefreshButton}
+                  onPress={async () => {
+                    setLoadingLocation(true);
+                    try {
+                      let currentLocation = await Location.getCurrentPositionAsync({
+                        accuracy: Location.Accuracy.High,
+                      });
+                      setLocation(currentLocation);
+                      Alert.alert("Success", "Location updated successfully");
+                    } catch (error) {
+                      Alert.alert("Error", "Failed to update location");
+                    } finally {
+                      setLoadingLocation(false);
+                    }
+                  }}
+                >
+                  <Ionicons name="refresh" size={18} color="#5D3FD3" />
+                </TouchableOpacity>
+              )}
+            </View>
+            {loadingLocation ? (
+              <View style={styles.mapLoadingContainer}>
+                <ActivityIndicator size="large" color="#5D3FD3" />
+                <Text style={styles.mapLoadingText}>Getting your location...</Text>
+              </View>
+            ) : errorMsg ? (
+              <View style={styles.mapErrorContainer}>
+                <Ionicons name="location-outline" size={40} color="#FF6B6B" />
+                <Text style={styles.mapErrorText}>{errorMsg}</Text>
+                <TouchableOpacity 
+                  style={styles.retryLocationButton}
+                  onPress={async () => {
+                    setLoadingLocation(true);
+                    try {
+                      // Request permissions again
+                      let { status } = await Location.requestForegroundPermissionsAsync();
+                      if (status !== 'granted') {
+                        setErrorMsg('Location permission is still denied. Please enable it in settings.');
+                        setLoadingLocation(false);
+                        return;
+                      }
+                      
+                      // Try to get location with high accuracy
+                      let currentLocation = await Location.getCurrentPositionAsync({
+                        accuracy: Location.Accuracy.High,
+                        timeout: 15000, // 15 second timeout
+                      });
+                      
+                      setLocation(currentLocation);
+                      setErrorMsg(null);
+                      Alert.alert("Success", "Location updated successfully");
+                    } catch (error) {
+                      console.error('Error getting location on retry:', error);
+                      setErrorMsg('Still unable to get your location. Please check your device settings.');
+                    } finally {
+                      setLoadingLocation(false);
+                    }
+                  }}
+                >
+                  <Text style={styles.retryLocationButtonText}>Try Again</Text>
+                </TouchableOpacity>
+              </View>
+            ) : location ? (
+              <View style={styles.mapWrapper}>
+                <View style={styles.staticMapContainer}>
+                  <View style={styles.customMapBackground}>
+                    <View style={styles.customMapGrid}>
+                      <View style={styles.customMapRoad} />
+                      <View style={[styles.customMapRoad, { transform: [{ rotate: '90deg' }] }]} />
+                      {/* Add some additional map details */}
+                      <View style={[styles.customMapRoad, { width: '30%', left: '10%', top: '30%', height: 10 }]} />
+                      <View style={[styles.customMapRoad, { width: '20%', left: '60%', top: '70%', height: 10 }]} />
+                      <View style={[styles.customMapRoad, { width: 10, height: '25%', left: '70%', top: '20%' }]} />
+                      <View style={[styles.customMapRoad, { width: 10, height: '15%', left: '30%', top: '60%' }]} />
+                      
+                      {/* Add some buildings */}
+                      <View style={styles.customMapBuilding1} />
+                      <View style={styles.customMapBuilding2} />
+                      <View style={styles.customMapBuilding3} />
+                    </View>
+                    
+                    {/* Animated Pulse Effects */}
+                    <Animated.View 
+                      style={[
+                        styles.mapMarkerPulseOuter,
+                        {
+                          opacity: pulseAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [0.1, 0.3]
+                          }),
+                          transform: [{
+                            scale: pulseAnim.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [1, 1.3]
+                            })
+                          }]
+                        }
+                      ]} 
+                    />
+                    <Animated.View 
+                      style={[
+                        styles.mapMarkerPulse,
+                        {
+                          opacity: pulseAnim.interpolate({
+                            inputRange: [0, 1],
+                            outputRange: [0.2, 0.5]
+                          }),
+                          transform: [{
+                            scale: pulseAnim.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [1, 1.2]
+                            })
+                          }]
+                        }
+                      ]} 
+                    />
+                    <View style={styles.mapMarker}>
+                      <Ionicons name="location" size={32} color="#5D3FD3" />
+                    </View>
+                  </View>
+                  <Text style={styles.locationText}>Your Current Location</Text>
+                </View>
+
+                <View style={styles.mapOverlay}>
+                  <Text style={styles.deliveryAddressLabel}>Delivery to this location:</Text>
+                  <Text style={styles.deliveryAddressCoords}>
+                    ({location.coords.latitude.toFixed(6)}, {location.coords.longitude.toFixed(6)})
+                  </Text>
+                  <View style={styles.deliveryStatusContainer}>
+                    <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
+                    <Text style={styles.deliveryStatusText}>Delivery available to this location</Text>
+                  </View>
+                  
+                  <View style={styles.deliveryEstimateContainer}>
+                    <View style={styles.deliveryEstimateItem}>
+                      <Ionicons name="cash-outline" size={16} color="#5D3FD3" />
+                      <Text style={styles.deliveryEstimateLabel}>Delivery Cost:</Text>
+                      <Text style={styles.deliveryEstimateValue}>
+                        GH₵{calculateDeliveryCost(location)}
+                      </Text>
+                    </View>
+                    <View style={styles.deliveryEstimateItem}>
+                      <Ionicons name="time-outline" size={16} color="#5D3FD3" />
+                      <Text style={styles.deliveryEstimateLabel}>Estimated Time:</Text>
+                      <Text style={styles.deliveryEstimateValue}>
+                        {estimateDeliveryTime(location)} mins
+                      </Text>
+                    </View>
+                  </View>
+                  
+                  <TouchableOpacity 
+                    style={styles.changeLocationButton}
+                    onPress={() => {
+                      // Show a confirmation dialog
+                      Alert.alert(
+                        "Confirm Delivery Location",
+                        "Would you like to set this as your delivery location?",
+                        [
+                          {
+                            text: "Cancel",
+                            style: "cancel"
+                          },
+                          { 
+                            text: "Confirm",
+                            onPress: () => Alert.alert("Success", "Delivery location confirmed!")
+                          }
+                        ]
+                      );
+                    }}
+                  >
+                    <Text style={styles.changeLocationButtonText}>Confirm Location</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            ) : (
+              <View style={styles.mapErrorContainer}>
+                <Text style={styles.mapErrorText}>Location not available</Text>
+              </View>
+            )}
           </View>
 
           {/* Seller Info */}
@@ -737,8 +1241,7 @@ const styles = StyleSheet.create({
   },
   productInfoContainer: {
     backgroundColor: "#fff",
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+ 
     marginTop: -20,
     padding: 20,
   },
@@ -749,37 +1252,53 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   productName: {
-    fontSize: 22,
-    fontWeight: "bold",
+    fontSize: 20,
     color: "#333",
-    flex: 1,
-    marginRight: 10,
+    // marginRight: 10,
   },
-  ratingContainer: {
+  stockStatusContainer: {
+    marginBottom: 8,
+  },
+  stockStatusIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  stockStatusText: {
+    fontSize: 14,
+    marginLeft: 4,
+    fontWeight: '500',
+  },
+  inStockText: {
+    color: '#4CAF50',
+  },
+  lowStockText: {
+    color: '#FFC107',
+  },
+  outOfStockText: {
+    color: '#F44336',
+  },
+  ratingStarsContainer: {
     flexDirection: "row",
     alignItems: "center",
-  },
-  ratingText: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#333",
-    marginLeft: 4,
+    marginVertical: 5,
   },
   reviewsText: {
     fontSize: 14,
     color: "#666",
-    marginLeft: 4,
+    marginLeft: 8,
+  },
+  starIcon: {
+    marginHorizontal: 2,
   },
   productPrice: {
-    fontSize: 24,
+    fontSize: 20,
     fontWeight: "bold",
     color: "#5D3FD3",
-    marginVertical: 10,
+    alignSelf: "center",
   },
   quantityContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginVertical: 16,
   },
   quantityLabel: {
     fontSize: 16,
@@ -814,6 +1333,12 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: "bold",
     color: "#333",
+    marginBottom: 8,
+  },
+  sectionTitleRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
     marginBottom: 8,
   },
   descriptionText: {
@@ -1076,6 +1601,316 @@ const styles = StyleSheet.create({
     height: 300,
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  deliveryInfoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 10,
+    backgroundColor: '#f0f0ff',
+    padding: 10,
+    borderRadius: 8,
+    borderLeftWidth: 3,
+    borderLeftColor: '#5D3FD3',
+  },
+  deliveryIcon: {
+    marginRight: 8,
+  },
+  deliveryInfoText: {
+    fontSize: 14,
+    color: '#444',
+    flex: 1,
+  },
+  deliveryHighlight: {
+    fontWeight: 'bold',
+  },
+  priceQuantityRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginVertical: 12,
+  },
+  productPriceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  similarProductsContainer: {
+    marginVertical: 16,
+  },
+  similarProductItem: {
+    width: 150,
+    marginRight: 12,
+    backgroundColor: '#fff',
+    overflow: 'hidden',
+  },
+  similarProductImage: {
+    width: '100%',
+    height: 150,
+  },
+  similarProductInfo: {
+    padding: 8,
+  },
+  similarProductName: {
+    fontSize: 14,
+    color: '#333',
+    height: 20,
+  },
+  similarProductPrice: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#5D3FD3',
+  },
+  similarProductsLoader: {
+    padding: 20,
+  },
+  noSimilarProductsText: {
+    fontSize: 14,
+    color: '#666',
+    fontStyle: 'italic',
+    textAlign: 'center',
+    marginBottom: 10,
+  },
+  noSimilarProductsContainer: {
+    padding: 20,
+    alignItems: 'center',
+  },
+  findSimilarButton: {
+    backgroundColor: '#5D3FD3',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+    marginTop: 10,
+  },
+  findSimilarButtonText: {
+    color: '#fff',
+    fontWeight: '500',
+  },
+  mapContainer: {
+    marginVertical: 16,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3.84,
+    elevation: 2,
+  },
+  mapWrapper: {
+    height: 300,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginTop: 8,
+  },
+  staticMapContainer: {
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+    backgroundColor: '#e0e0e0',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  customMapBackground: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#f0f0f0',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  customMapGrid: {
+    width: '100%',
+    height: '100%',
+    position: 'absolute',
+  },
+  customMapRoad: {
+    position: 'absolute',
+    top: '50%',
+    left: 0,
+    right: 0,
+    height: 20,
+    backgroundColor: '#e0e0e0',
+    marginTop: -10,
+  },
+  customMapBuilding1: {
+    position: 'absolute',
+    width: 30,
+    height: 30,
+    backgroundColor: '#d0d0d0',
+    top: '25%',
+    left: '25%',
+    borderRadius: 2,
+  },
+  customMapBuilding2: {
+    position: 'absolute',
+    width: 40,
+    height: 25,
+    backgroundColor: '#d0d0d0',
+    top: '60%',
+    left: '75%',
+    borderRadius: 2,
+  },
+  customMapBuilding3: {
+    position: 'absolute',
+    width: 35,
+    height: 35,
+    backgroundColor: '#d0d0d0',
+    top: '35%',
+    left: '65%',
+    borderRadius: 2,
+  },
+  mapMarkerPulseOuter: {
+    position: 'absolute',
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(93, 63, 211, 0.1)',
+    top: '50%',
+    left: '50%',
+    marginLeft: -50,
+    marginTop: -50,
+  },
+  mapMarkerPulse: {
+    position: 'absolute',
+    width: 70,
+    height: 70,
+    borderRadius: 35,
+    backgroundColor: 'rgba(93, 63, 211, 0.2)',
+    top: '50%',
+    left: '50%',
+    marginLeft: -35,
+    marginTop: -35,
+  },
+  mapMarker: {
+    position: 'absolute',
+    top: '50%',
+    left: '50%',
+    marginLeft: -16,
+    marginTop: -32,
+    zIndex: 10,
+  },
+  locationText: {
+    position: 'absolute',
+    bottom: 60,
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 16,
+    fontSize: 12,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  staticMapImage: {
+    width: '100%',
+    height: '100%',
+  },
+  mapLoadingContainer: {
+    height: 200,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+  },
+  mapLoadingText: {
+    marginTop: 10,
+    fontSize: 14,
+    color: '#666',
+  },
+  mapErrorContainer: {
+    height: 200,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+    padding: 20,
+  },
+  mapErrorText: {
+    marginTop: 10,
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+  },
+  retryLocationButton: {
+    marginTop: 16,
+    backgroundColor: '#5D3FD3',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  retryLocationButtonText: {
+    color: '#fff',
+    fontWeight: '500',
+  },
+  mapOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    padding: 12,
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  deliveryAddressLabel: {
+    fontSize: 12,
+    color: '#666',
+  },
+  deliveryAddressCoords: {
+    fontSize: 14,
+    fontWeight: '500',
+    marginTop: 2,
+    marginBottom: 8,
+  },
+  deliveryStatusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  deliveryStatusText: {
+    marginLeft: 6,
+    fontSize: 13,
+    color: '#4CAF50',
+    fontWeight: '500',
+  },
+  locationRefreshButton: {
+    padding: 8,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+  },
+  deliveryEstimateContainer: {
+    backgroundColor: '#f8f9fa',
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: 10,
+  },
+  deliveryEstimateItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginVertical: 4,
+  },
+  deliveryEstimateLabel: {
+    marginLeft: 6,
+    fontSize: 13,
+    color: '#666',
+    width: 105,
+  },
+  deliveryEstimateValue: {
+    fontSize: 13,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  changeLocationButton: {
+    backgroundColor: '#5D3FD3',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  changeLocationButtonText: {
+    color: '#fff',
+    fontWeight: '500',
+    fontSize: 13,
   },
 });
 

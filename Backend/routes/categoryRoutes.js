@@ -58,7 +58,7 @@ router.get('/:categoryId/products', async (req, res) => {
     }
     
     // Find products matching the query
-    const products = await Product.find(query);
+    const products = await Product.find(query).populate('seller', 'name');
     
     res.json(products);
   } catch (error) {

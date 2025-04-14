@@ -62,21 +62,23 @@ const CATEGORIES = [
 const BANNER_DATA = [
   {
     id: '1',
-    image: 'https://i.pinimg.com/736x/76/4d/1b/764d1b00c7719b5791c2d7d692a47264.jpg',
+    image: require('../assets/images/1.jpg'),
+    title: 'Happy Weekend',
+    subtitle: '25% OFF',
+    description: '*for All Menus',
+    bgColor: 'rgba(226, 240, 217, 0.8)'
+  },
+  {
+    id: '2',
+    image: require('../assets/images/3.jpg'),
     title: 'Special Offers',
     subtitle: 'Up to 50% off',
   },
   {
-    id: '2',
-    image: require('../assets/images/asb.png'),
+    id: '3',
+    image: require('../assets/images/2.jpg'),
     title: 'New Arrivals',
     subtitle: 'Check out the latest',
-  },
-  {
-    id: '3',
-    image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=2000&q=80',
-    title: 'Flash Sale',
-    subtitle: 'Limited time deals',
   },
 ];
 
@@ -367,11 +369,14 @@ const BuyerHomeScreen = () => {
         {/* Header with extra padding for Android */}
         <View style={styles.header}>
           <View style={styles.headerContent}>
-            <Text style={styles.greeting}>Hello, {userName}!</Text>
-            <Text style={styles.subtitle}>Find amazing products</Text>
+            <View style={styles.brandNameContainer}>
+              <Text style={[styles.greeting, {color: '#5D3FD3'}]}>Uni</Text>
+              <Text style={[styles.greeting, {color: '#f9004d'}]}>Market</Text>
+            </View>
+            <Text style={styles.subtitle}>Asarion Marketplace</Text>
           </View>
           <TouchableOpacity style={styles.notificationButton}>
-            <Ionicons name="notifications-outline" size={24} color="#FFD166" />
+            <Ionicons name="notifications-outline" size={24} color="#5D3FD3" />
           </TouchableOpacity>
         </View>
         
@@ -393,50 +398,67 @@ const BuyerHomeScreen = () => {
         
         <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollContent}>
           {/* Banner Carousel */}
-          <View style={styles.bannerContainer}>
-            <FlatList
-              ref={flatListRef}
-              data={BANNER_DATA}
-              renderItem={({ item }) => (
-                <View style={styles.bannerSlide}>
+          <FlatList
+            horizontal
+            pagingEnabled
+            data={BANNER_DATA}
+            keyExtractor={item => item.id}
+            showsHorizontalScrollIndicator={false}
+            ref={flatListRef}
+            onMomentumScrollEnd={(event) => {
+              const newIndex = Math.round(
+                event.nativeEvent.contentOffset.x / 
+                Dimensions.get('window').width
+              );
+              setCurrentBannerIndex(newIndex);
+            }}
+            renderItem={({ item }) => (
+              <View style={[styles.individualBannerContainer, { width: Dimensions.get('window').width }]}>
+                <View style={styles.bannerContent}>
                   <Image 
                     source={typeof item.image === 'string' ? { uri: item.image } : item.image}
                     style={styles.banner}
                     resizeMode="cover"
                   />
-                  <View style={styles.bannerOverlay}>
-                    <Text style={styles.bannerTitle}>{item.title}</Text>
-                    <Text style={styles.bannerSubtitle}>{item.subtitle}</Text>
-                    <TouchableOpacity style={styles.bannerButton}>
-                      <Text style={styles.bannerButtonText}>Shop Now</Text>
-                    </TouchableOpacity>
+                  <View style={[
+                    styles.bannerOverlay,
+                    item.id === '1' ? { backgroundColor: item.bgColor || 'rgba(0,0,0,0.1)' } : { backgroundColor: 'rgba(0,0,0,0.3)' }
+                  ]}>
+                    <View style={styles.bannerTextContainer}>
+                      {item.id === '1' ? (
+                        <>
+                          <View style={styles.dotsPattern}>
+                            <Text style={styles.dotText}>⋮⋮⋮</Text>
+                          </View>
+                          <Text style={styles.bannerTitle}>{item.title}</Text>
+                          <Text style={styles.bannerDiscount}>{item.subtitle}</Text>
+                          <Text style={styles.bannerDescription}>{item.description}</Text>
+                        </>
+                      ) : (
+                        <>
+                          <Text style={styles.bannerTitle}>{item.title}</Text>
+                          <Text style={styles.bannerSubtitle}>{item.subtitle}</Text>
+                          <TouchableOpacity style={styles.bannerButton}>
+                            <Text style={styles.bannerButtonText}>Shop Now</Text>
+                          </TouchableOpacity>
+                        </>
+                      )}
+                    </View>
                   </View>
                 </View>
-              )}
-              horizontal
-              pagingEnabled
-              showsHorizontalScrollIndicator={false}
-              keyExtractor={item => item.id}
-              onMomentumScrollEnd={(event) => {
-                const newIndex = Math.round(
-                  event.nativeEvent.contentOffset.x / 
-                  (Dimensions.get('window').width - 32)
-                );
-                setCurrentBannerIndex(newIndex);
-              }}
-              getItemLayout={(data, index) => ({
-                length: Dimensions.get('window').width - 32,
-                offset: (Dimensions.get('window').width - 32) * index,
-                index,
-              })}
-            />
+              </View>
+            )}
+          />
+
+          {/* Pagination Dots */}
+          <View style={styles.paginationDotsContainer}>
             <View style={styles.paginationDots}>
               {BANNER_DATA.map((_, index) => (
                 <View
                   key={index}
                   style={[
                     styles.dot,
-                    { backgroundColor: index === currentBannerIndex ? '#fff' : 'rgba(255,255,255,0.5)' }
+                    { backgroundColor: index === currentBannerIndex ? '#333' : 'rgba(150,150,150,0.5)' }
                   ]}
                 />
               ))}
@@ -878,7 +900,7 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#fff',
   },
   header: {
     flexDirection: 'row',
@@ -886,9 +908,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     paddingVertical: Platform.OS === 'android' ? 16 : 16,
-    paddingTop: Platform.OS === 'android' ? 24 : 16,
-    backgroundColor: '#f8f9fa',
-    borderBottomWidth: 1,
+    paddingTop: Platform.OS === 'android' ? 24 : 24,
+    backgroundColor: '#FFF',
+    // borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
     height: Platform.OS === 'android' ? 80 : 60,
   },
@@ -898,7 +920,9 @@ const styles = StyleSheet.create({
   greeting: {
     fontSize: 18,
     fontWeight: 'bold',
-    color: '#333',
+  },
+  brandNameContainer: {
+    flexDirection: 'row',
   },
   subtitle: {
     fontSize: 14,
@@ -934,31 +958,71 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
   },
-  bannerContainer: {
-    marginHorizontal: 16,
-    marginVertical: 12,
+  individualBannerContainer: {
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+  },
+  bannerContent: {
+    position: 'relative',
+    height: 160,
     borderRadius: 12,
     overflow: 'hidden',
-    height: 160,
   },
   banner: {
     width: '100%',
     height: '100%',
   },
-  bannerOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    padding: 16,
+  // bannerOverlay: {
+  //   position: 'absolute',
+  //   top: 0,
+  //   left: 0,
+  //   right: 0,
+  //   bottom: 0,
+  //   padding: 16,
+  //   justifyContent: 'center',
+  // },
+  paginationDotsContainer: {
+    alignItems: 'center',
+    marginTop: -10,
+    height: 20,
+    position: 'relative',
+    zIndex: 10,
+  },
+  paginationDots: {
+    flexDirection: 'row',
     justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.5)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginHorizontal: 4,
+    opacity: 0.9,
+  },
+  bannerTextContainer: {
+    flexDirection: 'column',
+    justifyContent: 'flex-start',
+    alignItems: 'flex-start',
+    marginLeft: 12,
+  },
+  dotsPattern: {
+    marginBottom: 5,
+  },
+  dotText: {
+    fontSize: 16,
+    color: '#333',
+    letterSpacing: 5,
+    fontWeight: 'bold',
   },
   bannerTitle: {
-    fontSize: 24,
+    fontSize: 18,
     fontWeight: 'bold',
-    color: '#fff',
+    color: '#333',
     marginBottom: 4,
   },
   bannerSubtitle: {
@@ -966,12 +1030,24 @@ const styles = StyleSheet.create({
     color: '#fff',
     marginBottom: 12,
   },
+  bannerDiscount: {
+    fontSize: 32,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 4,
+  },
+  bannerDescription: {
+    fontSize: 12,
+    color: '#555',
+    fontStyle: 'italic',
+  },
   bannerButton: {
     backgroundColor: '#fff',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
     alignSelf: 'flex-start',
+    marginTop: 12,
   },
   bannerButtonText: {
     color: '#3498db',
@@ -1210,27 +1286,6 @@ const styles = StyleSheet.create({
     right: 20,
     zIndex: 10,
   },
-  bannerSlide: {
-    width: Dimensions.get('window').width - 32, // Adjust based on your margins
-    height: 160,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  paginationDots: {
-    position: 'absolute',
-    bottom: 16,
-    left: 0,
-    right: 0,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginHorizontal: 4,
-  },
   gridContainer: {
     paddingHorizontal: 8,
   },
@@ -1290,7 +1345,6 @@ const styles = StyleSheet.create({
     width: 180,
     height: 180,
     backgroundColor: '#fff',
-    // borderRadius: 16,
     marginRight: 16,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -1332,23 +1386,15 @@ const styles = StyleSheet.create({
     color: '#666',
   },
   brandContainer: {
-    // paddingHorizontal: 16,
     marginBottom: 20,
   },
   brandCircle: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    // backgroundColor: '#fff',
     marginRight: 16,
     justifyContent: 'center',
     alignItems: 'center',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
-    // borderWidth: 1,
-    // borderColor: 'rgba(0,0,0,0.05)',
   },
   brandLogo: {
     width: 50,

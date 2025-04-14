@@ -33,6 +33,12 @@ const CartScreen = ({ navigation }) => {
   const { items: cartItems, loading, error } = useSelector(state => state.cart);
   const [showPayment, setShowPayment] = useState(false);
   const [userEmail, setUserEmail] = useState(''); // You should get this from user profile/auth
+  const [userLocation, setUserLocation] = useState({
+    coords: {
+      latitude: 5.6037,  // Default location in Ghana (Accra)
+      longitude: -0.1870
+    }
+  });
 
   // Fetch cart items whenever the screen is focused
   useFocusEffect(
@@ -51,6 +57,19 @@ const CartScreen = ({ navigation }) => {
         if (userDataString) {
           const userData = JSON.parse(userDataString);
           setUserEmail(userData.email);
+          
+          // If user has location data stored, retrieve it
+          if (userData.location) {
+            setUserLocation(userData.location);
+          } else {
+            // Default location in Ghana (Accra)
+            setUserLocation({
+              coords: {
+                latitude: 5.6037,
+                longitude: -0.1870
+              }
+            });
+          }
         }
       } catch (error) {
         console.error('Error fetching user email:', error);
@@ -174,6 +193,62 @@ const CartScreen = ({ navigation }) => {
     return cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
   };
 
+  const calculateDeliveryCost = (location) => {
+    // Simple example calculation - could be more complex with real data
+    // For this example, we'll use the distance from a fixed point (e.g., store location)
+    const storeLatitude = 5.6037; // Example store location in Ghana
+    const storeLongitude = -0.1870;
+    
+    // Calculate rough distance using Haversine formula
+    const distance = calculateDistance(
+      storeLatitude, 
+      storeLongitude,
+      location.coords.latitude,
+      location.coords.longitude
+    );
+    
+    // Base delivery fee GH₵5
+    let deliveryFee = 5;
+    
+    // Add GH₵1 for each additional km after first 2 km
+    if (distance > 2) {
+      deliveryFee += Math.ceil(distance - 2);
+    }
+    
+    // Cap the delivery fee at GH₵10
+    deliveryFee = Math.min(deliveryFee, 10);
+    
+    return deliveryFee.toFixed(2);
+  };
+
+  const deg2rad = (deg) => {
+    return deg * (Math.PI/180);
+  };
+  
+  const calculateDistance = (lat1, lon1, lat2, lon2) => {
+    const R = 6371; // Radius of the earth in km
+    const dLat = deg2rad(lat2 - lat1);
+    const dLon = deg2rad(lon2 - lon1);
+    const a = 
+      Math.sin(dLat/2) * Math.sin(dLat/2) +
+      Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
+      Math.sin(dLon/2) * Math.sin(dLon/2)
+    ; 
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
+    const distance = R * c; // Distance in km
+    return distance;
+  };
+
+  const calculateFinalTotal = () => {
+    const subtotal = calculateTotal();
+    // Add delivery fee if order is 50 or more
+    if (subtotal >= 50) {
+      const deliveryFee = userLocation ? parseFloat(calculateDeliveryCost(userLocation)) : 5;
+      return subtotal + deliveryFee;
+    }
+    return subtotal;
+  };
+
   // Update handlePaymentSuccess
   const handlePaymentSuccess = async (response) => {
     setShowPayment(false);
@@ -194,7 +269,7 @@ const CartScreen = ({ navigation }) => {
       const orderResponse = await axios.post(`${API_URL}/api/orders`, {
         paymentReference: paymentReference,
         items: cartItems,
-        totalAmount: calculateTotal(),
+        totalAmount: calculateFinalTotal(),
         paymentStatus: 'success'
       }, {
         headers: {
@@ -271,7 +346,7 @@ const CartScreen = ({ navigation }) => {
       }
 
       // Calculate total amount
-      const totalAmount = cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+      const totalAmount = calculateFinalTotal();
       
       // Get user email from userData
       const user = JSON.parse(userData);
@@ -461,14 +536,19 @@ const CartScreen = ({ navigation }) => {
           </View>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryText}>Delivery</Text>
-            <Text style={styles.shippingValue}>Free</Text>
+            <Text style={styles.deliveryFeeText}>
+              {calculateTotal() < 50 ? 
+                "Free Delivery" : 
+                `+ GH₵${userLocation ? calculateDeliveryCost(userLocation) : "5-10"} Delivery`
+              }
+            </Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.totalRow}>
             <Text style={styles.totalText}>Total</Text>
             <View style={styles.totalValueContainer}>
               <Text style={styles.currencySymbol}>GH₵</Text>
-              <Text style={styles.totalAmount}>{calculateTotal().toFixed(2)}</Text>
+              <Text style={styles.totalAmount}>{calculateFinalTotal().toFixed(2)}</Text>
             </View>
           </View>
         </View>
@@ -484,7 +564,7 @@ const CartScreen = ({ navigation }) => {
       {/* Add the PaystackPayment component */}
       <PaystackPayment
         isVisible={showPayment}
-        amount={calculateTotal()}
+        amount={calculateFinalTotal()}
         email={userEmail}
         onCancel={handlePaymentCancel}
         onSuccess={handlePaymentSuccess}
@@ -593,13 +673,13 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   listContainer: {
-    padding: 16,
-    paddingBottom: 24,
+    padding: 20,
+    // paddingBottom: 24,
   },
   cartItem: {
     flexDirection: 'row',
     backgroundColor: 'white',
-    borderRadius: 16,
+    // borderRadius: 16,
     marginBottom: 16,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -643,18 +723,17 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: '#5D3FD3',
-    marginVertical: 8,
+    // marginVertical: 8,
   },
   itemFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginTop: 8,
+    // marginTop: 8,
   },
   quantityContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    height: 36,
   },
   quantityButton: {
     width: 32,
@@ -669,7 +748,7 @@ const styles = StyleSheet.create({
   },
   quantityTextContainer: {
     minWidth: 36,
-    height: 36,
+    // height: 36,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -688,7 +767,7 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 30,
     borderTopRightRadius: 30,
     padding: 24,
-    paddingBottom: 36,
+    // paddingBottom: 36,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -6 },
     shadowOpacity: 0.1,
@@ -796,6 +875,11 @@ const styles = StyleSheet.create({
   },
   placeholder: {
     width: 40,
+  },
+  deliveryFeeText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#4CAF50',
   },
 });
 

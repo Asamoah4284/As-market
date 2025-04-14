@@ -34,7 +34,7 @@ router.get('/', async (req, res) => {
     query.status = 'approved';
     
     // Find products matching the query
-    const products = await Product.find(query);
+    const products = await Product.find(query).populate('seller', 'name');
     
     res.json(products);
   } catch (error) {
@@ -59,7 +59,8 @@ router.get('/featured', async (req, res) => {
     
     const products = await Product.find(query)
       .sort({ featuredRank: 1 }) // Sort by admin-defined ranking
-      .limit(limit);
+      .limit(limit)
+      .populate('seller', 'name');
       
     res.json(products);
   } catch (error) {
@@ -76,7 +77,7 @@ router.get('/pending', protect, async (req, res) => {
       return res.status(403).json({ message: 'Not authorized to access pending products' });
     }
     
-    const pendingProducts = await Product.find({ status: 'pending' });
+    const pendingProducts = await Product.find({ status: 'pending' }).populate('seller', 'name');
     res.json(pendingProducts);
   } catch (error) {
     console.error('Error fetching pending products:', error);
