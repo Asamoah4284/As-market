@@ -7,10 +7,13 @@ import {
   TouchableOpacity, 
   Image, 
   SafeAreaView,
-  ActivityIndicator
+  ActivityIndicator,
+  Platform,
+  StatusBar as RNStatusBar
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
+import Constants from 'expo-constants';
 
 const CategoryScreen = ({ route, navigation }) => {
   // Add default values to prevent undefined errors
@@ -101,6 +104,11 @@ const CategoryScreen = ({ route, navigation }) => {
     // Determine if the product is on sale (example condition)
     const isOnSale = item.discountPercentage && item.discountPercentage > 0;
     
+    // Make sure price is a number before calling toFixed
+    const price = typeof item.price === 'number' ? item.price.toFixed(2) : '0.00';
+    const originalPrice = isOnSale && typeof item.originalPrice === 'number' ? 
+      item.originalPrice.toFixed(2) : '0.00';
+    
     return (
       <TouchableOpacity 
         style={styles.productItem}
@@ -123,7 +131,9 @@ const CategoryScreen = ({ route, navigation }) => {
         </View>
         
         <View style={styles.productInfo}>
-          <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
+          <Text style={styles.productName} numberOfLines={1} ellipsizeMode="tail">
+            {item.name || 'Product Name'}
+          </Text>
           
           {/* Rating */}
           {item.rating && (
@@ -138,9 +148,9 @@ const CategoryScreen = ({ route, navigation }) => {
           
           {/* Price section */}
           <View style={styles.priceContainer}>
-            <Text style={styles.productPrice}>${item.price.toFixed(2)}</Text>
+            <Text style={styles.productPrice}>${price}</Text>
             {isOnSale && item.originalPrice && (
-              <Text style={styles.originalPrice}>${item.originalPrice.toFixed(2)}</Text>
+              <Text style={styles.originalPrice}>${originalPrice}</Text>
             )}
           </View>
           
@@ -148,7 +158,7 @@ const CategoryScreen = ({ route, navigation }) => {
           {item.isService ? (
             <Text style={styles.serviceTag}>Service</Text>
           ) : (
-            item.countInStock > 0 ? (
+            (item.countInStock === undefined || item.countInStock === null || item.countInStock > 0) ? (
               <Text style={styles.inStock}>In Stock</Text>
             ) : (
               <Text style={styles.outOfStock}>Out of Stock</Text>
@@ -178,12 +188,12 @@ const CategoryScreen = ({ route, navigation }) => {
     if (featuredOnly) return "Featured Products";
     if (services) return "Services";
     if (newArrivals) return "New Arrivals";
-    return categoryName;
+    return categoryName || "Products";
   };
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
+      <StatusBar style="light" />
       
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
@@ -202,7 +212,7 @@ const CategoryScreen = ({ route, navigation }) => {
           <Ionicons name="search-outline" size={70} color="#ddd" />
           <Text style={styles.emptyStateTitle}>No Products Found</Text>
           <Text style={styles.emptyStateText}>
-            We couldn't find any products matching "{categoryName}".
+            We couldn't find any products matching "{categoryName || 'this category'}".
           </Text>
           <TouchableOpacity 
             style={styles.browseButton}
@@ -215,7 +225,7 @@ const CategoryScreen = ({ route, navigation }) => {
         <FlatList
           key="two-column-grid"
           data={products}
-          keyExtractor={(item) => item._id.toString()}
+          keyExtractor={(item) => item._id ? item._id.toString() : Math.random().toString()}
           renderItem={renderProductItem}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.listContainer}
@@ -231,6 +241,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#f8f9fa',
+    paddingTop: Platform.OS === 'android' ? Constants.statusBarHeight : 0,
   },
   centered: {
     flex: 1,
@@ -250,6 +261,7 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
     marginBottom: 10,
+    height: Platform.OS === 'android' ? 60 : 'auto',
   },
   backButton: {
     padding: 8,
@@ -257,7 +269,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.2)',
   },
   headerTitle: {
-    fontSize: 22,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#fff',
     flex: 1,
@@ -326,7 +338,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     marginBottom: 3,
-    // Fixed height for two lines
   },
   ratingContainer: {
     flexDirection: 'row',
@@ -378,7 +389,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   addToCartButton: {
-    backgroundColor: '#3498db',
+    backgroundColor: '#5D3FD3',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
@@ -414,7 +425,7 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   browseButton: {
-    backgroundColor: '#3498db',
+    backgroundColor: '#5D3FD3',
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 10,

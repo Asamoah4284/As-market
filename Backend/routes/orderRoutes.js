@@ -9,7 +9,7 @@ const {
   testPaystackConnection,
   initializePayment,
   getAllOrders,
-  getSellerOrders
+  getOrdersBySellerId
 } = require('../controllers/orderController');
 
 // Test routes
@@ -24,8 +24,9 @@ router.route('/')
 router.route('/myorders')
   .get(protect, getMyOrders);
 
-router.route('/seller')
-  .get(protect, getSellerOrders);
+// This route must come before /:id to avoid conflicts
+router.route('/:sellerId')
+  .get(protect, getOrdersBySellerId);
 
 router.route('/:id')
   .get(protect, getOrderById);

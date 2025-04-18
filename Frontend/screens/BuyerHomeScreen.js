@@ -12,11 +12,18 @@ import {
   Modal,
   Dimensions,
   Platform,
+  Alert,
+  PermissionsAndroid,
 } from 'react-native';
 import { useState, useEffect, useRef } from 'react';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Location from 'expo-location';
+import { useSelector, useDispatch } from 'react-redux';
+import NotificationCenter from '../components/NotificationCenter';
+import NotificationBadge from '../components/NotificationBadge';
+import { handleAddToCartNotification } from '../services/notificationService';
 
 // Mock data - replace with actual API calls
 const FEATURED_PRODUCTS = [
@@ -51,7 +58,7 @@ const FEATURED_PRODUCTS = [
 ];
 
 const CATEGORIES = [
-  { id: '1', name: 'Electronics', icon: 'devices', color: '#FF6B6B' },
+  { id: '1', name: 'Electronic', icon: 'devices', color: '#FF6B6B' },
   { id: '2', name: 'Fashion', icon: 'checkroom', color: '#4ECDC4' },
   { id: '3', name: 'Home', icon: 'home', color: '#FFD166' },
   { id: '4', name: 'Beauty', icon: 'spa', color: '#FF9F9F' },
@@ -59,27 +66,19 @@ const CATEGORIES = [
   { id: '6', name: 'Books', icon: 'menu-book', color: '#1A535C' },
 ];
 
-const BANNER_DATA = [
+const SPECIAL_OFFERS = [
   {
     id: '1',
-    image: require('../assets/images/1.jpg'),
-    title: 'Happy Weekend',
-    subtitle: '25% OFF',
-    description: '*for All Menus',
-    bgColor: 'rgba(226, 240, 217, 0.8)'
+    backgroundImage: 'https://i.pinimg.com/736x/9e/1e/49/9e1e498dc20cd0bc7b0c51464c3fc1ee.jpg'
   },
   {
     id: '2',
-    image: require('../assets/images/3.jpg'),
-    title: 'Special Offers',
-    subtitle: 'Up to 50% off',
+    backgroundImage: 'https://i.pinimg.com/736x/d9/56/33/d95633c798707a3fbb4006d2951b04ee.jpg'
   },
   {
     id: '3',
-    image: require('../assets/images/2.jpg'),
-    title: 'New Arrivals',
-    subtitle: 'Check out the latest',
-  },
+    backgroundImage: 'https://i.pinimg.com/736x/2c/8a/fa/2c8afaa91b320839978894a63f332b17.jpg'
+  }
 ];
 
 let url = 'http://172.20.10.3:5000/api/products';
@@ -91,22 +90,78 @@ const BuyerHomeScreen = () => {
   const navigation = useNavigation();
   const [userName, setUserName] = useState('User');
   const [fullScreenImage, setFullScreenImage] = useState(null);
-  const [currentBannerIndex, setCurrentBannerIndex] = useState(0);
-  const flatListRef = useRef(null);
   const [services, setServices] = useState([]);
+  const [specialOffers, setSpecialOffers] = useState(SPECIAL_OFFERS);
+  const [activeOfferIndex, setActiveOfferIndex] = useState(0);
+  const specialOffersScrollViewRef = useRef(null);
+  const [location, setLocation] = useState('Loading location...');
+  const [locationPermission, setLocationPermission] = useState(false);
+  const [favorites, setFavorites] = useState([]);
+  const [showNotifications, setShowNotifications] = useState(false);
+  
+  // Get cart items from Redux store
+  const { items: cartItems } = useSelector(state => state.cart);
+  const dispatch = useDispatch();
 
+  // Location detection useEffect
   useEffect(() => {
-    const interval = setInterval(() => {
-      const nextIndex = (currentBannerIndex + 1) % BANNER_DATA.length;
-      flatListRef.current?.scrollToIndex({
-        index: nextIndex,
-        animated: true
-      });
-      setCurrentBannerIndex(nextIndex);
-    }, 2000);
-
-    return () => clearInterval(interval);
-  }, [currentBannerIndex]);
+    const getLocation = async () => {
+      try {
+        // Check if expo-location is available
+        if (!Location) {
+          console.log('Expo Location is not available');
+          setLocation('UCC, Capecoast'); // Fallback location
+          return;
+        }
+        
+        // Request location permission
+        const { status } = await Location.requestForegroundPermissionsAsync();
+        
+        if (status !== 'granted') {
+          console.log('Location permission denied');
+          setLocation('New York, USA'); // Fallback location
+          setLocationPermission(false);
+          return;
+        }
+        
+        setLocationPermission(true);
+        
+        // Get current position
+        const position = await Location.getCurrentPositionAsync({
+          accuracy: Location.Accuracy.Balanced,
+        });
+        
+        if (position) {
+          const { latitude, longitude } = position.coords;
+          
+          // Reverse geocode to get the address
+          const geocode = await Location.reverseGeocodeAsync({
+            latitude,
+            longitude
+          });
+          
+          if (geocode && geocode.length > 0) {
+            const address = geocode[0];
+            const locationString = address.city ? 
+              `${address.city}, ${address.country}` : 
+              address.region ? 
+                `${address.region}, ${address.country}` : 
+                `${address.country}`;
+                
+            console.log('Location detected:', locationString);
+            setLocation(locationString);
+          } else {
+            setLocation('New York, USA'); // Fallback location
+          }
+        }
+      } catch (error) {
+        console.error('Error getting location:', error);
+        setLocation('New York, USA'); // Fallback location
+      }
+    };
+    
+    getLocation();
+  }, []);
 
   // Add new useEffect to fetch products
   useEffect(() => {
@@ -202,9 +257,123 @@ const BuyerHomeScreen = () => {
     fetchServices();
   }, []);
 
+  // Add a useEffect for the auto-scrolling carousel functionality
+  useEffect(() => {
+    let interval;
+    
+    // Start auto-scrolling when component mounts
+    const startAutoScroll = () => {
+      interval = setInterval(() => {
+        if (specialOffersScrollViewRef.current) {
+          const nextIndex = (activeOfferIndex + 1) % specialOffers.length;
+          const slideWidth = 280 + 15; // card width + margin
+          
+          specialOffersScrollViewRef.current.scrollTo({
+            x: nextIndex * slideWidth,
+            animated: true,
+          });
+          
+          setActiveOfferIndex(nextIndex);
+        }
+      }, 3000); // Auto-scroll every 3 seconds
+    };
+    
+    startAutoScroll();
+    
+    // Clean up interval on component unmount
+    return () => {
+      if (interval) {
+        clearInterval(interval);
+      }
+    };
+  }, [activeOfferIndex, specialOffers.length]);
+
+  // Add new useEffect to load favorites from AsyncStorage
+  useEffect(() => {
+    const loadFavorites = async () => {
+      try {
+        const storedFavorites = await AsyncStorage.getItem('favorites');
+        if (storedFavorites) {
+          setFavorites(JSON.parse(storedFavorites));
+          console.log('Loaded favorites from storage:', JSON.parse(storedFavorites));
+        }
+      } catch (error) {
+        console.error('Error loading favorites:', error);
+      }
+    };
+
+    loadFavorites();
+  }, []);
+
+  // Function to toggle favorite status
+  const toggleFavorite = async (productId) => {
+    try {
+      let newFavorites;
+      if (favorites.includes(productId)) {
+        // Remove from favorites
+        newFavorites = favorites.filter(id => id !== productId);
+      } else {
+        // Add to favorites
+        newFavorites = [...favorites, productId];
+      }
+
+      // Update state
+      setFavorites(newFavorites);
+      
+      // Store in AsyncStorage
+      await AsyncStorage.setItem('favorites', JSON.stringify(newFavorites));
+      console.log('Favorites updated:', newFavorites);
+    } catch (error) {
+      console.error('Error updating favorites:', error);
+    }
+  };
+
   const handleSearch = (query) => {
     setSearchQuery(query);
     // Implement search functionality
+  };
+
+  const handleAddToCart = async (product) => {
+    try {
+      // Check if user is logged in
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        Alert.alert(
+          'Login Required',
+          'Please login to add items to your cart',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            { text: 'Login', onPress: () => navigation.navigate('Login') }
+          ]
+        );
+        return;
+      }
+      
+      // Make API call to add to cart
+      const response = await fetch(`${url}/api/cart/add`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          productId: product._id,
+          quantity: 1
+        })
+      });
+      
+      if (response.ok) {
+        // Send notification
+        await handleAddToCartNotification(product.name, dispatch);
+        Alert.alert('Success', 'Product added to cart');
+      } else {
+        const errorData = await response.json();
+        Alert.alert('Error', errorData.message || 'Failed to add product to cart');
+      }
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      Alert.alert('Error', 'Failed to add product to cart');
+    }
   };
 
   const renderFeaturedProduct = ({ item }) => {
@@ -212,10 +381,16 @@ const BuyerHomeScreen = () => {
       ? item.image 
       : `http://172.20.10.3:5000${item.image}`);
     
+    // Check if this product is in favorites
+    const isFavorite = favorites.includes(item._id);
+    
+    // Log product details for debugging
     console.log('Product:', item.name);
     console.log('Product ID:', item._id);
-    console.log('Original image path:', item.image);
-    console.log('Constructed image URI:', imageUri);
+    console.log('Stock:', item.countInStock);
+    console.log('Is New:', item.isNew);
+    console.log('Is Service:', item.isService);
+    console.log('Is Favorite:', isFavorite);
 
     return (
       <TouchableOpacity 
@@ -234,20 +409,39 @@ const BuyerHomeScreen = () => {
             onError={(error) => console.error('Image loading error:', error.nativeEvent.error)}
             onLoad={() => console.log('Image loaded successfully:', imageUri)}
           />
-          <View style={styles.productBadge}>
-            <Text style={styles.productBadgeText}>New</Text>
-          </View>
-          <TouchableOpacity style={styles.favoriteButton}>
-            <Ionicons name="heart-outline" size={20} color="#fff" />
+          {/* Show New badge only for new products */}
+          {item.isNew === true && (
+            <View style={[styles.productBadge, { backgroundColor: '#FF6B6B' }]}>
+              <Text style={styles.productBadgeText}>New</Text>
+            </View>
+          )}
+          {/* Show Out of Stock badge only for non-service products with zero stock and not new */}
+          {!item.isNew && !item.isService && item.countInStock === 0 && (
+            <View style={[styles.productBadge, { backgroundColor: '#FF4757' }]}>
+              <Text style={styles.productBadgeText}>Out of Stock</Text>
+            </View>
+          )}
+          <TouchableOpacity 
+            style={styles.favoriteButton}
+            onPress={(e) => {
+              e.stopPropagation(); // Prevent triggering the parent onPress
+              toggleFavorite(item._id);
+            }}
+          >
+            <Ionicons 
+              name={isFavorite ? "heart" : "heart-outline"} 
+              size={20} 
+              color={isFavorite ? "#FFD700" : "#fff"} 
+            />
           </TouchableOpacity>
         </View>
         <View style={styles.productInfo}>
           <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
           <View style={styles.productDetails}>
             <View style={styles.priceContainer}>
-              <Text style={styles.productPrice}>${item.price.toFixed(2)}</Text>
+              <Text style={styles.productPrice}>GH¢{item.price.toFixed(2)}</Text>
               {item.originalPrice && (
-                <Text style={styles.originalPrice}>${item.originalPrice.toFixed(2)}</Text>
+                <Text style={styles.originalPrice}>GH¢{item.originalPrice.toFixed(2)}</Text>
               )}
             </View>
             <View style={styles.ratingContainer}>
@@ -268,7 +462,10 @@ const BuyerHomeScreen = () => {
               <Ionicons name="car-outline" size={12} color="#666" />
               <Text style={styles.sellerText}>15% off delivery</Text>
             </View>
-            <TouchableOpacity style={styles.addToCartButton}>
+            <TouchableOpacity 
+              style={styles.addToCartButton}
+              onPress={() => handleAddToCart(item)}
+            >
               <Ionicons name="add-circle" size={20} color="#3498db" />
             </TouchableOpacity>
           </View>
@@ -298,10 +495,14 @@ const BuyerHomeScreen = () => {
       ? item.image 
       : `http://172.20.10.3:5000${item.image}`);
 
+    // Check if this service is in favorites
+    const isFavorite = favorites.includes(item._id);
+
     console.log('Service:', item.name);
     console.log('Service ID:', item._id);
     console.log('Original image path:', item.image);
     console.log('Constructed image URI:', imageUri);
+    console.log('Is Favorite:', isFavorite);
 
     return (
       <TouchableOpacity 
@@ -323,8 +524,18 @@ const BuyerHomeScreen = () => {
           <View style={[styles.productBadge, { backgroundColor: '#4ECDC4' }]}>
             <Text style={styles.productBadgeText}>Service</Text>
           </View>
-          <TouchableOpacity style={styles.favoriteButton}>
-            <Ionicons name="heart-outline" size={20} color="#fff" />
+          <TouchableOpacity 
+            style={styles.favoriteButton}
+            onPress={(e) => {
+              e.stopPropagation(); // Prevent triggering the parent onPress
+              toggleFavorite(item._id);
+            }}
+          >
+            <Ionicons 
+              name={isFavorite ? "heart" : "heart-outline"} 
+              size={20} 
+              color={isFavorite ? "#FFD700" : "#fff"} 
+            />
           </TouchableOpacity>
         </View>
         <View style={styles.productInfo}>
@@ -353,7 +564,10 @@ const BuyerHomeScreen = () => {
               <Ionicons name="time-outline" size={12} color="#666" />
               <Text style={styles.sellerText}>Available Now</Text>
             </View>
-            <TouchableOpacity style={styles.addToCartButton}>
+            <TouchableOpacity 
+              style={styles.addToCartButton}
+              onPress={() => handleAddToCart(item)}
+            >
               <Ionicons name="add-circle" size={20} color="#3498db" />
             </TouchableOpacity>
           </View>
@@ -370,13 +584,69 @@ const BuyerHomeScreen = () => {
         <View style={styles.header}>
           <View style={styles.headerContent}>
             <View style={styles.brandNameContainer}>
-              <Text style={[styles.greeting, {color: '#5D3FD3'}]}>Uni</Text>
-              <Text style={[styles.greeting, {color: '#f9004d'}]}>Market</Text>
+              <Text style={[styles.greeting, {color: '#fff'}]}>Uni</Text>
+              <Text style={[styles.greeting, {color: '#FF4757'}]}>Market</Text>
             </View>
-            <Text style={styles.subtitle}>Asarion Marketplace</Text>
+            <View style={styles.locationContainer}>
+              <Ionicons name="location-outline" size={14} color="#fff" />
+              <Text style={styles.locationText}>{location}</Text>
+              {location === 'Loading location...' ? (
+                <Ionicons name="sync" size={14} color="#fff" style={{marginLeft: 4, opacity: 0.8}} />
+              ) : (
+                <TouchableOpacity 
+                  onPress={() => {
+                    setLocation('Loading location...');
+                    // Re-fetch location
+                    const getLocation = async () => {
+                      try {
+                        if (!Location) {
+                          setLocation('UCC, Capecoast');
+                          return;
+                        }
+                        
+                        const position = await Location.getCurrentPositionAsync({
+                          accuracy: Location.Accuracy.Balanced,
+                        });
+                        
+                        if (position) {
+                          const { latitude, longitude } = position.coords;
+                          const geocode = await Location.reverseGeocodeAsync({
+                            latitude,
+                            longitude
+                          });
+                          
+                          if (geocode && geocode.length > 0) {
+                            const address = geocode[0];
+                            const locationString = address.city ? 
+                              `${address.city}, ${address.country}` : 
+                              address.region ? 
+                                `${address.region}, ${address.country}` : 
+                                `${address.country}`;
+                            
+                            setLocation(locationString);
+                          } else {
+                            setLocation('New York, USA');
+                          }
+                        }
+                      } catch (error) {
+                        console.error('Error refreshing location:', error);
+                        setLocation('New York, USA');
+                      }
+                    };
+                    
+                    getLocation();
+                  }}
+                >
+                </TouchableOpacity>
+              )}
+            </View>
           </View>
-          <TouchableOpacity style={styles.notificationButton}>
-            <Ionicons name="notifications-outline" size={24} color="#5D3FD3" />
+          <TouchableOpacity 
+            style={styles.notificationButton}
+            onPress={() => setShowNotifications(true)}
+          >
+            <Ionicons name="notifications-outline" size={24} color="#fff" />
+            <NotificationBadge style={styles.headerNotificationBadge} />
           </TouchableOpacity>
         </View>
         
@@ -389,76 +659,74 @@ const BuyerHomeScreen = () => {
             value={searchQuery}
             onChangeText={handleSearch}
           />
-          {searchQuery.length > 0 && (
+          {searchQuery.length > 0 ? (
             <TouchableOpacity onPress={() => setSearchQuery('')}>
               <Ionicons name="close-circle" size={20} color="#999" />
+            </TouchableOpacity>
+          ) : (
+            <TouchableOpacity style={styles.searchButton}>
+              <Ionicons name="options-outline" size={20} color="#fff" />
             </TouchableOpacity>
           )}
         </View>
         
         <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollContent}>
-          {/* Banner Carousel */}
-          <FlatList
-            horizontal
-            pagingEnabled
-            data={BANNER_DATA}
-            keyExtractor={item => item.id}
-            showsHorizontalScrollIndicator={false}
-            ref={flatListRef}
-            onMomentumScrollEnd={(event) => {
-              const newIndex = Math.round(
-                event.nativeEvent.contentOffset.x / 
-                Dimensions.get('window').width
-              );
-              setCurrentBannerIndex(newIndex);
-            }}
-            renderItem={({ item }) => (
-              <View style={[styles.individualBannerContainer, { width: Dimensions.get('window').width }]}>
-                <View style={styles.bannerContent}>
+          {/* Special Offers Section - Added based on image reference */}
+          <View style={styles.specialOffersContainer}>
+            <View style={styles.specialOffersHeader}>
+              <Text style={styles.specialOffersTitle}>#SpecialForYou</Text>
+              <TouchableOpacity>
+                <Text style={styles.seeAllLink}>See All</Text>
+              </TouchableOpacity>
+            </View>
+            
+            <ScrollView 
+              ref={specialOffersScrollViewRef}
+              horizontal 
+              showsHorizontalScrollIndicator={false}
+              pagingEnabled
+              onMomentumScrollEnd={(event) => {
+                const slideWidth = 280 + 15; // card width + margin
+                const offsetX = event.nativeEvent.contentOffset.x;
+                const activeIndex = Math.round(offsetX / slideWidth);
+                setActiveOfferIndex(activeIndex);
+              }}
+            >
+              {specialOffers.map((offer) => (
+                <TouchableOpacity key={offer.id} style={styles.specialOfferCard}>
                   <Image 
-                    source={typeof item.image === 'string' ? { uri: item.image } : item.image}
-                    style={styles.banner}
-                    resizeMode="cover"
+                    source={{ uri: offer.backgroundImage }}
+                    style={styles.offerBackgroundImage}
                   />
-                  <View style={[
-                    styles.bannerOverlay,
-                    item.id === '1' ? { backgroundColor: item.bgColor || 'rgba(0,0,0,0.1)' } : { backgroundColor: 'rgba(0,0,0,0.3)' }
-                  ]}>
-                    <View style={styles.bannerTextContainer}>
-                      {item.id === '1' ? (
-                        <>
-                          <View style={styles.dotsPattern}>
-                            <Text style={styles.dotText}>⋮⋮⋮</Text>
-                          </View>
-                          <Text style={styles.bannerTitle}>{item.title}</Text>
-                          <Text style={styles.bannerDiscount}>{item.subtitle}</Text>
-                          <Text style={styles.bannerDescription}>{item.description}</Text>
-                        </>
-                      ) : (
-                        <>
-                          <Text style={styles.bannerTitle}>{item.title}</Text>
-                          <Text style={styles.bannerSubtitle}>{item.subtitle}</Text>
-                          <TouchableOpacity style={styles.bannerButton}>
-                            <Text style={styles.bannerButtonText}>Shop Now</Text>
-                          </TouchableOpacity>
-                        </>
-                      )}
+                  <View style={styles.offerContentWrapper}>
+                    <View style={styles.offerImageContainer}>
+                      <Image 
+                        source={{ uri: offer.productImage }}
+                        style={styles.offerImage}
+                        resizeMode="cover"
+                      />
+                    </View>
+                    <View style={styles.offerContent}>
+                      <Text style={styles.offerHeading}>{offer.title}</Text>
+                      <Text style={styles.offerDiscount}>{offer.discount}</Text>
+                      <Text style={styles.offerDetails}>{offer.details}</Text>
+                      <TouchableOpacity style={[styles.offerButton, { backgroundColor: offer.buttonColor }]}>
+                        <Text style={styles.offerButtonText}>{offer.buttonText}</Text>
+                      </TouchableOpacity>
                     </View>
                   </View>
-                </View>
-              </View>
-            )}
-          />
-
-          {/* Pagination Dots */}
-          <View style={styles.paginationDotsContainer}>
-            <View style={styles.paginationDots}>
-              {BANNER_DATA.map((_, index) => (
-                <View
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+            
+            {/* Pagination Dots */}
+            <View style={styles.paginationDotsContainer}>
+              {specialOffers.map((_, index) => (
+                <View 
                   key={index}
                   style={[
-                    styles.dot,
-                    { backgroundColor: index === currentBannerIndex ? '#333' : 'rgba(150,150,150,0.5)' }
+                    styles.paginationDot,
+                    index === activeOfferIndex && styles.paginationDotActive
                   ]}
                 />
               ))}
@@ -469,10 +737,7 @@ const BuyerHomeScreen = () => {
           <View style={styles.sectionContainer}>
             <View style={styles.sectionHeader}>
               <Text style={styles.sectionTitle}>Categories</Text>
-              
-              
-          
-          <TouchableOpacity onPress={() => navigation.navigate('CategoriesScreen')}>
+              <TouchableOpacity onPress={() => navigation.navigate('CategoriesScreen')}>
                 <Text style={styles.seeAllText}>See All</Text>
               </TouchableOpacity>
             </View>
@@ -515,7 +780,7 @@ const BuyerHomeScreen = () => {
           <View style={[styles.sectionContainer, { marginBottom: 20 }]}>
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleContainer}>
-                <View style={[styles.sectionTitleAccent, {backgroundColor: '#FF6B6B'}]}></View>
+                <View style={[styles.sectionTitleAccent, {backgroundColor: '#5D3FD3'}]}></View>
                 <Text style={styles.sectionTitle}>New Arrivals</Text>
               </View>
               <TouchableOpacity 
@@ -663,7 +928,7 @@ const BuyerHomeScreen = () => {
                   onPress={() => navigation.navigate('CategoriesScreen', { categoryName: 'Bags', categoryId: 'bags' })}
                 >
                   <Image 
-                    source={{ uri: 'https://images.unsplash.com/photo-1584917865442-a4155224a1ad' }} 
+                    source={{ uri: 'https://i.pinimg.com/474x/0b/8f/d9/0b8fd9d0b8f2006f2af7077c273a5375.jpg' }} 
                     style={styles.gridImage}
                   />
                   <View style={styles.gridOverlay}>
@@ -691,7 +956,7 @@ const BuyerHomeScreen = () => {
           <View style={[styles.sectionContainer, { marginBottom: 20 }]}>
             <View style={styles.sectionHeader}>
               <View style={styles.sectionTitleContainer}>
-                <View style={[styles.sectionTitleAccent, {backgroundColor: '#FF4757'}]}></View>
+                <View style={[styles.sectionTitleAccent, {backgroundColor: '#5D3FD3'}]}></View>
                 <Text style={styles.sectionTitle}>Special Offers & Deals</Text>
               </View>
             </View>
@@ -699,7 +964,7 @@ const BuyerHomeScreen = () => {
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dealsContainer}>
               {/* Flash Sale Card */}
               <TouchableOpacity style={styles.dealCard}>
-                <View style={[styles.dealBadge, { backgroundColor: '#FF4757' }]}>
+                <View style={[styles.dealBadge, { backgroundColor: '#5D3FD3' }]}>
                   <Text style={styles.dealBadgeText}>50% OFF</Text>
                 </View>
                 <Image 
@@ -821,7 +1086,7 @@ const BuyerHomeScreen = () => {
         <View style={styles.bottomNavigation}>
           <TouchableOpacity 
             style={styles.navItem} 
-            onPress={() => navigation.navigate('Home')}
+            onPress={() => navigation.navigate('BuyerHome')}
           >
             <Ionicons name="home" size={22} color="#5D3FD3" />
             <Text style={[styles.navText, styles.activeNavText]}>Home</Text>
@@ -841,9 +1106,11 @@ const BuyerHomeScreen = () => {
           >
             <View style={styles.centerButtonInner}>
               <Ionicons name="cart" size={24} color="#fff" />
-              <View style={styles.cartBadge}>
-                <Text style={styles.cartBadgeText}>+5</Text>
-              </View>
+              {cartItems && cartItems.length > 0 && (
+                <View style={styles.cartBadge}>
+                  <Text style={styles.cartBadgeText}>{cartItems.length}</Text>
+                </View>
+              )}
             </View>
           </TouchableOpacity>
           
@@ -851,8 +1118,17 @@ const BuyerHomeScreen = () => {
             style={styles.navItem} 
             onPress={() => navigation.navigate('Favorites')}
           >
-            <Ionicons name="heart-outline" size={22} color="#999" />
+            <Ionicons 
+              name={favorites.length > 0 ? "heart" : "heart-outline"} 
+              size={22} 
+              color={favorites.length > 0 ? "#FF4757" : "#999"} 
+            />
             <Text style={styles.navText}>Favorites</Text>
+            {favorites.length > 0 && (
+              <View style={styles.favoriteBadge}>
+                <Text style={styles.favoriteBadgeText}>{favorites.length}</Text>
+              </View>
+            )}
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -887,6 +1163,13 @@ const BuyerHomeScreen = () => {
             )}
           </View>
         </Modal>
+
+        {/* Notification Center */}
+        <NotificationCenter 
+          visible={showNotifications} 
+          onClose={() => setShowNotifications(false)} 
+          navigation={navigation}
+        />
       </View>
     </SafeAreaView>
   );
@@ -907,12 +1190,17 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: Platform.OS === 'android' ? 16 : 16,
-    paddingTop: Platform.OS === 'android' ? 24 : 24,
-    backgroundColor: '#FFF',
-    // borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
-    height: Platform.OS === 'android' ? 80 : 60,
+    paddingVertical: Platform.OS === 'android' ? 16 : 20,
+    paddingTop: Platform.OS === 'android' ? 20: 24,
+    backgroundColor: '#5D3FD3',
+    borderBottomLeftRadius: 0,
+    borderBottomRightRadius: 0,
+    height: Platform.OS === 'android' ? 100 : 100,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 5,
   },
   headerContent: {
     flex: 1,
@@ -920,20 +1208,22 @@ const styles = StyleSheet.create({
   greeting: {
     fontSize: 18,
     fontWeight: 'bold',
+    color: '#fff', // Changed to white to show on red background
   },
   brandNameContainer: {
     flexDirection: 'row',
   },
   subtitle: {
     fontSize: 14,
-    color: '#666',
+    color: '#fff', // Changed to white to show on red background
     marginTop: 2,
+    opacity: 0.9,
   },
   notificationButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)', // Translucent white
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -943,11 +1233,19 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderRadius: 10,
     marginHorizontal: 16,
-    marginVertical: 12,
+    marginTop: -20, // Overlapping with the header
+    marginBottom: 12,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderWidth: 1,
     borderColor: '#e0e0e0',
+    // Shadow for the search bar
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+    zIndex: 2,
   },
   searchIcon: {
     marginRight: 8,
@@ -958,100 +1256,96 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333',
   },
-  individualBannerContainer: {
+  
+  /* Special Offers Section - Added based on image reference */
+  specialOffersContainer: {
+    marginTop: 10,
     paddingHorizontal: 16,
-    paddingVertical: 12,
   },
-  bannerContent: {
-    position: 'relative',
-    height: 160,
-    borderRadius: 12,
-    overflow: 'hidden',
-  },
-  banner: {
-    width: '100%',
-    height: '100%',
-  },
-  // bannerOverlay: {
-  //   position: 'absolute',
-  //   top: 0,
-  //   left: 0,
-  //   right: 0,
-  //   bottom: 0,
-  //   padding: 16,
-  //   justifyContent: 'center',
-  // },
-  paginationDotsContainer: {
-    alignItems: 'center',
-    marginTop: -10,
-    height: 20,
-    position: 'relative',
-    zIndex: 10,
-  },
-  paginationDots: {
+  specialOffersHeader: {
     flexDirection: 'row',
-    justifyContent: 'center',
+    justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.5)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 20,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    marginHorizontal: 4,
-    opacity: 0.9,
-  },
-  bannerTextContainer: {
-    flexDirection: 'column',
-    justifyContent: 'flex-start',
-    alignItems: 'flex-start',
-    marginLeft: 12,
-  },
-  dotsPattern: {
-    marginBottom: 5,
-  },
-  dotText: {
-    fontSize: 16,
-    color: '#333',
-    letterSpacing: 5,
-    fontWeight: 'bold',
-  },
-  bannerTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 4,
-  },
-  bannerSubtitle: {
-    fontSize: 16,
-    color: '#fff',
     marginBottom: 12,
   },
-  bannerDiscount: {
-    fontSize: 32,
+  specialOffersTitle: {
+    fontSize: 16,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 4,
   },
-  bannerDescription: {
-    fontSize: 12,
-    color: '#555',
-    fontStyle: 'italic',
-  },
-  bannerButton: {
-    backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 20,
-    alignSelf: 'flex-start',
-    marginTop: 12,
-  },
-  bannerButtonText: {
+  seeAllLink: {
+    fontSize: 14,
     color: '#3498db',
+  },
+  specialOfferCard: {
+    width: 280,
+    height: 160,
+    borderRadius: 15,
+    marginRight: 15,
+    overflow: 'hidden',
+    position: 'relative',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  offerBackgroundImage: {
+    position: 'absolute',
+    width: '100%',
+    height: '100%',
+    opacity: 0.85,
+  },
+  offerContentWrapper: {
+    flex: 1,
+    flexDirection: 'row',
+    padding: 15,
+    position: 'relative',
+    zIndex: 1,
+  },
+  offerImageContainer: {
+    width: 100,
+    height: 130,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  offerImage: {
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+  },
+  offerContent: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  offerHeading: {
+    fontSize: 16,
     fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+  },
+  offerDiscount: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 5,
+  },
+  offerDetails: {
+    fontSize: 12,
+    color: '#666',
+    marginBottom: 12,
+  },
+  offerButton: {
+    backgroundColor: '#f9004d',
+    paddingHorizontal: 18,
+    paddingVertical: 8,
+    borderRadius: 25,
+    alignSelf: 'flex-start',
+  },
+  offerButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 12,
   },
   sectionContainer: {
     marginTop: 16,
@@ -1477,7 +1771,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -2,
     right: -2,
-    backgroundColor: '#f9004d',
+    backgroundColor: '#FF4757',
     borderRadius: 10,
     minWidth: 20,
     height: 20,
@@ -1491,6 +1785,77 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: 'bold',
     paddingHorizontal: 3,
+  },
+  paginationDotsContainer: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 12,
+  },
+  paginationDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#D9D9D9',
+    marginHorizontal: 4,
+  },
+  paginationDotActive: {
+    backgroundColor: '#5D3FD3',
+    width: 16,
+  },
+  locationContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  locationText: {
+    fontSize: 14,
+    color: '#fff',
+    marginLeft: 4,
+    marginRight: 4,
+    opacity: 0.9,
+  },
+  searchButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#5D3FD3',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  favoriteBadge: {
+    position: 'absolute',
+    top: -2,
+    right: 10,
+    backgroundColor: '#FF4757',
+    borderRadius: 10,
+    minWidth: 16,
+    height: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#fff',
+  },
+  favoriteBadgeText: {
+    color: '#fff',
+    fontSize: 9,
+    fontWeight: 'bold',
+    paddingHorizontal: 3,
+  },
+  headerNotificationBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -5,
+    backgroundColor: '#FF4757',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#fff',
+    zIndex: 10,
   },
 });
 

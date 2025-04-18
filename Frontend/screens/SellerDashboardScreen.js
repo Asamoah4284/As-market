@@ -21,6 +21,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { LinearGradient } from 'expo-linear-gradient';
+import { handleNewProductNotification } from '../services/notificationService';
 
 const SellerDashboardScreen = () => {
   const navigation = useNavigation();
@@ -221,46 +222,34 @@ const SellerDashboardScreen = () => {
       setLoading(true);
       const token = await AsyncStorage.getItem('userToken');
       
-    
-
-      // Log the full request details
       const requestUrl = `${API_URL}/api/products/seller`;
       const headers = {
         'Authorization': `Bearer ${token}`,
         'Accept': 'application/json'
       };
       
-      console.log('Request URL:', requestUrl);
-      console.log('Request headers:', headers);
-
       const response = await fetch(requestUrl, {
-        method: 'GET', // Explicitly specify method
+        method: 'GET',
         headers: headers
       });
       
-      // Log response status and headers
-      console.log('Response status:', response.status);
-      console.log('Response headers:', response.headers);
-
       if (!response.ok) {
         const errorData = await response.json().catch(() => null);
-        console.log('Error response data:', errorData);
         throw new Error(errorData?.message || `HTTP error! status: ${response.status}`);
       }
       
       const data = await response.json();
-      console.log('Response data:', data);
 
-      // Validate data structure
-      if (!Array.isArray(data)) {
-        console.log('Invalid data format received:', data);
-        throw new Error('Invalid data format received from server');
-      }
+      // Ensure each product has a sales count
+      const productsWithSales = data.map(product => ({
+        ...product,
+        sales: product.sales || 0
+      }));
 
-      setProducts(data);
+      setProducts(productsWithSales);
     } catch (error) {
       console.error('Detailed fetch error:', error);
-      setProducts([]); // Ensure products is empty on error
+      setProducts([]);
       setErrorMessage(`Failed to fetch products: ${error.message}`);
     } finally {
       setLoading(false);
@@ -275,7 +264,7 @@ const SellerDashboardScreen = () => {
         return [];
       }
 
-      const response = await fetch('http://172.20.10.3:5000/api/orders/seller', {
+      const response = await fetch(`${API_URL}/api/orders/seller`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -283,16 +272,13 @@ const SellerDashboardScreen = () => {
         }
       });
 
-      console.log('Orders API Response Status:', response.status);
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Fetched orders:', data);
-        return data;
-      } else {
-        console.error('Failed to fetch orders:', response.status);
-        return [];
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
+
+      const data = await response.json();
+      console.log('Fetched orders:', data);
+      return data;
     } catch (error) {
       console.error('Error fetching orders:', error);
       return [];
@@ -484,15 +470,16 @@ const SellerDashboardScreen = () => {
       const url = isEditing 
         ? `${baseUrl}/api/products/${currentProductId}`
         : `${baseUrl}/api/products`;
-        
+      
+      const method = isEditing ? 'PUT' : 'POST';
+      
       const response = await fetch(url, {
-        method: isEditing ? 'PUT' : 'POST',
+        method,
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
+          'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify(productData),
+        body: JSON.stringify(productData)
       });
       
       if (!response.ok) {
@@ -502,38 +489,26 @@ const SellerDashboardScreen = () => {
       
       const savedProduct = await response.json();
       
-      // Update products state
-      if (isEditing) {
-        setProducts(prevProducts => 
-          prevProducts.map(product => 
-            product._id === currentProductId ? savedProduct : product
-          )
-        );
-      } else {
-        setProducts(prevProducts => [savedProduct, ...prevProducts]);
+      // Send notification for new product (not for edits)
+      if (!isEditing) {
+        // Get seller name from profile data
+        const sellerName = profileData.name || 'A seller';
+        handleNewProductNotification(productData.name, sellerName);
       }
       
-      setSuccessMessage(isEditing ? 'Product updated successfully' : 'Product created successfully');
-      setModalVisible(false);
+      setSuccessMessage(isEditing 
+        ? 'Product updated successfully! It will be reviewed by admin.' 
+        : 'Product added successfully! It will be reviewed by admin.'
+      );
       
-      // Reset form
-      setProductForm({
-        name: '',
-        price: '',
-        description: '',
-        category: '',
-        stock: '',
-        image: '',
-        additionalImages: [],
-        isService: false,
-        status: 'pending' // Add default status as pending
-      });
-      setIsEditing(false);
-      setCurrentProductId(null);
-
+      // Close modal after delay to allow user to see success message
+      setTimeout(() => {
+        setModalVisible(false);
+        fetchProducts(); // Refresh the products list
+      }, 1500);
+      
     } catch (error) {
-      console.error('Error saving product:', error);
-      setErrorMessage(error.message || 'Failed to save product');
+      setErrorMessage(error.message || 'Something went wrong, please try again');
     } finally {
       setLoading(false);
     }
@@ -560,8 +535,28 @@ const SellerDashboardScreen = () => {
         throw new Error('Failed to update order status');
       }
 
+      // If the order is being marked as completed, update the product sales count
+      if (newStatus === 'completed') {
+        const order = orders.find(o => o._id === orderId);
+        if (order) {
+          // Update the products state with new sales count
+          setProducts(prevProducts => {
+            return prevProducts.map(product => {
+              const orderItem = order.items.find(item => item.product._id === product._id);
+              if (orderItem) {
+                return {
+                  ...product,
+                  sales: (product.sales || 0) + orderItem.quantity
+                };
+              }
+              return product;
+            });
+          });
+        }
+      }
+
       // Refresh orders after successful update
-      await mockFetchOrders();
+      await fetchOrders();
       Alert.alert('Success', 'Order status updated successfully');
     } catch (error) {
       console.error('Error updating order status:', error);
@@ -669,26 +664,25 @@ const SellerDashboardScreen = () => {
   };
 
   const renderOrderItem = ({ item }) => {
-    // Add null check for item
     if (!item) return null;
 
     return (
       <View style={styles.orderCard}>
         <View style={styles.orderHeader}>
-          <Text style={styles.orderId}>Order #{item._id || 'N/A'}</Text>
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.status || 'pending') }]}>
-            <Text style={styles.statusText}>{item.status || 'Pending'}</Text>
+          <Text style={styles.orderId}>Order #{item._id?.slice(-6) || 'N/A'}</Text>
+          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.orderStatus || 'pending') }]}>
+            <Text style={styles.statusText}>{item.orderStatus || 'Pending'}</Text>
           </View>
         </View>
         
         <View style={styles.orderDetails}>
           <Text style={styles.customerName}>Customer: {item.user?.name || 'Unknown'}</Text>
           <Text style={styles.orderDate}>Date: {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'N/A'}</Text>
-          <Text style={styles.orderTotal}>Total: ${item.totalAmount?.toFixed(2) || '0.00'}</Text>
+          <Text style={styles.orderTotal}>Total: GH₵{item.totalAmount?.toFixed(2) || '0.00'}</Text>
         </View>
 
         <View style={styles.orderItems}>
-          {(item.orderItems || []).map((orderItem, index) => (
+          {(item.items || []).map((orderItem, index) => (
             <View key={index} style={styles.orderItem}>
               <Image 
                 source={{ uri: orderItem.product?.image || 'https://via.placeholder.com/50' }} 
@@ -696,7 +690,7 @@ const SellerDashboardScreen = () => {
               />
               <View style={styles.orderItemDetails}>
                 <Text style={styles.orderItemName}>{orderItem.product?.name || 'Unknown Product'}</Text>
-                <Text style={styles.orderItemPrice}>${orderItem.price?.toFixed(2) || '0.00'} x {orderItem.quantity || 1}</Text>
+                <Text style={styles.orderItemPrice}>GH₵{orderItem.price?.toFixed(2) || '0.00'} x {orderItem.quantity || 1}</Text>
               </View>
             </View>
           ))}
@@ -710,7 +704,7 @@ const SellerDashboardScreen = () => {
             <Text style={styles.actionButtonText}>View Details</Text>
           </TouchableOpacity>
           
-          {(item.status === 'pending' || !item.status) && (
+          {(item.orderStatus === 'pending' || !item.orderStatus) && (
             <TouchableOpacity 
               style={[styles.actionButton, styles.acceptButton]}
               onPress={() => handleUpdateOrderStatus(item._id, 'processing')}
@@ -719,7 +713,7 @@ const SellerDashboardScreen = () => {
             </TouchableOpacity>
           )}
           
-          {item.status === 'processing' && (
+          {item.orderStatus === 'processing' && (
             <TouchableOpacity 
               style={[styles.actionButton, styles.completeButton]}
               onPress={() => handleUpdateOrderStatus(item._id, 'completed')}

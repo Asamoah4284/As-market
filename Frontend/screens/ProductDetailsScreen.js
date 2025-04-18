@@ -16,14 +16,16 @@ import {
   Modal,
   Pressable,
   Linking,
+  Platform,
   Animated,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation, useRoute } from "@react-navigation/native";
+import { useNavigation, useRoute, useFocusEffect } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchProductById } from '../store/slices/productSlice';
 import * as Location from 'expo-location';
+import { handleAddToCartNotification } from '../services/notificationService';
 
 const API_URL = 'http://172.20.10.3:5000';
 
@@ -63,11 +65,33 @@ const ProductDetailsScreen = () => {
   // Add animation for pulsing location marker
   const [pulseAnim] = useState(new Animated.Value(0));
 
+  // Add useFocusEffect to refresh product data when screen is focused
+  useFocusEffect(
+    React.useCallback(() => {
+      if (productId) {
+        // Clear the product cache for this product
+        AsyncStorage.removeItem(`product_${productId}`);
+        // Fetch fresh product data
+        dispatch(fetchProductById(productId));
+      }
+    }, [productId])
+  );
+
   useEffect(() => {
     if (productId) {
       dispatch(fetchProductById(productId));
     }
   }, [dispatch, productId]);
+
+  // Add effect to log product data changes
+  useEffect(() => {
+    console.log('Current Product Data:', {
+      id: currentProduct?._id,
+      name: currentProduct?.name,
+      stock: currentProduct?.stock,
+      fullData: currentProduct
+    });
+  }, [currentProduct]);
 
   // Add effect to fetch comments on component mount
   useEffect(() => {
@@ -323,6 +347,9 @@ const ProductDetailsScreen = () => {
       });
 
       if (response.ok) {
+        // Send notification
+        await handleAddToCartNotification(currentProduct.name, dispatch);
+        
         Alert.alert("Success", "Product added to cart successfully!", [
           { 
             text: "View Cart", 
@@ -701,20 +728,26 @@ const ProductDetailsScreen = () => {
           
           {/* Stock Status Indicator */}
           <View style={styles.stockStatusContainer}>
-            {currentProduct.countInStock > 5 ? (
+            {currentProduct.stock > 5 ? (
               <View style={styles.stockStatusIndicator}>
                 <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
-                <Text style={[styles.stockStatusText, styles.inStockText]}>In Stock</Text>
+                <Text style={[styles.stockStatusText, styles.inStockText]}>
+                  In Stock
+                </Text>
               </View>
-            ) : currentProduct.countInStock > 0 ? (
+            ) : currentProduct.stock > 0 ? (
               <View style={styles.stockStatusIndicator}>
                 <Ionicons name="alert-circle" size={16} color="#FFC107" />
-                <Text style={[styles.stockStatusText, styles.lowStockText]}>Low Stock</Text>
+                <Text style={[styles.stockStatusText, styles.lowStockText]}>
+                   Low Stock
+                </Text>
               </View>
             ) : (
               <View style={styles.stockStatusIndicator}>
                 <Ionicons name="close-circle" size={16} color="#F44336" />
-                <Text style={[styles.stockStatusText, styles.outOfStockText]}>Out of Stock</Text>
+                <Text style={[styles.stockStatusText, styles.outOfStockText]}>
+                   Out of Stock
+                </Text>
               </View>
             )}
           </View>
@@ -789,7 +822,9 @@ const ProductDetailsScreen = () => {
             <View style={styles.specItem}>
               <Text style={styles.specLabel}>In Stock</Text>
               <Text style={styles.specValue}>
-                {currentProduct.countInStock > 0 ? "Yes" : "No"}
+                {(currentProduct.countInStock === undefined || 
+                  currentProduct.countInStock === null || 
+                  currentProduct.countInStock > 0) ? "Yes" : "No"}
               </Text>
             </View>
           </View>
@@ -1179,6 +1214,8 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: "#e0e0e0",
     backgroundColor: "#fff",
+    marginTop: Platform.OS === 'android' ? 16 : 10,
+
   },
   backButton: {
     width: 40,

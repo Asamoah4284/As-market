@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "asarion-marketplace",
+    "name": "Asarion Marketplace",
     "slug": "asarion-marketplace",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -12,17 +12,49 @@
       "resizeMode": "contain",
       "backgroundColor": "#ffffff"
     },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.asarion.marketplace"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
-      }
+      },
+      "package": "com.asarion.marketplace",
+      "googleServicesFile": "./google-services.json",
+      "permissions": [
+        "VIBRATE",
+        "RECEIVE_BOOT_COMPLETED",
+        "ACCESS_NOTIFICATION_POLICY"
+      ],
+      "useNextNotificationsApi": true
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-font",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#5D3FD3",
+          "projectId": "987ca341-92d7-4d38-be41-f41cc65182c3"
+        }
+      ]
+    ],
+    "notification": {
+      "displayName": "Asarion"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "987ca341-92d7-4d38-be41-f41cc65182c3"
+      }
+    },
+    "owner": "asamoah4284"
   }
 }

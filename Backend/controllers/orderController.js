@@ -152,53 +152,74 @@ const initializePayment = asyncHandler(async (req, res) => {
 // @access  Private
 const createOrder = asyncHandler(async (req, res) => {
   try {
-    console.log('Creating order with data:', req.body);
+    console.log('Creating order with data:', JSON.stringify(req.body, null, 2));
     console.log('User ID:', req.user._id);
+
+    // Validate request body
+    if (!req.body) {
+      console.error('Empty request body');
+      return res.status(400).json({ message: 'Empty request body' });
+    }
 
     const { 
       paymentReference,
-      items,
+      orderItems,
       totalAmount
     } = req.body;
 
+    // Check for either orderItems or items property
+    const items = orderItems || req.body.items;
+
+    // Log item presence and format
+    console.log('orderItems property exists:', !!orderItems);
+    console.log('items property exists:', !!req.body.items);
+    console.log('Final items to use:', items ? `${items.length} items` : 'undefined');
+
     if (!items || items.length === 0) {
-      console.error('No order items provided');
-      res.status(400);
-      throw new Error('No order items');
+      console.error('No order items provided in request:', JSON.stringify(req.body, null, 2));
+      return res.status(400).json({ message: 'No order items provided' });
     }
 
     if (!paymentReference) {
       console.error('No payment reference provided');
-      res.status(400);
-      throw new Error('Payment reference is required');
+      return res.status(400).json({ message: 'Payment reference is required' });
     }
 
     // Verify payment with Paystack
     console.log('Verifying payment with reference:', paymentReference);
-    const paymentVerification = await verifyPaystackPayment(paymentReference);
-    console.log('Payment verification response:', paymentVerification);
+    try {
+      const paymentVerification = await verifyPaystackPayment(paymentReference);
+      console.log('Payment verification response:', paymentVerification);
 
-    if (!paymentVerification.status) {
-      res.status(400);
-      throw new Error('Payment verification failed: Invalid response from Paystack');
+      if (!paymentVerification.status) {
+        return res.status(400).json({ 
+          message: 'Payment verification failed: Invalid response from Paystack' 
+        });
+      }
+
+      if (paymentVerification.data?.status !== 'success') {
+        return res.status(400).json({ 
+          message: `Payment verification failed: Transaction status is ${paymentVerification.data?.status}` 
+        });
+      }
+
+      // Get the amount paid from Paystack response (already in pesewas)
+      const amountPaidInPesewas = paymentVerification.data?.amount;
+      // Convert our order amount to pesewas
+      const orderAmountInPesewas = Math.round(totalAmount);
+
+      console.log('Amount Verification:', {
+        orderAmountInPesewas,
+        amountPaidInPesewas,
+        orderAmount: totalAmount,
+        amountPaid: paymentVerification.data?.amount / 100
+      });
+    } catch (verificationError) {
+      console.error('Payment verification error:', verificationError);
+      return res.status(400).json({ 
+        message: `Payment verification failed: ${verificationError.message}` 
+      });
     }
-
-    if (paymentVerification.data?.status !== 'success') {
-      res.status(400);
-      throw new Error(`Payment verification failed: Transaction status is ${paymentVerification.data?.status}`);
-    }
-
-    // Get the amount paid from Paystack response (already in pesewas)
-    const amountPaidInPesewas = paymentVerification.data?.amount;
-    // Convert our order amount to pesewas
-    const orderAmountInPesewas = Math.round(totalAmount);
-
-    console.log('Amount Verification:', {
-      orderAmountInPesewas,
-      amountPaidInPesewas,
-      orderAmount: totalAmount,
-      amountPaid: paymentVerification.data?.amount / 100
-    });
 
     // Create order
     const orderData = {
@@ -208,7 +229,8 @@ const createOrder = asyncHandler(async (req, res) => {
         quantity: item.quantity,
         price: item.price,
         name: item.name,
-        image: item.image
+        image: item.image,
+        sellerId: item.sellerId
       })),
       paymentInfo: {
         reference: paymentReference,
@@ -222,19 +244,90 @@ const createOrder = asyncHandler(async (req, res) => {
     };
 
     console.log('Creating order with data:', orderData);
-    const order = new Order(orderData);
-    const createdOrder = await order.save();
-    console.log('Order created successfully:', createdOrder._id);
+    try {
+      const order = new Order(orderData);
+      const createdOrder = await order.save();
+      console.log('Order created successfully:', createdOrder._id);
+      
+      // Update stock for each product in the order
+      for (const item of items) {
+        try {
+          // Log the entire item to see its structure
+          console.log('Processing order item:', item);
+          
+          // Get the product ID - handle both _id and productId cases
+          const productId = item.productId || item._id;
+          if (!productId) {
+            console.error('No product ID found in item:', item);
+            continue;
+          }
 
-    // Clear user's cart
-    await Cart.deleteMany({ user: req.user._id });
-    console.log('User cart cleared');
+          console.log('Looking up product with ID:', productId);
+          const product = await Product.findById(productId);
+          
+          if (!product) {
+            console.error(`Product ${productId} not found`);
+            continue;
+          }
 
-    res.status(201).json(createdOrder);
+          // Only update stock if it's not a service
+          if (!product.isService) {
+            // Ensure stock is a number
+            const currentStock = Number(product.stock);
+            const orderQuantity = Number(item.quantity);
+
+            if (isNaN(currentStock)) {
+              console.error(`Invalid stock value for product ${product._id}:`, product.stock);
+              continue;
+            }
+
+            if (isNaN(orderQuantity)) {
+              console.error(`Invalid quantity for product ${product._id}:`, item.quantity);
+              continue;
+            }
+
+            if (currentStock < orderQuantity) {
+              console.error(`Insufficient stock for product ${product._id}. Current: ${currentStock}, Required: ${orderQuantity}`);
+              continue;
+            }
+
+            // Update stock
+            const newStock = currentStock - orderQuantity;
+            product.stock = newStock;
+            await product.save();
+          } else {
+            console.log(`Product ${product._id} is a service, skipping stock update`);
+          }
+        } catch (itemError) {
+          console.error(`Error updating stock for item:`, itemError);
+          // Continue with other products even if one fails
+          continue;
+        }
+      }
+
+      // Clear user's cart
+      try {
+        await Cart.deleteMany({ user: req.user._id });
+        console.log('User cart cleared');
+      } catch (cartError) {
+        console.error('Error clearing cart:', cartError);
+        // Continue even if cart clear fails
+      }
+
+      return res.status(201).json(createdOrder);
+    } catch (orderSaveError) {
+      console.error('Error saving order:', orderSaveError);
+      return res.status(500).json({ 
+        message: 'Failed to save order in database', 
+        error: orderSaveError.message 
+      });
+    }
   } catch (error) {
     console.error('Order creation failed:', error);
-    res.status(error.status || 400);
-    throw new Error(error.message || 'Failed to create order');
+    return res.status(error.status || 500).json({
+      message: error.message || 'Failed to create order',
+      error: error.stack
+    });
   }
 });
 
@@ -312,12 +405,12 @@ const getAllOrders = asyncHandler(async (req, res) => {
   }
 });
 
-// @desc    Get seller's orders
-// @route   GET /api/orders/seller
-// @access  Private/Seller
-const getSellerOrders = asyncHandler(async (req, res) => {
+// @desc    Get orders by seller ID
+// @route   GET /api/orders/:sellerId
+// @access  Private
+const getOrdersBySellerId = asyncHandler(async (req, res) => {
   try {
-    const sellerId = req.user._id;
+    const sellerId = req.params.sellerId;
     console.log('Fetching orders for seller:', sellerId);
 
     // First, find all products belonging to the seller
@@ -382,7 +475,7 @@ const getSellerOrders = asyncHandler(async (req, res) => {
     console.log('Transformed orders:', transformedOrders.length);
     res.json(transformedOrders);
   } catch (error) {
-    console.error('Error in getSellerOrders:', error);
+    console.error('Error in getOrdersBySellerId:', error);
     res.status(500);
     throw new Error('Failed to fetch seller orders: ' + error.message);
   }
@@ -396,5 +489,5 @@ module.exports = {
   testPaystackConnection,
   initializePayment,
   getAllOrders,
-  getSellerOrders
+  getOrdersBySellerId
 }; 

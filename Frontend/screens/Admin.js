@@ -16,6 +16,9 @@ import PremiumProducts from './PremiumProducts';
 import AllOrders from './AllOrders';
 import PendingOrders from './PendingOrders';
 import CompletedOrders from './CompletedOrders';
+import { useSelector } from 'react-redux';
+import NotificationCenter from '../components/NotificationCenter';
+import NotificationBadge from '../components/NotificationBadge';
 // Ignore specific SVG-related warnings
 LogBox.ignoreLogs([
   'Invariant Violation: Tried to register two views with the same name RNSVGFeFlood',
@@ -45,6 +48,14 @@ const Admin = () => {
   const slideAnim = useRef(new Animated.Value(-250)).current; // Initialize off-screen
   const [showProductDropdowns, setShowProductDropdowns] = useState(false);
   const [showOrderDropdowns, setShowOrderDropdowns] = useState(false);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const { notifications } = useSelector((state) => state.notifications);
+  
+  // Count unread admin-related notifications
+  const unreadAdminNotifications = notifications.filter(
+    notification => !notification.read && 
+    notification.data?.type === 'ADMIN_PAYMENT_RECEIVED'
+  ).length;
 
   useEffect(() => {
     // Update active section when route params change
@@ -496,6 +507,19 @@ const Admin = () => {
         <Text style={styles.headerTitle}>
           {adminOptions.find(option => option.section === activeSection)?.title || 'Admin Dashboard'}
         </Text>
+        <TouchableOpacity 
+          style={styles.notificationButton}
+          onPress={() => setShowNotifications(true)}
+        >
+          <MaterialIcons name="notifications" size={24} color="white" />
+          {unreadAdminNotifications > 0 && (
+            <View style={styles.notificationBadge}>
+              <Text style={styles.notificationBadgeText}>
+                {unreadAdminNotifications}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </View>
       
       <TouchableOpacity 
@@ -522,6 +546,13 @@ const Admin = () => {
           {renderContent()}
         </View>
       </View>
+      
+      {/* Notification Center */}
+      <NotificationCenter 
+        visible={showNotifications} 
+        onClose={() => setShowNotifications(false)} 
+        navigation={navigation}
+      />
     </SafeAreaView>
   );
 };
@@ -954,6 +985,35 @@ const styles = StyleSheet.create({
   componentContainer: {
     flex: 1,
     padding: 0,
+  },
+  notificationButton: {
+    position: 'absolute',
+    right: 16,
+    top: 12,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: -8,
+    right: -8,
+    width: 18,
+    height: 18,
+    borderRadius: 9,
+    backgroundColor: '#FF3B30',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#fff',
+    zIndex: 10,
+  },
+  notificationBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
 });
 

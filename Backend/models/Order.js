@@ -22,7 +22,13 @@ const orderSchema = new mongoose.Schema({
       required: true
     },
     name: String,
-    image: String
+    image: String,
+    sellerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+      
+
+    }
   }],
   shippingAddress: {
     address: String,

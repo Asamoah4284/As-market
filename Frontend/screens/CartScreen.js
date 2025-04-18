@@ -9,7 +9,9 @@ import {
   SafeAreaView,
   StatusBar,
   ActivityIndicator,
-  Alert
+  Alert,
+  Platform,
+  Switch
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -22,6 +24,7 @@ import {
   setError 
 } from '../store/slices/cartSlice';
 import PaystackPayment from '../components/PaystackPayment';
+import { handleAddToCartNotification, sendLocalNotification } from '../services/notificationService';
 
 
 const API_URL = 'http://172.20.10.3:5000';
@@ -39,6 +42,7 @@ const CartScreen = ({ navigation }) => {
       longitude: -0.1870
     }
   });
+  const [isPayOnDelivery, setIsPayOnDelivery] = useState(false);
 
   // Fetch cart items whenever the screen is focused
   useFocusEffect(
@@ -115,10 +119,13 @@ const CartScreen = ({ navigation }) => {
     }
   };
 
-  // Modify handleUpdateQuantity to use Redux
+  // Modify handleUpdateQuantity to use Redux and show notification
   const handleUpdateQuantity = async (productId, newQuantity) => {
     try {
       const token = await AsyncStorage.getItem('userToken');
+      
+      // Get the product name for notification
+      const product = cartItems.find(item => item.productId === productId);
       
       // Update optimistically
       dispatch(setCartItems(
@@ -138,7 +145,12 @@ const CartScreen = ({ navigation }) => {
         },
       });
 
-      if (response.status !== 200) {
+      if (response.status === 200) {
+        // Show notification when quantity is increased
+        if (newQuantity > (product.quantity || 1)) {
+          await handleAddToCartNotification(product.name || 'Product', dispatch);
+        }
+      } else {
         // Revert on failure
         fetchCartItems();
         Alert.alert('Error', 'Failed to update quantity');
@@ -355,12 +367,59 @@ const CartScreen = ({ navigation }) => {
         return;
       }
 
-      // Navigate to Payment screen with required data
-      navigation.navigate('Payment', {
-        amount: totalAmount, // Convert to pesewas here, since this is the entry point
-        email: user.email
-      });
+      if (isPayOnDelivery) {
+        // Handle pay on delivery option
+        try {
+          // Create order with payment status 'pending'
+          const orderResponse = await axios.post(`${API_URL}/api/orders`, {
+            paymentReference: 'POD-' + Date.now(), // Create a unique reference for pay on delivery
+            items: cartItems,
+            totalAmount: calculateFinalTotal(),
+            paymentStatus: 'pending',
+            paymentMethod: 'pay_on_delivery'
+          }, {
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+          });
 
+          if (orderResponse.status === 201) {
+            // Clear cart on backend
+            await axios.delete(`${API_URL}/api/cart`, {
+              headers: {
+                Authorization: `Bearer ${token}`,
+              },
+            });
+
+            // Clear cart in Redux
+            dispatch(setCartItems([]));
+
+            // Send a notification
+            await sendLocalNotification(
+              'Order Placed', 
+              'Your order has been placed successfully. You will pay on delivery.'
+            );
+
+            navigation.reset({
+              index: 0,
+              routes: [{ 
+                name: 'PaymentSuccess',
+                params: { payOnDelivery: true }
+              }],
+            });
+          }
+        } catch (error) {
+          console.error('Error processing order:', error);
+          Alert.alert('Error', 'There was an error processing your order. Please try again.');
+        }
+      } else {
+        // Navigate to Payment screen with required data
+        navigation.navigate('Payment', {
+          amount: totalAmount,
+          email: user.email
+        });
+      }
     } catch (error) {
       console.error('Checkout error:', error);
       Alert.alert('Error', 'Something went wrong. Please try again.');
@@ -383,7 +442,7 @@ const CartScreen = ({ navigation }) => {
       </View>
       <View style={styles.itemContent}>
         <View style={styles.itemHeader}>
-          <Text style={styles.itemName} numberOfLines={2}>{item.name}</Text>
+          <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
           <TouchableOpacity 
             style={styles.removeButton}
             onPress={() => handleRemoveItem(item.productId)}
@@ -519,15 +578,7 @@ const CartScreen = ({ navigation }) => {
       />
       
       <View style={styles.checkoutContainer}>
-        <View style={styles.promoContainer}>
-          <View style={styles.promoInputContainer}>
-            <Ionicons name="pricetag-outline" size={20} color="#666" />
-            <Text style={styles.promoPlaceholder}>Add promo code</Text>
-          </View>
-          <TouchableOpacity style={styles.applyButton}>
-            <Text style={styles.applyButtonText}>Apply</Text>
-          </TouchableOpacity>
-        </View>
+       
         
         <View style={styles.summaryContainer}>
           <View style={styles.summaryRow}>
@@ -553,11 +604,32 @@ const CartScreen = ({ navigation }) => {
           </View>
         </View>
         
+        {/* Payment Option Toggle */}
+        <View style={styles.paymentOptionContainer}>
+          <View style={styles.paymentOptionRow}>
+            <Text style={styles.paymentOptionText}>Pay on Delivery</Text>
+            <Switch
+              trackColor={{ false: "#E0E0E0", true: "#D4C8FF" }}
+              thumbColor={isPayOnDelivery ? "#5D3FD3" : "#F5F5F5"}
+              ios_backgroundColor="#E0E0E0"
+              onValueChange={() => setIsPayOnDelivery(!isPayOnDelivery)}
+              value={isPayOnDelivery}
+            />
+          </View>
+          <Text style={styles.paymentOptionDescription}>
+            {isPayOnDelivery 
+              ? "You'll pay in cash when your order is delivered" 
+              : "Secure payment via Paystack"}
+          </Text>
+        </View>
+        
         <TouchableOpacity 
           style={styles.checkoutButton}
           onPress={handleCheckout}
         >
-          <Text style={styles.checkoutButtonText}>Proceed to Checkout</Text>
+          <Text style={styles.checkoutButtonText}>
+            {isPayOnDelivery ? "Place Order - Pay on Delivery" : "Proceed to Checkout"}
+          </Text>
         </TouchableOpacity>
       </View>
 
@@ -656,6 +728,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
+    marginTop: Platform.OS === 'android' ? 16 : 10,
+
   },
   backButton: {
     padding: 8,
@@ -715,12 +789,16 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: 8,
     lineHeight: 22,
+    height: 22,
+    overflow: 'hidden',
+    flexShrink: 1,
+    flexWrap: 'nowrap'
   },
   removeButton: {
     padding: 4,
   },
   itemPrice: {
-    fontSize: 18,
+    fontSize: 15,
     fontWeight: '700',
     color: '#5D3FD3',
     // marginVertical: 8,
@@ -729,7 +807,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    // marginTop: 8,
   },
   quantityContainer: {
     flexDirection: 'row',
@@ -747,25 +824,25 @@ const styles = StyleSheet.create({
     backgroundColor: '#E0E0E0',
   },
   quantityTextContainer: {
-    minWidth: 36,
+    minWidth: 30,
     // height: 36,
     justifyContent: 'center',
     alignItems: 'center',
   },
   quantityText: {
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: '600',
     color: '#1A1A1A',
   },
   itemTotal: {
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: '700',
     color: '#1A1A1A',
   },
   checkoutContainer: {
     backgroundColor: 'white',
-    borderTopLeftRadius: 30,
-    borderTopRightRadius: 30,
+    // borderTopLeftRadius: 30,
+    // borderTopRightRadius: 30,
     padding: 24,
     // paddingBottom: 36,
     shadowColor: '#000',
@@ -788,29 +865,14 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     marginRight: 12,
   },
-  promoPlaceholder: {
-    marginLeft: 8,
-    color: '#999',
-    fontSize: 14,
-  },
-  applyButton: {
-    backgroundColor: '#F6F6F6',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    justifyContent: 'center',
-  },
-  applyButtonText: {
-    color: '#5D3FD3',
-    fontWeight: '600',
-    fontSize: 14,
-  },
+
   summaryContainer: {
-    marginBottom: 24,
+    marginBottom: 8,
   },
   summaryRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 12,
+    marginBottom: 8,
   },
   summaryText: {
     fontSize: 16,
@@ -877,9 +939,33 @@ const styles = StyleSheet.create({
     width: 40,
   },
   deliveryFeeText: {
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: '500',
     color: '#4CAF50',
+  },
+  paymentOptionContainer: {
+    marginBottom: 10,
+    backgroundColor: '#F9F9F9',
+    padding: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#EFEFEF',
+  },
+  paymentOptionRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  paymentOptionText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1A1A1A',
+  },
+  paymentOptionDescription: {
+    fontSize: 14,
+    color: '#666',
+    lineHeight: 14,
   },
 });
 

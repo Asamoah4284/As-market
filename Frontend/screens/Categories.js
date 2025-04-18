@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
   TextInput,
   ScrollView,
+  Platform,
 } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
@@ -582,6 +583,7 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderBottomColor: '#e0e0e0',
     backgroundColor: '#fff',
+    marginTop: Platform.OS === 'android' ? 25 : 0,
   },
   backButton: {
     padding: 8,
