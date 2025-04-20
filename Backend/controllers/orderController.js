@@ -164,8 +164,11 @@ const createOrder = asyncHandler(async (req, res) => {
     const { 
       paymentReference,
       orderItems,
-      totalAmount
+      totalAmount,
+      paymentMethod
     } = req.body;
+
+    console.log('Payment method from request:', paymentMethod);
 
     // Check for either orderItems or items property
     const items = orderItems || req.body.items;
@@ -174,51 +177,64 @@ const createOrder = asyncHandler(async (req, res) => {
     console.log('orderItems property exists:', !!orderItems);
     console.log('items property exists:', !!req.body.items);
     console.log('Final items to use:', items ? `${items.length} items` : 'undefined');
+    console.log('Payment method:', paymentMethod);
 
     if (!items || items.length === 0) {
       console.error('No order items provided in request:', JSON.stringify(req.body, null, 2));
       return res.status(400).json({ message: 'No order items provided' });
     }
 
-    if (!paymentReference) {
-      console.error('No payment reference provided');
-      return res.status(400).json({ message: 'Payment reference is required' });
-    }
-
-    // Verify payment with Paystack
-    console.log('Verifying payment with reference:', paymentReference);
-    try {
-      const paymentVerification = await verifyPaystackPayment(paymentReference);
-      console.log('Payment verification response:', paymentVerification);
-
-      if (!paymentVerification.status) {
-        return res.status(400).json({ 
-          message: 'Payment verification failed: Invalid response from Paystack' 
-        });
+    // For online payments, verify with Paystack
+    if (paymentMethod !== 'pay_on_delivery') {
+      if (!paymentReference) {
+        console.error('No payment reference provided for online payment');
+        return res.status(400).json({ message: 'Payment reference is required for online payments' });
       }
 
-      if (paymentVerification.data?.status !== 'success') {
+      // Verify payment with Paystack
+      console.log('Verifying payment with reference:', paymentReference);
+      try {
+        const paymentVerification = await verifyPaystackPayment(paymentReference);
+        console.log('Payment verification response:', paymentVerification);
+
+        if (!paymentVerification.status) {
+          return res.status(400).json({ 
+            message: 'Payment verification failed: Invalid response from Paystack' 
+          });
+        }
+
+        if (paymentVerification.data?.status !== 'success') {
+          return res.status(400).json({ 
+            message: `Payment verification failed: Transaction status is ${paymentVerification.data?.status}` 
+          });
+        }
+
+        // Get the amount paid from Paystack response (already in pesewas)
+        const amountPaidInPesewas = paymentVerification.data?.amount;
+        // Convert our order amount to pesewas
+        const orderAmountInPesewas = Math.round(totalAmount);
+
+        console.log('Amount Verification:', {
+          orderAmountInPesewas,
+          amountPaidInPesewas,
+          orderAmount: totalAmount,
+          amountPaid: paymentVerification.data?.amount / 100
+        });
+      } catch (verificationError) {
+        console.error('Payment verification error:', verificationError);
         return res.status(400).json({ 
-          message: `Payment verification failed: Transaction status is ${paymentVerification.data?.status}` 
+          message: `Payment verification failed: ${verificationError.message}` 
         });
       }
-
-      // Get the amount paid from Paystack response (already in pesewas)
-      const amountPaidInPesewas = paymentVerification.data?.amount;
-      // Convert our order amount to pesewas
-      const orderAmountInPesewas = Math.round(totalAmount);
-
-      console.log('Amount Verification:', {
-        orderAmountInPesewas,
-        amountPaidInPesewas,
-        orderAmount: totalAmount,
-        amountPaid: paymentVerification.data?.amount / 100
-      });
-    } catch (verificationError) {
-      console.error('Payment verification error:', verificationError);
-      return res.status(400).json({ 
-        message: `Payment verification failed: ${verificationError.message}` 
-      });
+    } else {
+      console.log('Pay on delivery order - skipping payment verification');
+      // For pay-on-delivery, we don't need to verify with Paystack
+      if (!paymentReference) {
+        // Generate a unique reference for the pay-on-delivery order
+        const payOnDeliveryRef = `POD-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+        req.body.paymentReference = payOnDeliveryRef;
+        console.log('Generated pay-on-delivery reference:', payOnDeliveryRef);
+      }
     }
 
     // Create order
@@ -233,17 +249,19 @@ const createOrder = asyncHandler(async (req, res) => {
         sellerId: item.sellerId
       })),
       paymentInfo: {
-        reference: paymentReference,
-        status: 'success',
+        reference: req.body.paymentReference || paymentReference,
+        status: paymentMethod === 'pay_on_delivery' ? 'pending' : 'success',
         amount: totalAmount,
         currency: 'GHS',
-        paidAt: Date.now()
+        paidAt: paymentMethod === 'pay_on_delivery' ? null : Date.now(),
+        paymentMethod: paymentMethod || 'online'
       },
       totalAmount,
-      orderStatus: 'processing'
+      orderStatus: paymentMethod === 'pay_on_delivery' ? 'pending' : 'processing'
     };
 
     console.log('Creating order with data:', orderData);
+    console.log('Payment Method in order data:', orderData.paymentInfo.paymentMethod);
     try {
       const order = new Order(orderData);
       const createdOrder = await order.save();

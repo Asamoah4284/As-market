@@ -20,13 +20,34 @@ const FavoritesScreen = () => {
   const [favorites, setFavorites] = useState([]);
   const [favoriteProducts, setFavoriteProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const navigation = useNavigation();
 
-  // Load favorites when screen is focused
+  // Check authentication status when screen is focused
   useFocusEffect(
     React.useCallback(() => {
-      loadFavorites();
-      return () => {}; // Cleanup function
+      const checkAuth = async () => {
+        const token = await AsyncStorage.getItem('userToken');
+        
+        if (!token) {
+          // Redirect to login if not authenticated
+          Alert.alert(
+            'Authentication Required',
+            'Please log in or sign up to view your favorites',
+            [
+              { text: 'Cancel', onPress: () => navigation.goBack(), style: 'cancel' },
+              { text: 'Login', onPress: () => navigation.navigate('Login') }
+            ]
+          );
+          setIsAuthenticated(false);
+        } else {
+          setIsAuthenticated(true);
+          // Load favorites only if user is authenticated
+          loadFavorites();
+        }
+      };
+      
+      checkAuth();
     }, [])
   );
 
@@ -181,32 +202,36 @@ const FavoritesScreen = () => {
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-      <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Ionicons name="arrow-back" size={24} color="#333" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>My Favorites</Text>
-          <View style={styles.placeholder} />
+      
+      {/* Only render content if authenticated */}
+      {isAuthenticated ? (
+        <View style={styles.container}>
+          {/* Header */}
+          <View style={styles.header}>
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}
+            >
+              <Ionicons name="arrow-back" size={24} color="#333" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>My Favorites</Text>
+            <View style={styles.placeholder} />
+          </View>
+          
+          {loading ? renderLoadingState() : (
+            favoriteProducts.length === 0 ? renderEmptyState() : (
+              <FlatList
+                data={favoriteProducts}
+                renderItem={renderFavoriteItem}
+                keyExtractor={(item) => item._id}
+                contentContainerStyle={styles.productsList}
+                numColumns={2}
+                showsVerticalScrollIndicator={false}
+              />
+            )
+          )}
         </View>
-        
-        {loading ? renderLoadingState() : (
-          favoriteProducts.length === 0 ? renderEmptyState() : (
-            <FlatList
-              data={favoriteProducts}
-              renderItem={renderFavoriteItem}
-              keyExtractor={(item) => item._id}
-              contentContainerStyle={styles.productsList}
-              numColumns={2}
-              showsVerticalScrollIndicator={false}
-            />
-          )
-        )}
-      </View>
+      ) : null}
     </SafeAreaView>
   );
 };

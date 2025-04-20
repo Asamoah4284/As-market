@@ -11,14 +11,14 @@ import {
 const PaymentSuccessScreen = ({ navigation, route }) => {
   const dispatch = useDispatch();
   const isProcessing = route.params?.isProcessing || false;
-  const payOnDelivery = route.params?.payOnDelivery || false;
+  const isPOD = route.params?.isPOD || false;
   const customMessage = route.params?.message || (
-    payOnDelivery
+    isPOD
       ? "Your order has been placed successfully. You will pay when your order is delivered."
       : "Thank you for your purchase. Your order has been successfully placed and will be processed shortly."
   );
   const orderNumber = route.params?.orderNumber || Math.floor(100000 + Math.random() * 900000);
-  const totalAmount = route.params?.totalAmount || 0;
+  const amount = route.params?.amount || 0;
 
   // Prevent going back with hardware back button
   useEffect(() => {
@@ -29,19 +29,29 @@ const PaymentSuccessScreen = ({ navigation, route }) => {
   // Send notifications when payment is successful
   useEffect(() => {
     // Send notification to user - different message for pay on delivery
-    if (payOnDelivery) {
-      handlePaymentSuccessfulNotification(orderNumber, "Your order has been placed! You'll pay on delivery.");
+    if (isPOD) {
+      handlePaymentSuccessfulNotification(
+        orderNumber, 
+        "Your order has been placed! You'll pay on delivery."
+      );
     } else {
-      handlePaymentSuccessfulNotification(orderNumber);
+      handlePaymentSuccessfulNotification(
+        orderNumber,
+        `Thank you for your purchase! Your payment of GHS ${amount} has been confirmed.`
+      );
     }
     
     // Send notification to admin with different message for pay on delivery
-    if (payOnDelivery) {
-      handleAdminPaymentReceivedNotification(orderNumber, totalAmount, "New order with Pay on Delivery");
+    if (isPOD) {
+      handleAdminPaymentReceivedNotification(
+        orderNumber, 
+        amount, 
+        "New order with Pay on Delivery"
+      );
     } else {
-      handleAdminPaymentReceivedNotification(orderNumber, totalAmount);
+      handleAdminPaymentReceivedNotification(orderNumber, amount);
     }
-  }, []);
+  }, [isPOD, orderNumber, amount]);
 
   const handleContinueShopping = () => {
     dispatch(clearCart());
@@ -63,7 +73,7 @@ const PaymentSuccessScreen = ({ navigation, route }) => {
   };
 
   const getScreenTitle = () => {
-    if (payOnDelivery) {
+    if (isPOD) {
       return "Order Placed!";
     } else if (isProcessing) {
       return "Payment Successful - Processing Order";
@@ -73,7 +83,7 @@ const PaymentSuccessScreen = ({ navigation, route }) => {
   };
 
   const getIconName = () => {
-    if (payOnDelivery) {
+    if (isPOD) {
       return "bicycle";
     } else if (isProcessing) {
       return "time";
@@ -83,7 +93,7 @@ const PaymentSuccessScreen = ({ navigation, route }) => {
   };
 
   const getIconColor = () => {
-    if (payOnDelivery) {
+    if (isPOD) {
       return "#5D3FD3";
     } else if (isProcessing) {
       return "#FFA500";
@@ -111,6 +121,22 @@ const PaymentSuccessScreen = ({ navigation, route }) => {
           {customMessage}
         </Text>
 
+        <View style={styles.orderDetails}>
+          <Text style={styles.orderDetailsTitle}>Order Details</Text>
+          <View style={styles.orderDetailRow}>
+            <Text style={styles.orderDetailLabel}>Order Number:</Text>
+            <Text style={styles.orderDetailValue}>{orderNumber}</Text>
+          </View>
+          <View style={styles.orderDetailRow}>
+            <Text style={styles.orderDetailLabel}>Amount:</Text>
+            <Text style={styles.orderDetailValue}>GHS {amount}</Text>
+          </View>
+          <View style={styles.orderDetailRow}>
+            <Text style={styles.orderDetailLabel}>Payment Method:</Text>
+            <Text style={styles.orderDetailValue}>{isPOD ? 'Pay on Delivery' : 'Online Payment'}</Text>
+          </View>
+        </View>
+
         <View style={styles.infoContainer}>
           <Ionicons name="mail-outline" size={24} color="#666" style={styles.infoIcon} />
           <Text style={styles.infoText}>
@@ -118,7 +144,7 @@ const PaymentSuccessScreen = ({ navigation, route }) => {
           </Text>
         </View>
 
-        {payOnDelivery && (
+        {isPOD && (
           <View style={styles.infoContainer}>
             <Ionicons name="cash-outline" size={24} color="#666" style={styles.infoIcon} />
             <Text style={styles.infoText}>
@@ -170,8 +196,35 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
-    marginBottom: 30,
+    marginBottom: 20,
     lineHeight: 24,
+  },
+  orderDetails: {
+    width: '100%',
+    backgroundColor: '#f8f8f8',
+    borderRadius: 10,
+    padding: 15,
+    marginBottom: 20,
+  },
+  orderDetailsTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#333',
+  },
+  orderDetailRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  orderDetailLabel: {
+    fontSize: 14,
+    color: '#666',
+  },
+  orderDetailValue: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#333',
   },
   infoContainer: {
     flexDirection: 'row',

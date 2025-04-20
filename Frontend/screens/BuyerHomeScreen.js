@@ -24,6 +24,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import NotificationCenter from '../components/NotificationCenter';
 import NotificationBadge from '../components/NotificationBadge';
 import { handleAddToCartNotification } from '../services/notificationService';
+import { requireAuthentication } from '../App'; // Import the authentication helper
 
 // Mock data - replace with actual API calls
 const FEATURED_PRODUCTS = [
@@ -307,6 +308,11 @@ const BuyerHomeScreen = () => {
 
   // Function to toggle favorite status
   const toggleFavorite = async (productId) => {
+    // Check if user is authenticated
+    if (!requireAuthentication(navigation, 'add to favorites')) {
+      return;
+    }
+    
     try {
       let newFavorites;
       if (favorites.includes(productId)) {
@@ -334,20 +340,14 @@ const BuyerHomeScreen = () => {
   };
 
   const handleAddToCart = async (product) => {
+    // Check if user is authenticated
+    if (!requireAuthentication(navigation, 'add items to cart')) {
+      return;
+    }
+    
     try {
-      // Check if user is logged in
       const token = await AsyncStorage.getItem('userToken');
-      if (!token) {
-        Alert.alert(
-          'Login Required',
-          'Please login to add items to your cart',
-          [
-            { text: 'Cancel', style: 'cancel' },
-            { text: 'Login', onPress: () => navigation.navigate('Login') }
-          ]
-        );
-        return;
-      }
+      // Token is guaranteed to exist at this point because of requireAuthentication
       
       // Make API call to add to cart
       const response = await fetch(`${url}/api/cart/add`, {

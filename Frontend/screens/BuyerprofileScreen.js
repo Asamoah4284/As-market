@@ -21,13 +21,30 @@ const BuyerProfileScreen = ({ navigation, route }) => {
   const [userData, setUserData] = useState(null);
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
-    loadUserData();
-    if (activeTab === 'orders') {
-      fetchOrders();
+    checkAuthentication();
+  }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      loadUserData();
+      if (activeTab === 'orders') {
+        fetchOrders();
+      }
     }
-  }, [activeTab]);
+  }, [activeTab, isAuthenticated]);
+
+  const checkAuthentication = async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      setIsAuthenticated(!!token);
+    } catch (error) {
+      console.error('Error checking authentication status:', error);
+      setIsAuthenticated(false);
+    }
+  };
 
   const loadUserData = async () => {
     try {
@@ -80,6 +97,7 @@ const BuyerProfileScreen = ({ navigation, route }) => {
         errorMessage += 'Please log in again.';
         // Handle unauthorized error
         AsyncStorage.removeItem('userToken');
+        setIsAuthenticated(false);
         navigation.reset({
           index: 0,
           routes: [{ name: 'Login' }],
@@ -103,6 +121,8 @@ const BuyerProfileScreen = ({ navigation, route }) => {
     try {
       await AsyncStorage.removeItem('userToken');
       await AsyncStorage.removeItem('userData');
+      setIsAuthenticated(false);
+      setUserData(null);
       navigation.reset({
         index: 0,
         routes: [{ name: 'Welcome' }],
@@ -112,97 +132,171 @@ const BuyerProfileScreen = ({ navigation, route }) => {
     }
   };
 
-  const renderProfileTab = () => (
-    <View style={styles.tabContent}>
-      {userData && (
-        <>
-          <View style={styles.profileHeader}>
-            <View style={styles.avatarContainer}>
-              <Ionicons name="person-circle" size={80} color="#5D3FD3" />
-            </View>
-            <Text style={styles.userName}>{userData.name}</Text>
-            <Text style={styles.userEmail}>{userData.email}</Text>
-        </View>
-
-          <View style={styles.profileOptions}>
-            <TouchableOpacity style={styles.profileOption}>
-              <Ionicons name="settings-outline" size={24} color="#666" />
-              <Text style={styles.optionText}>Settings</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.profileOption}>
-              <Ionicons name="help-circle-outline" size={24} color="#666" />
-              <Text style={styles.optionText}>Help & Support</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-              <Ionicons name="log-out-outline" size={24} color="#FF3B30" />
-              <Text style={styles.logoutText}>Logout</Text>
-            </TouchableOpacity>
-          </View>
-        </>
-      )}
+  const renderGuestProfileTab = () => (
+    <View style={styles.guestContainer}>
+      <View style={styles.guestAvatarContainer}>
+        <Ionicons name="person-outline" size={80} color="#ccc" />
+      </View>
+      <Text style={styles.guestTitle}>Welcome to Asarion Marketplace</Text>
+      <Text style={styles.guestSubtitle}>
+        Sign in to view your profile, track orders, and manage your account
+      </Text>
+      
+      <View style={styles.guestButtons}>
+        <TouchableOpacity 
+          style={styles.signInButton} 
+          onPress={() => navigation.navigate('Login')}
+        >
+          <Text style={styles.signInButtonText}>Sign In</Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.createAccountButton}
+          onPress={() => navigation.navigate('SignUp')}
+        >
+          <Text style={styles.createAccountText}>Create Account</Text>
+        </TouchableOpacity>
+      </View>
     </View>
   );
 
-  const renderOrdersTab = () => (
-    <ScrollView 
-      style={styles.tabContent}
-      refreshControl={
-        <RefreshControl refreshing={loading} onRefresh={fetchOrders} />
-      }
-    >
-      {orders.map((order) => (
-        <View key={order._id} style={styles.orderCard}>
-          <View style={styles.orderHeader}>
-            <Text style={styles.orderNumber}>Order #{order._id.slice(-6)}</Text>
-            <Text style={styles.orderDate}>
-              {new Date(order.createdAt).toLocaleDateString()}
-            </Text>
-          </View>
-          
-          <View style={styles.orderItems}>
-            {order.items.map((item, index) => (
-              <View key={index} style={styles.orderItem}>
-                <Image 
-                  source={{ uri: item.image }} 
-                  style={styles.itemImage}
-                />
-                <View style={styles.itemDetails}>
-                  <Text style={styles.itemName}>{item.name}</Text>
-                  <Text style={styles.itemQuantity}>Qty: {item.quantity}</Text>
-                  <Text style={styles.itemPrice}>GH₵{item.price.toFixed(2)}</Text>
-        </View>
-          </View>
-            ))}
-          </View>
-
-          <View style={styles.orderFooter}>
-            <Text style={styles.orderStatus}>
-              Status: <Text style={styles.statusText}>{order.orderStatus}</Text>
-            </Text>
-            <Text style={styles.orderTotal}>
-              Total: <Text style={styles.totalAmount}>GH₵{order.totalAmount.toFixed(2)}</Text>
-            </Text>
-          </View>
+  const renderProfileTab = () => {
+    if (!isAuthenticated) {
+      return renderGuestProfileTab();
+    }
+    
+    return (
+      <View style={styles.tabContent}>
+        {userData && (
+          <>
+            <View style={styles.profileHeader}>
+              <View style={styles.avatarContainer}>
+                <Ionicons name="person-circle" size={80} color="#5D3FD3" />
+              </View>
+              <Text style={styles.userName}>{userData.name}</Text>
+              <Text style={styles.userEmail}>{userData.email}</Text>
             </View>
-          ))}
 
-      {orders.length === 0 && !loading && (
-        <View style={styles.emptyState}>
-          <Ionicons name="cart-outline" size={64} color="#ccc" />
-          <Text style={styles.emptyText}>No orders found</Text>
-        </View>
-      )}
-    </ScrollView>
+            <View style={styles.profileOptions}>
+              <TouchableOpacity style={styles.profileOption}>
+                <Ionicons name="settings-outline" size={24} color="#666" />
+                <Text style={styles.optionText}>Settings</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.profileOption}>
+                <Ionicons name="help-circle-outline" size={24} color="#666" />
+                <Text style={styles.optionText}>Help & Support</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
+                <Ionicons name="log-out-outline" size={24} color="#FF3B30" />
+                <Text style={styles.logoutText}>Logout</Text>
+              </TouchableOpacity>
+            </View>
+          </>
+        )}
+      </View>
+    );
+  };
+
+  const renderGuestOrdersTab = () => (
+    <View style={styles.guestContainer}>
+      <Ionicons name="cart-outline" size={80} color="#ccc" />
+      <Text style={styles.guestTitle}>No Orders Found</Text>
+      <Text style={styles.guestSubtitle}>
+        Sign in to view your order history and track current orders
+      </Text>
+      
+      <TouchableOpacity 
+        style={styles.signInButton} 
+        onPress={() => navigation.navigate('Login')}
+      >
+        <Text style={styles.signInButtonText}>Sign In</Text>
+      </TouchableOpacity>
+    </View>
   );
+
+  const renderOrdersTab = () => {
+    if (!isAuthenticated) {
+      return renderGuestOrdersTab();
+    }
+    
+    return (
+      <ScrollView 
+        style={styles.tabContent}
+        refreshControl={
+          <RefreshControl refreshing={loading} onRefresh={fetchOrders} />
+        }
+      >
+        {orders.map((order) => (
+          <View key={order._id} style={styles.orderCard}>
+            <View style={styles.orderHeader}>
+              <Text style={styles.orderNumber}>Order #{order._id.slice(-6)}</Text>
+              <Text style={styles.orderDate}>
+                {new Date(order.createdAt).toLocaleDateString()}
+              </Text>
+            </View>
+            
+            <View style={styles.orderItems}>
+              {order.items.map((item, index) => (
+                <View key={index} style={styles.orderItem}>
+                  <Image 
+                    source={{ uri: item.image }} 
+                    style={styles.itemImage}
+                  />
+                  <View style={styles.itemDetails}>
+                    <Text style={styles.itemName}>{item.name}</Text>
+                    <Text style={styles.itemQuantity}>Qty: {item.quantity}</Text>
+                    <Text style={styles.itemPrice}>GH₵{item.price.toFixed(2)}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+
+            <View style={styles.orderFooter}>
+              <View style={styles.orderStatusContainer}>
+                <Text style={styles.orderStatus}>
+                  Status: <Text style={styles.statusText}>{order.orderStatus}</Text>
+                </Text>
+                <Text style={styles.paymentMethod}>
+                  Payment: <Text style={styles.paymentMethodText}>
+                    {(order.paymentInfo?.paymentMethod === 'online' ||
+                     order.paymentInfo?.paymentMethod === 'paystack' ||
+                     order.paymentInfo?.status === 'success' ||
+                     order.paymentStatus === 'success' ||
+                     (order.paymentReference && !order.paymentReference.startsWith('POD-'))) 
+                     ? 'Online' 
+                     : (order.paymentInfo?.paymentMethod === 'pay_on_delivery' ||
+                        order.paymentMethod === 'pay_on_delivery' ||
+                        (order.paymentReference && order.paymentReference.startsWith('POD-')))
+                       ? 'Pay on Delivery'
+                       : 'Pay on Delivery'}
+                  </Text>
+                </Text>
+              </View>
+              <Text style={styles.orderTotal}>
+                Total: <Text style={styles.totalAmount}>GH₵{order.totalAmount.toFixed(2)}</Text>
+              </Text>
+            </View>
+          </View>
+        ))}
+
+        {orders.length === 0 && !loading && (
+          <View style={styles.emptyState}>
+            <Ionicons name="cart-outline" size={64} color="#ccc" />
+            <Text style={styles.emptyText}>No orders found</Text>
+          </View>
+        )}
+      </ScrollView>
+    );
+  };
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={24} color="#333" />
-          </TouchableOpacity>
+        </TouchableOpacity>
         <Text style={styles.headerTitle}>My Profile</Text>
         <View style={{ width: 24 }} />
       </View>
@@ -215,7 +309,7 @@ const BuyerProfileScreen = ({ navigation, route }) => {
           <Text style={[styles.tabText, activeTab === 'profile' && styles.activeTabText]}>
             Profile
           </Text>
-          </TouchableOpacity>
+        </TouchableOpacity>
         <TouchableOpacity 
           style={[styles.tab, activeTab === 'orders' && styles.activeTab]}
           onPress={() => setActiveTab('orders')}
@@ -223,8 +317,8 @@ const BuyerProfileScreen = ({ navigation, route }) => {
           <Text style={[styles.tabText, activeTab === 'orders' && styles.activeTabText]}>
             Orders
           </Text>
-          </TouchableOpacity>
-        </View>
+        </TouchableOpacity>
+      </View>
 
       {activeTab === 'profile' ? renderProfileTab() : renderOrdersTab()}
     </View>
@@ -387,17 +481,30 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 12,
     borderBottomRightRadius: 12,
   },
+  orderStatusContainer: {
+    flexDirection: 'column',
+  },
   orderStatus: {
     fontSize: 14,
     color: '#666',
+    marginBottom: 4,
   },
   statusText: {
     color: '#4CAF50',
     fontWeight: '600',
   },
+  paymentMethod: {
+    fontSize: 14,
+    color: '#666',
+  },
+  paymentMethodText: {
+    color: '#5D3FD3',
+    fontWeight: '600',
+  },
   orderTotal: {
     fontSize: 14,
     color: '#666',
+    alignSelf: 'flex-end',
   },
   totalAmount: {
     color: '#333',
@@ -414,6 +521,69 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#666',
     textAlign: 'center',
+  },
+  // Guest user styles
+  guestContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  guestAvatarContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#f5f5f5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  guestTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
+    textAlign: 'center',
+  },
+  guestSubtitle: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginBottom: 32,
+    paddingHorizontal: 12,
+  },
+  guestButtons: {
+    width: '100%',
+    alignItems: 'center',
+  },
+  signInButton: {
+    backgroundColor: '#5D3FD3',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 40,
+    marginBottom: 16,
+    width: '80%',
+    alignItems: 'center',
+  },
+  signInButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  createAccountButton: {
+    borderWidth: 1,
+    borderColor: '#5D3FD3',
+    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 40,
+    width: '80%',
+    alignItems: 'center',
+    backgroundColor: 'transparent',
+  },
+  createAccountText: {
+    color: '#5D3FD3',
+    fontSize: 16,
+    fontWeight: 'bold',
   },
 });
 

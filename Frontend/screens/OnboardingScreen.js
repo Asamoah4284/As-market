@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width, height } = Dimensions.get('window');
 
@@ -76,8 +77,16 @@ const OnboardingScreen = ({ navigation }) => {
     }
   };
 
-  const handleGetStarted = () => {
-    navigation.replace('Welcome');
+  const handleGetStarted = async () => {
+    try {
+      // Mark onboarding as completed
+      await AsyncStorage.setItem('onboardingCompleted', 'true');
+      // Navigate to BuyerHome instead of Welcome
+      navigation.replace('BuyerHome');
+    } catch (error) {
+      console.error('Error saving onboarding status:', error);
+      navigation.replace('BuyerHome');
+    }
   };
 
   const renderPhoneMockup = (item) => {
@@ -100,7 +109,7 @@ const OnboardingScreen = ({ navigation }) => {
                       </View>
                     </View>
                     <View style={styles.buyButton}>
-                      <Text style={styles.buttonLabel}>Buy Now</Text>
+                      <Text style={styles.buttonLabel}>Buy</Text>
                     </View>
                   </View>
                 </View>
@@ -114,7 +123,7 @@ const OnboardingScreen = ({ navigation }) => {
                       <View style={styles.uploadBar} />
                     </View>
                     <View style={styles.sellButton}>
-                      <Text style={styles.buttonLabel}>List Item</Text>
+                      <Text style={styles.buttonLabel}>List</Text>
                     </View>
                   </View>
                 </View>
@@ -608,27 +617,29 @@ const styles = StyleSheet.create({
   },
   securityFeatures: {
     width: '100%',
+    marginVertical: 10,
   },
   securityFeature: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 15,
+    marginBottom: 12,
     backgroundColor: '#f5f5f5',
     borderRadius: 12,
-    padding: 12,
+    padding: 8,
   },
   securityIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     backgroundColor: 'rgba(0, 168, 150, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 15,
+    marginRight: 10,
   },
   securityText: {
-    fontSize: 14,
+    fontSize: 11,
     color: '#333',
+    flex: 1,
   },
   notificationContainer: {
     width: '100%',
@@ -683,7 +694,7 @@ const styles = StyleSheet.create({
   },
   footer: {
     position: 'absolute',
-    bottom: 30,
+    bottom: 15,
     left: 20,
     right: 20,
     flexDirection: 'row',

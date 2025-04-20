@@ -26,6 +26,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { fetchProductById } from '../store/slices/productSlice';
 import * as Location from 'expo-location';
 import { handleAddToCartNotification } from '../services/notificationService';
+import { requireAuthentication } from '../App';
 
 const API_URL = 'http://172.20.10.3:5000';
 
@@ -268,18 +269,15 @@ const ProductDetailsScreen = () => {
   const handleSubmitComment = async () => {
     if (!newComment.trim()) return;
 
+    // Check if user is authenticated
+    if (!requireAuthentication(navigation, 'post a comment')) {
+      return;
+    }
+
     try {
       setSubmittingComment(true);
       const token = await AsyncStorage.getItem("userToken");
-
-      if (!token) {
-        Alert.alert("Sign In Required", "Please sign in to post a comment", [
-          { text: "Cancel", style: "cancel" },
-          { text: "Sign In", onPress: () => navigation.navigate("Login") },
-        ]);
-        return;
-      }
-
+      
       // Use the consistent API URL pattern
       const apiUrl = API_URL.startsWith('http') ? API_URL : `http://${API_URL}`;
       const response = await fetch(
@@ -316,21 +314,14 @@ const ProductDetailsScreen = () => {
   };
 
   const handleAddToCart = async () => {
+    // Check if user is authenticated
+    if (!requireAuthentication(navigation, 'add items to cart')) {
+      return;
+    }
+
     try {
       const token = await AsyncStorage.getItem("userToken");
-
-      if (!token) {
-        Alert.alert(
-          "Sign In Required",
-          "Please sign in to add items to your cart",
-          [
-            { text: "Cancel", style: "cancel" },
-            { text: "Sign In", onPress: () => navigation.navigate("Login") },
-          ]
-        );
-        return;
-      }
-
+      
       // Add a local loading state for the button
       // Use the consistent API URL pattern
       const apiUrl = API_URL.startsWith('http') ? API_URL : `http://${API_URL}`;
@@ -391,37 +382,119 @@ const ProductDetailsScreen = () => {
 
   // Add function to handle contact seller
   const handleContactSeller = () => {
+    // Check if user is authenticated
+    if (!requireAuthentication(navigation, 'contact the seller')) {
+      return;
+    }
+    
     setContactModalVisible(true);
   };
 
   // Add function to open WhatsApp
   const contactViaWhatsApp = () => {
-    // You can customize the message or use seller's phone if available
-    const phoneNumber = currentProduct.seller?.phone || "1234567890";
-    const message = `Hello, I'm interested in your product: ${currentProduct.name}`;
-    const whatsappUrl = `whatsapp://send?phone=${phoneNumber}&text=${encodeURIComponent(message)}`;
+    // Use the provided number as the default seller phone
+    const sellerPhone = currentProduct.seller?.phone || "0542343069";
     
+    // Show a dialog to confirm using the phone number
+    Alert.alert(
+      "Contact via WhatsApp",
+      `Connect with the seller at ${sellerPhone}?`,
+      [
+        {
+          text: "Cancel",
+          style: "cancel"
+        },
+        {
+          text: "Continue",
+          onPress: () => {
+            openWhatsApp(sellerPhone);
+          }
+        }
+      ]
+    );
+    
+    setContactModalVisible(false);
+  };
+
+  // Helper function to open WhatsApp with a specific phone number
+  const openWhatsApp = (phoneNumber) => {
+    // Format the number - ensure it has international format
+    // Remove any non-digits except the + sign
+    let formattedPhone = phoneNumber.replace(/[^\d+]/g, "");
+    
+    // If number doesn't start with +, add Ghana's country code
+    if (!formattedPhone.startsWith('+')) {
+      // If it starts with 0, replace the 0 with +233
+      if (formattedPhone.startsWith('0')) {
+        formattedPhone = '+233' + formattedPhone.substring(1);
+      } else {
+        // Otherwise just add +233 prefix
+        formattedPhone = '+233' + formattedPhone;
+      }
+    }
+    
+    const message = `Hello, I'm interested in your product: ${currentProduct.name}`;
+    
+    // Try multiple WhatsApp URL formats for better compatibility
+    const whatsappUrl = `whatsapp://send?phone=${formattedPhone}&text=${encodeURIComponent(message)}`;
+    const whatsappUrlAlt = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
+    
+    // First try the deep link format
     Linking.canOpenURL(whatsappUrl)
       .then(supported => {
         if (supported) {
           return Linking.openURL(whatsappUrl);
         } else {
-          Alert.alert("WhatsApp not installed", "Please install WhatsApp to contact the seller.");
+          // If deep link doesn't work, try the web URL format
+          Linking.canOpenURL(whatsappUrlAlt)
+            .then(webSupported => {
+              if (webSupported) {
+                return Linking.openURL(whatsappUrlAlt);
+              } else {
+                Alert.alert(
+                  "WhatsApp Issue", 
+                  "Unable to open WhatsApp. Please make sure WhatsApp is installed correctly or try reinstalling the app.",
+                  [
+                    { 
+                      text: "Copy Number", 
+                      onPress: () => {
+                        // Here you would copy the number to clipboard
+                        Alert.alert("Phone number copied", `${formattedPhone}`);
+                      }
+                    },
+                    { text: "OK" }
+                  ]
+                );
+              }
+            })
+            .catch(err => console.error('Error opening WhatsApp web link:', err));
         }
       })
       .catch(err => console.error('Error opening WhatsApp:', err));
-    
-    setContactModalVisible(false);
   };
 
   // Add function to view seller profile
   const viewSellerProfile = () => {
-    // Navigate to seller profile screen if available
-    if (currentProduct.seller?._id) {
-      navigation.navigate('SellerProfile', { sellerId: currentProduct.seller._id });
-    } else {
-      Alert.alert("Seller Profile", "Seller profile is not available.");
-    }
+    // Use the provided number 
+    const phoneNumber = "0542343069";
+    
+    // Create a phone URI
+    const phoneUrl = `tel:${phoneNumber}`;
+    
+    // Try to open phone app
+    Linking.canOpenURL(phoneUrl)
+      .then(supported => {
+        if (supported) {
+          return Linking.openURL(phoneUrl);
+        } else {
+          Alert.alert("Phone Call Failed", "Your device doesn't support making calls directly. Please dial this number manually: " + phoneNumber);
+        }
+      })
+      .catch(err => {
+        console.error('Error opening phone app:', err);
+        Alert.alert("Error", "Could not open phone app. Please dial this number manually: " + phoneNumber);
+      });
+    
     setContactModalVisible(false);
   };
 
@@ -622,8 +695,8 @@ const ProductDetailsScreen = () => {
                 style={styles.contactOption}
                 onPress={viewSellerProfile}
               >
-                <Ionicons name="person" size={24} color="#5D3FD3" />
-                <Text style={styles.contactOptionText}>View Seller's Profile</Text>
+                <Ionicons name="call" size={24} color="#4CAF50" />
+                <Text style={styles.contactOptionText}>Contact Seller</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -783,9 +856,9 @@ const ProductDetailsScreen = () => {
             <Ionicons name="star" size={18} color="#FFD700" style={styles.starIcon} />
             <Ionicons name="star" size={18} color="#FFD700" style={styles.starIcon} />
             <Ionicons name="star" size={18} color="#FFD700" style={styles.starIcon} />
-            <Ionicons name="star" size={18} color="#FFD700" style={styles.starIcon} />
-            <Ionicons name="star" size={18} color="#FFD700" style={styles.starIcon} />
-            <Text style={styles.reviewsText}>(120 reviews)</Text>
+            <Ionicons name="star-half" size={18} color="#FFD700" style={styles.starIcon} />
+            <Ionicons name="star-half" size={18} color="#FFD700" style={styles.starIcon} />
+            <Text style={styles.reviewsText}>Reviews</Text>
           </View>
 
           {/* Delivery Information */}

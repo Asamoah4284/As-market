@@ -4,12 +4,13 @@ import { NavigationContainer } from '@react-navigation/native';
 import { createStackNavigator } from '@react-navigation/stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import 'react-native-reanimated';
-import { Provider, useDispatch } from 'react-redux';
+import { Provider, useDispatch, useSelector } from 'react-redux';
 import { store } from './store/store';
 import * as Notifications from 'expo-notifications';
 import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { setPushToken, addNotification } from './store/slices/notificationSlice';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 // Import screens
 import WelcomeScreen from './screens/WelcomeScreen';
 import SignUpScreen from './screens/SignUpScreen';
@@ -39,6 +40,46 @@ export function navigate(name, params) {
     navigationRef.current.navigate(name, params);
   }
 }
+
+// Function to check if user needs to see onboarding
+export const checkOnboardingStatus = async () => {
+  try {
+    const onboardingCompleted = await AsyncStorage.getItem('onboardingCompleted');
+    return onboardingCompleted === 'true';
+  } catch (error) {
+    console.error('Error checking onboarding status:', error);
+    return false;
+  }
+};
+
+// Function to prompt login if user is not authenticated
+export const requireAuthentication = (navigation, actionType) => {
+  // Get authentication status from store or AsyncStorage
+  const token = store.getState().auth?.token;
+  
+  if (!token) {
+    Alert.alert(
+      'Authentication Required',
+      `Please log in or sign up to ${actionType}.`,
+      [
+        {
+          text: 'Cancel',
+          style: 'cancel'
+        },
+        {
+          text: 'Login',
+          onPress: () => navigation.navigate('Login')
+        },
+        {
+          text: 'Sign Up',
+          onPress: () => navigation.navigate('SignUp')
+        }
+      ]
+    );
+    return false;
+  }
+  return true;
+};
 
 // Configure notification handler
 Notifications.setNotificationHandler({
@@ -124,11 +165,29 @@ async function registerForPushNotificationsAsync() {
 function AppContent() {
   const [expoPushToken, setExpoPushToken] = useState('');
   const [notification, setNotification] = useState(undefined);
+  const [initialRoute, setInitialRoute] = useState('Onboarding');
+  const [isLoading, setIsLoading] = useState(true);
   const notificationListener = useRef();
   const responseListener = useRef();
   const dispatch = useDispatch();
 
   useEffect(() => {
+    // Check if onboarding is completed
+    const checkInitialRoute = async () => {
+      try {
+        const onboardingCompleted = await AsyncStorage.getItem('onboardingCompleted');
+        if (onboardingCompleted === 'true') {
+          setInitialRoute('BuyerHome');
+        }
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error checking initial route:', error);
+        setIsLoading(false);
+      }
+    };
+
+    checkInitialRoute();
+
     // Register for push notifications
     registerForPushNotificationsAsync()
       .then(token => {
@@ -205,16 +264,24 @@ function AppContent() {
     };
   }, [dispatch]);
 
+  if (isLoading) {
+    return <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}><Text>Loading...</Text></View>;
+  }
+
   return (
     <SafeAreaProvider>
       <NavigationContainer ref={navigationRef}>
         <Stack.Navigator 
-          initialRouteName="Onboarding"
+          initialRouteName={initialRoute}
           screenOptions={{
             headerShown: false
           }}
         >
-          <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+          <Stack.Screen 
+            name="Onboarding" 
+            component={OnboardingScreen} 
+            options={{ gestureEnabled: false }}
+          />
           <Stack.Screen name="Welcome" component={WelcomeScreen} />
           <Stack.Screen name="SignUp" component={SignUpScreen} />
           <Stack.Screen name="Cart" component={CartScreen} />

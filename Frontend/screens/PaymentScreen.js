@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, StyleSheet, ActivityIndicator, Alert, Text } from 'react-native';
+import { View, StyleSheet, ActivityIndicator, Alert, Text, TouchableOpacity, ScrollView } from 'react-native';
 import { Paystack } from 'react-native-paystack-webview';
 import { useSelector, useDispatch } from 'react-redux';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -11,11 +11,14 @@ import {
   handleOrderPlacedNotification 
 } from '../services/notificationService';
 import { addNotification } from '../store/slices/notificationSlice';
+import { MaterialIcons } from '@expo/vector-icons';
 
 const PAYSTACK_PUBLIC_KEY = 'pk_test_adab0e58f74cc222a31e9e82a291ae8de3952848';
 
 const PaymentScreen = ({ navigation, route }) => {
   const [email, setEmail] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState(null); // 'online' or 'pay_on_delivery'
+  const [isProcessing, setIsProcessing] = useState(false);
   const dispatch = useDispatch();
   const { items: cartItems } = useSelector(state => state.cart);
   const { amount } = route.params;
@@ -65,7 +68,7 @@ const PaymentScreen = ({ navigation, route }) => {
     getUserEmail();
   }, []);
 
-  const createOrder = async (reference) => {
+  const createOrder = async (reference, forcePaymentMethod = null) => {
     try {
       const token = await AsyncStorage.getItem('userToken');
       if (!token) {
@@ -127,6 +130,7 @@ const PaymentScreen = ({ navigation, route }) => {
       console.log('Prepared order items:', JSON.stringify(orderItems));
       console.log('Total amount:', amount);
       console.log('Payment reference:', reference);
+      console.log('Payment method:', forcePaymentMethod || paymentMethod);
 
       // Use API_ENDPOINTS if available, otherwise construct URL from base
       const orderUrl = API_ENDPOINTS.CREATE_ORDER || `${API_BASE_URL}/api/orders`;
@@ -137,11 +141,13 @@ const PaymentScreen = ({ navigation, route }) => {
         paymentReference: reference,
         orderItems: orderItems,  // This must match what backend expects
         totalAmount: amount,
-        paymentStatus: 'success'
+        paymentMethod: forcePaymentMethod || paymentMethod,
+        paymentStatus: (forcePaymentMethod || paymentMethod) === 'pay_on_delivery' ? 'pending' : 'success'
       };
       
       // Log the final payload being sent
       console.log('Final order payload:', JSON.stringify(orderPayload, null, 2));
+      console.log('Payment method in payload:', forcePaymentMethod || paymentMethod);
 
       const response = await fetch(orderUrl, {
         method: 'POST',
@@ -198,6 +204,82 @@ const PaymentScreen = ({ navigation, route }) => {
     }
   };
 
+  const handlePayOnDelivery = async () => {
+    try {
+      setIsProcessing(true);
+      console.log('Starting Pay on Delivery flow with payment method:', paymentMethod);
+      
+      // Make sure payment method is set correctly
+      if (paymentMethod !== 'pay_on_delivery') {
+        console.log('Payment method not set properly, forcing to pay_on_delivery');
+        setPaymentMethod('pay_on_delivery');
+      }
+      
+      // Generate a unique pay-on-delivery reference
+      const payOnDeliveryRef = `POD-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+      console.log('Generated POD reference:', payOnDeliveryRef);
+      
+      // Create the order with the POD reference
+      const orderResult = await createOrder(payOnDeliveryRef, 'pay_on_delivery');
+      console.log('POD Order created:', orderResult);
+      
+      // Generate an order number from the order ID
+      const orderNumber = orderResult._id.substring(orderResult._id.length - 6).toUpperCase();
+      
+      // Send local notifications
+      const notificationId = await handleOrderPlacedNotification(orderNumber);
+      console.log('Order placed notification sent:', notificationId);
+      
+      // Add notification to Redux store
+      dispatch(addNotification({
+        title: 'Order Placed',
+        body: `Your pay-on-delivery order #${orderNumber} has been placed successfully.`,
+        data: { 
+          type: 'ORDER_PLACED',
+          orderId: orderResult._id
+        }
+      }));
+      
+      // Clear cart after successful order creation
+      dispatch(clearCart());
+      
+      // Navigate to success screen
+      navigation.reset({
+        index: 0,
+        routes: [{ 
+          name: 'PaymentSuccess',
+          params: {
+            orderNumber: orderNumber,
+            amount: amount/100,
+            orderId: orderResult._id,
+            isPOD: true
+          }
+        }],
+      });
+    } catch (error) {
+      setIsProcessing(false);
+      console.error('Error in handlePayOnDelivery:', error);
+      
+      Alert.alert(
+        'Order Processing Error',
+        error.message || 'An error occurred while processing your order',
+        [
+          {
+            text: 'Try Again',
+            onPress: () => console.log('Try again pressed')
+          },
+          {
+            text: 'Go to Home',
+            onPress: () => navigation.reset({
+              index: 0,
+              routes: [{ name: 'BuyerHome' }],
+            })
+          }
+        ]
+      );
+    }
+  };
+
   const handlePaymentSuccess = async (response) => {
     try {
       console.log('Payment successful, full response:', response);
@@ -218,7 +300,7 @@ const PaymentScreen = ({ navigation, route }) => {
       }
 
       console.log('Creating order with payment reference:', paymentReference);
-      const orderResult = await createOrder(paymentReference);
+      const orderResult = await createOrder(paymentReference, 'online');
       console.log('Order created:', orderResult);
       
       // Generate a order number from the order ID (could be any unique value)
@@ -352,6 +434,7 @@ const PaymentScreen = ({ navigation, route }) => {
   };
 
   const handlePaymentCancel = () => {
+    setPaymentMethod(null);
     navigation.goBack();
   };
 
@@ -379,6 +462,71 @@ const PaymentScreen = ({ navigation, route }) => {
     );
   }
 
+  // If user hasn't selected a payment method yet, show payment method selection screen
+  if (!paymentMethod) {
+    return (
+      <ScrollView style={styles.container}>
+        <View style={styles.paymentMethodContainer}>
+          <Text style={styles.pageTitle}>Choose Payment Method</Text>
+          <Text style={styles.amountText}>Total: GHS {(amount/100).toFixed(2)}</Text>
+          
+          <TouchableOpacity 
+            style={styles.paymentOption}
+            onPress={() => setPaymentMethod('online')}
+          >
+            <MaterialIcons name="credit-card" size={24} color="#5D3FD3" />
+            <View style={styles.paymentOptionTextContainer}>
+              <Text style={styles.paymentOptionTitle}>Pay Online</Text>
+              <Text style={styles.paymentOptionDescription}>
+                Pay securely with credit card, mobile money, or bank transfer
+              </Text>
+            </View>
+            <MaterialIcons name="arrow-forward-ios" size={16} color="#999" />
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.paymentOption}
+            onPress={() => {
+              // Explicitly set payment method first, then handle pay on delivery
+              setPaymentMethod('pay_on_delivery');
+              // Use setTimeout to ensure state is updated before handling the flow
+              setTimeout(() => {
+                handlePayOnDelivery();
+              }, 0);
+            }}
+          >
+            <MaterialIcons name="attach-money" size={24} color="#5D3FD3" />
+            <View style={styles.paymentOptionTextContainer}>
+              <Text style={styles.paymentOptionTitle}>Pay on Delivery</Text>
+              <Text style={styles.paymentOptionDescription}>
+                Pay with cash or mobile money when your order is delivered
+              </Text>
+            </View>
+            <MaterialIcons name="arrow-forward-ios" size={16} color="#999" />
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.backButton}
+            onPress={handlePaymentCancel}
+          >
+            <Text style={styles.backButtonText}>Back to Cart</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    );
+  }
+
+  // Show loading indicator while processing Pay on Delivery
+  if (paymentMethod === 'pay_on_delivery' && isProcessing) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#5D3FD3" />
+        <Text style={styles.loadingText}>Processing your order...</Text>
+      </View>
+    );
+  }
+
+  // Show Paystack payment screen only if online payment is selected
   return (
     <View style={styles.container}>
       <Paystack
@@ -386,7 +534,10 @@ const PaymentScreen = ({ navigation, route }) => {
         amount={amount} // Amount is already in pesewas, don't multiply
         billingEmail={email}
         activityIndicatorColor="#5D3FD3"
-        onCancel={handlePaymentCancel}
+        onCancel={() => {
+          setPaymentMethod(null);
+          handlePaymentCancel();
+        }}
         onSuccess={handlePaymentSuccess}
         autoStart={true}
         channels={["card", "bank", "ussd", "qr", "mobile_money"]}
@@ -413,6 +564,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#fff'
   },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#5D3FD3'
+  },
   errorContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -431,6 +587,56 @@ const styles = StyleSheet.create({
   linkText: {
     color: '#5D3FD3',
     fontWeight: 'bold'
+  },
+  paymentMethodContainer: {
+    padding: 20,
+    backgroundColor: '#fff'
+  },
+  pageTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginVertical: 20,
+    textAlign: 'center'
+  },
+  amountText: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 30,
+    textAlign: 'center',
+    color: '#5D3FD3'
+  },
+  paymentOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#f9f9f9',
+    borderRadius: 12,
+    padding: 20,
+    marginBottom: 15,
+    borderWidth: 1,
+    borderColor: '#eee'
+  },
+  paymentOptionTextContainer: {
+    flex: 1,
+    marginLeft: 15,
+    marginRight: 10
+  },
+  paymentOptionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4
+  },
+  paymentOptionDescription: {
+    fontSize: 14,
+    color: '#666'
+  },
+  backButton: {
+    alignItems: 'center',
+    marginTop: 30,
+    padding: 15
+  },
+  backButtonText: {
+    color: '#999',
+    fontSize: 16
   }
 });
 

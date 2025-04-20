@@ -1,11 +1,15 @@
-import React, { useEffect, useRef } from 'react';
-import { Text, View, TouchableOpacity, Animated, StyleSheet, ImageBackground, Dimensions } from 'react-native';
+import React, { useEffect, useRef, useState } from 'react';
+import { Text, View, TouchableOpacity, Animated, StyleSheet, ImageBackground, Dimensions, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { checkOnboardingStatus } from '../App'; // Import the helper function
 
 // Get screen dimensions for responsive design
 const { width, height } = Dimensions.get('window');
 
 function WelcomeScreen({ navigation }) {
+  const [isLoading, setIsLoading] = useState(true);
+  
   // Multiple animation values for more complex animations
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const titleFadeAnim = useRef(new Animated.Value(0)).current;
@@ -15,61 +19,91 @@ function WelcomeScreen({ navigation }) {
   const buttonOpacityAnim = useRef(new Animated.Value(0)).current;
   const logoRotateAnim = useRef(new Animated.Value(0)).current;
 
+  // Check if onboarding has been completed
   useEffect(() => {
-    // Staggered animations for a more dynamic entrance
-    Animated.sequence([
-      // First animate the main content
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
+    const checkOnboarding = async () => {
+      try {
+        const onboardingCompleted = await AsyncStorage.getItem('onboardingCompleted');
+        if (onboardingCompleted === 'true') {
+          // Redirect to BuyerHome if onboarding is completed
+          navigation.replace('BuyerHome');
+          return;
+        }
+        setIsLoading(false);
+      } catch (error) {
+        console.error('Error checking onboarding status:', error);
+        setIsLoading(false);
+      }
+    };
+    
+    checkOnboarding();
+  }, [navigation]);
+
+  useEffect(() => {
+    if (!isLoading) {
+      // Start animations only after loading check is complete
+      Animated.sequence([
+        // First animate the main content
+        Animated.parallel([
+          Animated.timing(fadeAnim, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.spring(scaleAnim, {
+            toValue: 1,
+            tension: 20,
+            friction: 7,
+            useNativeDriver: true,
+          }),
+          Animated.timing(slideAnim, {
+            toValue: 0,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ]),
+        // Then animate the title with a slight delay
+        Animated.timing(titleFadeAnim, {
+          toValue: 1,
+          duration: 600,
+          useNativeDriver: true,
+        }),
+        // Rotate logo animation
+        Animated.timing(logoRotateAnim, {
           toValue: 1,
           duration: 800,
           useNativeDriver: true,
         }),
-        Animated.spring(scaleAnim, {
-          toValue: 1,
-          tension: 20,
-          friction: 7,
-          useNativeDriver: true,
-        }),
-        Animated.timing(slideAnim, {
-          toValue: 0,
-          duration: 800,
-          useNativeDriver: true,
-        }),
-      ]),
-      // Then animate the title with a slight delay
-      Animated.timing(titleFadeAnim, {
-        toValue: 1,
-        duration: 600,
-        useNativeDriver: true,
-      }),
-      // Rotate logo animation
-      Animated.timing(logoRotateAnim, {
-        toValue: 1,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-      // Finally animate the buttons
-      Animated.parallel([
-        Animated.timing(buttonOpacityAnim, {
-          toValue: 1,
-          duration: 500,
-          useNativeDriver: true,
-        }),
-        Animated.spring(buttonSlideAnim, {
-          toValue: 0,
-          tension: 50,
-          friction: 7,
-          useNativeDriver: true,
-        }),
-      ]),
-    ]).start();
-  }, []);
+        // Finally animate the buttons
+        Animated.parallel([
+          Animated.timing(buttonOpacityAnim, {
+            toValue: 1,
+            duration: 500,
+            useNativeDriver: true,
+          }),
+          Animated.spring(buttonSlideAnim, {
+            toValue: 0,
+            tension: 50,
+            friction: 7,
+            useNativeDriver: true,
+          }),
+        ]),
+      ]).start();
+    }
+  }, [isLoading]);
 
   const spin = logoRotateAnim.interpolate({
     inputRange: [0, 1],
     outputRange: ['0deg', '360deg']
   });
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#FF6B6B" />
+      </View>
+    );
+  }
 
   return (
     <ImageBackground 
@@ -144,6 +178,14 @@ function WelcomeScreen({ navigation }) {
                 activeOpacity={0.8}
               >
                 <Text style={styles.loginButtonText}>Already have an account? Sign In</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity 
+                style={styles.guestButton}
+                onPress={() => navigation.navigate('BuyerHome')}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.guestButtonText}>Continue as Guest</Text>
               </TouchableOpacity>
             </Animated.View>
           </View>
@@ -291,6 +333,24 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textDecorationLine: 'underline',
     textDecorationColor: 'rgba(255,255,255,0.5)',
+  },
+  guestButton: {
+    paddingVertical: 12,
+    width: '100%',
+    marginTop: 10,
+  },
+  guestButtonText: {
+    fontSize: 16,
+    color: 'rgba(255,255,255,0.9)',
+    textAlign: 'center',
+    fontWeight: '500',
+    textDecorationLine: 'underline',
+    textDecorationColor: 'rgba(255,255,255,0.5)',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

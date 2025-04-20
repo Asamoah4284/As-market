@@ -43,18 +43,41 @@ const CartScreen = ({ navigation }) => {
     }
   });
   const [isPayOnDelivery, setIsPayOnDelivery] = useState(false);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
-  // Fetch cart items whenever the screen is focused
+  // Check authentication status when screen is focused
   useFocusEffect(
     React.useCallback(() => {
-      // Set loading to true immediately when screen is focused
-      dispatch(setLoading(true));
-      fetchCartItems();
+      const checkAuth = async () => {
+        const token = await AsyncStorage.getItem('userToken');
+        
+        if (!token) {
+          // Redirect to login if not authenticated
+          Alert.alert(
+            'Authentication Required',
+            'Please log in or sign up to view your cart',
+            [
+              { text: 'Cancel', onPress: () => navigation.goBack(), style: 'cancel' },
+              { text: 'Login', onPress: () => navigation.navigate('Login') }
+            ]
+          );
+          setIsAuthenticated(false);
+        } else {
+          setIsAuthenticated(true);
+          // Set loading to true immediately when screen is focused
+          dispatch(setLoading(true));
+          fetchCartItems();
+        }
+      };
+      
+      checkAuth();
     }, [])
   );
 
   // Add user email fetch
   useEffect(() => {
+    if (!isAuthenticated) return;
+    
     const getUserEmail = async () => {
       try {
         const userDataString = await AsyncStorage.getItem('userData');
@@ -81,7 +104,7 @@ const CartScreen = ({ navigation }) => {
     };
 
     getUserEmail();
-  }, []);
+  }, [isAuthenticated]);
 
   // Modify fetchCartItems to use Redux
   const fetchCartItems = async () => {
@@ -558,89 +581,75 @@ const CartScreen = ({ navigation }) => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" />
       
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="chevron-back" size={24} color="#333" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>My Cart</Text>
-        <Text style={styles.itemCount}>{cartItems.length} {cartItems.length === 1 ? 'item' : 'items'}</Text>
-      </View>
+      {/* Only render cart content if authenticated */}
+      {isAuthenticated ? (
+        <>
+          <View style={styles.header}>
+            <TouchableOpacity 
+              style={styles.backButton}
+              onPress={() => navigation.goBack()}
+            >
+              <Ionicons name="chevron-back" size={24} color="#333" />
+            </TouchableOpacity>
+            <Text style={styles.headerTitle}>My Cart</Text>
+            <Text style={styles.itemCount}>{cartItems.length} {cartItems.length === 1 ? 'item' : 'items'}</Text>
+          </View>
 
-      <FlatList
-        data={cartItems}
-        renderItem={renderItem}
-        keyExtractor={(item) => item.productId}
-        contentContainerStyle={styles.listContainer}
-        showsVerticalScrollIndicator={false}
-      />
-      
-      <View style={styles.checkoutContainer}>
-       
-        
-        <View style={styles.summaryContainer}>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryText}>Subtotal</Text>
-            <Text style={styles.summaryValue}>GH₵{calculateTotal().toFixed(2)}</Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryText}>Delivery</Text>
-            <Text style={styles.deliveryFeeText}>
-              {calculateTotal() < 50 ? 
-                "Free Delivery" : 
-                `+ GH₵${userLocation ? calculateDeliveryCost(userLocation) : "5-10"} Delivery`
-              }
-            </Text>
-          </View>
-          <View style={styles.divider} />
-          <View style={styles.totalRow}>
-            <Text style={styles.totalText}>Total</Text>
-            <View style={styles.totalValueContainer}>
-              <Text style={styles.currencySymbol}>GH₵</Text>
-              <Text style={styles.totalAmount}>{calculateFinalTotal().toFixed(2)}</Text>
+          <FlatList
+            data={cartItems}
+            renderItem={renderItem}
+            keyExtractor={(item) => item.productId}
+            contentContainerStyle={styles.listContainer}
+            showsVerticalScrollIndicator={false}
+          />
+          
+          <View style={styles.checkoutContainer}>
+           
+            <View style={styles.summaryContainer}>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryText}>Subtotal</Text>
+                <Text style={styles.summaryValue}>GH₵{calculateTotal().toFixed(2)}</Text>
+              </View>
+              <View style={styles.summaryRow}>
+                <Text style={styles.summaryText}>Delivery</Text>
+                <Text style={styles.deliveryFeeText}>
+                  {calculateTotal() < 50 ? 
+                    "Free Delivery" : 
+                    `+ GH₵${userLocation ? calculateDeliveryCost(userLocation) : "5-10"} Delivery`
+                  }
+                </Text>
+              </View>
+              <View style={styles.divider} />
+              <View style={styles.totalRow}>
+                <Text style={styles.totalText}>Total</Text>
+                <View style={styles.totalValueContainer}>
+                  <Text style={styles.currencySymbol}>GH₵</Text>
+                  <Text style={styles.totalAmount}>{calculateFinalTotal().toFixed(2)}</Text>
+                </View>
+              </View>
             </View>
+            
+          
+            <TouchableOpacity 
+              style={styles.checkoutButton}
+              onPress={handleCheckout}
+            >
+              <Text style={styles.checkoutButtonText}>
+                {isPayOnDelivery ? "Place Order - Pay on Delivery" : "Proceed to Checkout"}
+              </Text>
+            </TouchableOpacity>
           </View>
-        </View>
-        
-        {/* Payment Option Toggle */}
-        <View style={styles.paymentOptionContainer}>
-          <View style={styles.paymentOptionRow}>
-            <Text style={styles.paymentOptionText}>Pay on Delivery</Text>
-            <Switch
-              trackColor={{ false: "#E0E0E0", true: "#D4C8FF" }}
-              thumbColor={isPayOnDelivery ? "#5D3FD3" : "#F5F5F5"}
-              ios_backgroundColor="#E0E0E0"
-              onValueChange={() => setIsPayOnDelivery(!isPayOnDelivery)}
-              value={isPayOnDelivery}
-            />
-          </View>
-          <Text style={styles.paymentOptionDescription}>
-            {isPayOnDelivery 
-              ? "You'll pay in cash when your order is delivered" 
-              : "Secure payment via Paystack"}
-          </Text>
-        </View>
-        
-        <TouchableOpacity 
-          style={styles.checkoutButton}
-          onPress={handleCheckout}
-        >
-          <Text style={styles.checkoutButtonText}>
-            {isPayOnDelivery ? "Place Order - Pay on Delivery" : "Proceed to Checkout"}
-          </Text>
-        </TouchableOpacity>
-      </View>
 
-      {/* Add the PaystackPayment component */}
-      <PaystackPayment
-        isVisible={showPayment}
-        amount={calculateFinalTotal()}
-        email={userEmail}
-        onCancel={handlePaymentCancel}
-        onSuccess={handlePaymentSuccess}
-      />
+          {/* Add the PaystackPayment component */}
+          <PaystackPayment
+            isVisible={showPayment}
+            amount={calculateFinalTotal()}
+            email={userEmail}
+            onCancel={handlePaymentCancel}
+            onSuccess={handlePaymentSuccess}
+          />
+        </>
+      ) : null}
     </SafeAreaView>
   );
 };
@@ -897,6 +906,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    marginBottom: 12
   },
   totalText: {
     fontSize: 18,
