@@ -28,7 +28,7 @@ import * as Location from 'expo-location';
 import { handleAddToCartNotification } from '../services/notificationService';
 import { requireAuthentication } from '../App';
 
-const API_URL = 'http://172.20.10.3:5000';
+const API_URL = 'https://unimarket-ikin.onrender.com';
 
 const ProductDetailsScreen = () => {
   const navigation = useNavigation();

@@ -27,7 +27,7 @@ import PaystackPayment from '../components/PaystackPayment';
 import { handleAddToCartNotification, sendLocalNotification } from '../services/notificationService';
 
 
-const API_URL = 'http://172.20.10.3:5000';
+const API_URL = 'https://unimarket-ikin.onrender.com';
 
 const CartScreen = ({ navigation }) => {
   const dispatch = useDispatch();

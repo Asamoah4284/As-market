@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator } from 'react-native';
 import axios from 'axios';
+import { API_BASE_URL } from '../config/api';
+
 
 const AllProducts = ({ navigation }) => {
   const [products, setProducts] = useState([]);
@@ -15,7 +17,7 @@ const AllProducts = ({ navigation }) => {
     try {
       setLoading(true);
       // Use environment variable or config for API URL instead of hardcoded IP
-      const API_URL = 'http://172.20.10.3:5000/api/products';
+      const API_URL = `${API_BASE_URL}/api/products`;
       console.log('Fetching products from:', API_URL);
       const response = await axios.get(API_URL);
       console.log('API response:', response.data);

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { StyleSheet, Text, View, TouchableOpacity, TextInput, ScrollView } from 'react-native';
 
 // Add this constant at the top of your file
-const API_URL = 'http://172.20.10.3:5000';
+const API_URL = 'https://unimarket-ikin.onrender.com';
 
 function SignUpScreen({ navigation }) {
   const [userType, setUserType] = useState(null);

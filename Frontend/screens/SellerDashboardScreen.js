@@ -41,8 +41,8 @@ const SellerDashboardScreen = () => {
     highlight: '#F0F4FF',
   };
 
-  const API_URL = 'http://172.20.10.3:5000';
-  const API_BASE_URL = 'http://172.20.10.3:5000';
+  const API_URL = 'https://unimarket-ikin.onrender.com';
+  const API_BASE_URL = 'https://unimarket-ikin.onrender.com';
 
   const [activeTab, setActiveTab] = useState('products');
   const [products, setProducts] = useState([]);

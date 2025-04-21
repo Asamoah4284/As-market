@@ -82,7 +82,7 @@ const SPECIAL_OFFERS = [
   }
 ];
 
-let url = 'http://172.20.10.3:5000/api/products';
+let url = 'https://unimarket-ikin.onrender.com/api/products';
 
 const BuyerHomeScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -168,7 +168,7 @@ const BuyerHomeScreen = () => {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        const response = await fetch('http://172.20.10.3:5000/api/products');
+        const response = await fetch(`${url}`);
         console.log('Products API Response Status:', response.status);
         
         if (response.ok) {
@@ -199,7 +199,7 @@ const BuyerHomeScreen = () => {
         if (token) {
           console.log('Token found:', token.substring(0, 10) + '...');
           
-          const response = await fetch('http://172.20.10.3:5000/api/users/profile', {
+          const response = await fetch('https://unimarket-ikin.onrender.com/api/users/profile', {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
@@ -234,7 +234,7 @@ const BuyerHomeScreen = () => {
   useEffect(() => {
     const fetchServices = async () => {
       try {
-        const response = await fetch('http://172.20.10.3:5000/api/products');
+        const response = await fetch(`${url}`);
         console.log('Products API Response Status:', response.status);
         
         if (response.ok) {
@@ -379,7 +379,7 @@ const BuyerHomeScreen = () => {
   const renderFeaturedProduct = ({ item }) => {
     const imageUri = item.image && (item.image.startsWith('http') 
       ? item.image 
-      : `http://172.20.10.3:5000${item.image}`);
+      : `https://unimarket-ikin.onrender.com${item.image}`);
     
     // Check if this product is in favorites
     const isFavorite = favorites.includes(item._id);
@@ -493,7 +493,7 @@ const BuyerHomeScreen = () => {
   const renderService = ({ item }) => {
     const imageUri = item.image && (item.image.startsWith('http') 
       ? item.image 
-      : `http://172.20.10.3:5000${item.image}`);
+      : `https://unimarket-ikin.onrender.com${item.image}`);
 
     // Check if this service is in favorites
     const isFavorite = favorites.includes(item._id);

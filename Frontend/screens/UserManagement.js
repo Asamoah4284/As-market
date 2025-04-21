@@ -25,7 +25,7 @@ const UserManagement = () => {
       const token = await AsyncStorage.getItem('userToken');
       console.log('Token used for fetching users:', token);
       
-      const response = await fetch('http://172.20.10.3:5000/api/users', {
+      const response = await fetch('https://unimarket-ikin.onrender.com/api/users', {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -67,7 +67,7 @@ const UserManagement = () => {
               const token = await AsyncStorage.getItem('userToken');
               console.log('Token used for deleting user:', token);
               
-              const response = await fetch(`http://172.20.10.3:5000/api/users/${userId}`, {
+              const response = await fetch(`https://unimarket-ikin.onrender.com/api/users/${userId}`, {
                 method: 'DELETE',
                 headers: {
                   'Content-Type': 'application/json',

@@ -21,7 +21,7 @@ const ProfileScreen = () => {
 
   const fetchSellerData = async () => {
     try {
-      const response = await fetch('http://172.20.10.3:5000/api/seller/profile', {
+      const response = await fetch('https://unimarket-ikin.onrender.com/api/seller/profile', {
         headers: {
           'Authorization': `Bearer ${userToken}`,
           'Accept': 'application/json',

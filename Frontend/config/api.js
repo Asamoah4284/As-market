@@ -1,5 +1,5 @@
 // API Configuration
-export const API_BASE_URL = 'http://172.20.10.3:5000'; // Replace with your actual backend URL
+export const API_BASE_URL = 'https://unimarket-ikin.onrender.com'; // Replace with your actual backend URL
 
 export const API_ENDPOINTS = {
   // Auth endpoints

@@ -86,7 +86,7 @@ const Categories = () => {
       // Use the newValue directly instead of relying on the state
       params.append('isService', !newValue ? 'true' : 'false');
       
-      let url = `http://172.20.10.3:5000/api/products?${params.toString()}`;
+      let url = `https://unimarket-ikin.onrender.com/api/products?${params.toString()}`;
       
       console.log('Toggling to URL:', url); // Debug log
       
@@ -116,7 +116,7 @@ const Categories = () => {
     setLoading(true);
     try {
       // Construct the URL with category filter if provided
-      let url = 'http://172.20.10.3:5000/api/products';
+      let url = 'https://unimarket-ikin.onrender.com/api/products';
       
       const params = new URLSearchParams();
       
@@ -203,7 +203,7 @@ const Categories = () => {
     console.log('Product item:', item);
     const imageUri = item.image && (item.image.startsWith('http') 
       ? item.image 
-      : `http://10.10.90.155:5000${item.image}`);
+      : `https://unimarket-ikin.onrender.com${item.image}`);
       
     return (
       <TouchableOpacity 

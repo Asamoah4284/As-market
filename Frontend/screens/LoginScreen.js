@@ -4,7 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useDispatch } from 'react-redux';
 import { setCredentials } from '../store/slices/authSlice';
 
-const API_URL = 'http://172.20.10.3:5000';
+const API_URL = 'https://unimarket-ikin.onrender.com';
 
 function LoginScreen({ navigation, route }) {
   const dispatch = useDispatch();

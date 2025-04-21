@@ -15,7 +15,7 @@ import {
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const API_URL = 'http://172.20.10.3:5000'; // Replace with your API URL
+const API_URL = 'https://unimarket-ikin.onrender.com'; // Replace with your API URL
 
 const PendingProducts = () => {
   const [pendingProducts, setPendingProducts] = useState([]);

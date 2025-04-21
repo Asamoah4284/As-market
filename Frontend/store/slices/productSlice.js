@@ -2,7 +2,7 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutes in milliseconds
-const API_URL = 'http://172.20.10.3:5000';
+const API_URL = 'https://unimarket-ikin.onrender.com';
 
 
 export const fetchProducts = createAsyncThunk(
