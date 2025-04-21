@@ -24,6 +24,11 @@ app.use(cors());
 app.use(express.json({limit: '50mb'}));
 app.use(express.urlencoded({limit: '50mb', extended: true}));
 
+// Basic Route for the root
+app.get('/', (req, res) => {
+  res.send('Welcome to the backend API!');
+});
+
 // Routes
 app.use('/api/users', userRoutes);
 app.use('/api/products', productRoutes);
