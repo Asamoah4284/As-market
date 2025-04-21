@@ -255,9 +255,9 @@ const BuyerProfileScreen = ({ navigation, route }) => {
 
             <View style={styles.orderFooter}>
               <View style={styles.orderStatusContainer}>
-                <Text style={styles.orderStatus}>
+                {/* <Text style={styles.orderStatus}>
                   Status: <Text style={styles.statusText}>{order.orderStatus}</Text>
-                </Text>
+                </Text> */}
                 <Text style={styles.paymentMethod}>
                   Payment: <Text style={styles.paymentMethodText}>
                     {(order.paymentInfo?.paymentMethod === 'online' ||

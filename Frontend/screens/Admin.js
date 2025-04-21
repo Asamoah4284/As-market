@@ -19,6 +19,9 @@ import CompletedOrders from './CompletedOrders';
 import { useSelector } from 'react-redux';
 import NotificationCenter from '../components/NotificationCenter';
 import NotificationBadge from '../components/NotificationBadge';
+import { registerForPushNotificationsAsync } from '../services/notificationService';
+import axios from 'axios';
+import { API_BASE_URL } from '../config/api';
 // Ignore specific SVG-related warnings
 LogBox.ignoreLogs([
   'Invariant Violation: Tried to register two views with the same name RNSVGFeFlood',
@@ -67,6 +70,36 @@ const Admin = () => {
   useEffect(() => {
     // Fetch admin dashboard data
     fetchDashboardData();
+  }, []);
+
+  useEffect(() => {
+    const registerAdminPushToken = async () => {
+      try {
+        console.log('Registering admin push token...');
+        const token = await registerForPushNotificationsAsync();
+        
+        if (token) {
+          console.log('Registering admin token with backend:', token.substring(0, 10) + '...');
+          
+          // Use the admin token endpoint that doesn't require auth
+          const response = await axios.post(
+            `${API_BASE_URL}/api/notifications/admin-token`,
+            {
+              pushToken: token,
+              adminKey: 'asarion_admin_key'
+            }
+          );
+          
+          console.log('Admin token registration response:', response.data);
+        } else {
+          console.error('Failed to get push token for admin');
+        }
+      } catch (error) {
+        console.error('Error registering admin push token:', error.message);
+      }
+    };
+    
+    registerAdminPushToken();
   }, []);
 
   const fetchDashboardData = async () => {
@@ -552,6 +585,7 @@ const Admin = () => {
         visible={showNotifications} 
         onClose={() => setShowNotifications(false)} 
         navigation={navigation}
+        isAdmin={true}
       />
     </SafeAreaView>
   );

@@ -8,6 +8,14 @@ const initialState = {
   error: null,
 };
 
+// Helper function to generate unique IDs with a counter to ensure uniqueness
+let notificationCounter = 0;
+const generateUniqueId = () => {
+  const timestamp = Date.now();
+  notificationCounter++;
+  return `${timestamp}-${notificationCounter}`;
+};
+
 const notificationSlice = createSlice({
   name: 'notifications',
   initialState,
@@ -26,7 +34,7 @@ const notificationSlice = createSlice({
     },
     addNotification: (state, action) => {
       state.notifications.unshift({
-        id: Date.now().toString(),
+        id: action.payload.id || generateUniqueId(),
         timestamp: new Date().toISOString(),
         read: false,
         ...action.payload,

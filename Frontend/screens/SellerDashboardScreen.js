@@ -22,11 +22,12 @@ import * as ImagePicker from 'expo-image-picker';
 import * as FileSystem from 'expo-file-system';
 import { LinearGradient } from 'expo-linear-gradient';
 import { handleNewProductNotification } from '../services/notificationService';
+import { API_BASE_URL } from '../config/api';
 
 const SellerDashboardScreen = () => {
   const navigation = useNavigation();
-  const colors = {
-    primary: '#4361EE',
+  const theme = {
+    primary: '#5D3FD3',
     primaryDark: '#3730A3',
     secondary: '#6c757d',
     success: '#2EC4B6',
@@ -40,9 +41,6 @@ const SellerDashboardScreen = () => {
     border: '#E2E8F0',
     highlight: '#F0F4FF',
   };
-
-  const API_URL = 'https://unimarket-ikin.onrender.com';
-  const API_BASE_URL = 'https://unimarket-ikin.onrender.com';
 
   const [activeTab, setActiveTab] = useState('products');
   const [products, setProducts] = useState([]);
@@ -222,7 +220,7 @@ const SellerDashboardScreen = () => {
       setLoading(true);
       const token = await AsyncStorage.getItem('userToken');
       
-      const requestUrl = `${API_URL}/api/products/seller`;
+      const requestUrl = `${API_BASE_URL}/api/products/seller`;
       const headers = {
         'Authorization': `Bearer ${token}`,
         'Accept': 'application/json'
@@ -264,7 +262,7 @@ const SellerDashboardScreen = () => {
         return [];
       }
 
-      const response = await fetch(`${API_URL}/api/orders/seller`, {
+      const response = await fetch(`${API_BASE_URL}/api/orders/seller`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -299,7 +297,7 @@ const SellerDashboardScreen = () => {
       const token = await AsyncStorage.getItem('userToken');
     
       
-      const response = await fetch(`${API_URL}/api/seller/profile`, {
+      const response = await fetch(`${API_BASE_URL}/api/seller/profile`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json'
@@ -398,7 +396,7 @@ const SellerDashboardScreen = () => {
   const handleDeleteProduct = async (productId) => {
     try {
       const token = await AsyncStorage.getItem('userToken'); // Changed from 'token' to 'userToken'
-      const response = await fetch(`${API_URL}/api/products/${productId}`, {
+      const response = await fetch(`${API_BASE_URL}/api/products/${productId}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -466,7 +464,7 @@ const SellerDashboardScreen = () => {
       };
       
       // Use the same base URL as fetch products
-      const baseUrl = `${API_URL}`;
+      const baseUrl = `${API_BASE_URL}`;
       const url = isEditing 
         ? `${baseUrl}/api/products/${currentProductId}`
         : `${baseUrl}/api/products`;
@@ -522,7 +520,7 @@ const SellerDashboardScreen = () => {
         return;
       }
 
-      const response = await fetch(`${API_URL}/api/orders/${orderId}/status`, {
+      const response = await fetch(`${API_BASE_URL}/api/orders/${orderId}/status`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -567,7 +565,7 @@ const SellerDashboardScreen = () => {
   const renderProductItem = ({ item }) => {
     console.log(item);
     return (
-      <View style={[styles.card, { backgroundColor: colors.cardBackground }]}>
+      <View style={[styles.card, { backgroundColor: theme.cardBackground }]}>
         <View style={styles.productImageContainer}>
           <Image source={{ uri: item.image }} style={styles.productImage} />
           <View style={styles.productBadge}>
@@ -599,25 +597,25 @@ const SellerDashboardScreen = () => {
           )}
         </View>
         <View style={styles.productInfo}>
-          <Text style={[styles.productName, { color: colors.text }]}>{item.name}</Text>
+          <Text style={[styles.productName, { color: theme.text }]}>{item.name}</Text>
           <View style={styles.productMetrics}>
             <View style={styles.metricItem}>
-              <Text style={[styles.metricValue, { color: colors.primary }]}>GH₵{item.price.toFixed(2)}</Text>
-              <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>Price</Text>
+              <Text style={[styles.metricValue, { color: theme.primary }]}>GH₵{item.price.toFixed(2)}</Text>
+              <Text style={[styles.metricLabel, { color: theme.textSecondary }]}>Price</Text>
             </View>
             <View style={styles.metricDivider} />
             <View style={styles.metricItem}>
-              <Text style={[styles.metricValue, { color: colors.text }]}>
+              <Text style={[styles.metricValue, { color: theme.text }]}>
                 {item.isService ? 'Yes' : item.stock}
               </Text>
-              <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
+              <Text style={[styles.metricLabel, { color: theme.textSecondary }]}>
                 {item.isService ? 'Availability' : 'In Stock'}
               </Text>
             </View>
             <View style={styles.metricDivider} />
             <View style={styles.metricItem}>
-              <Text style={[styles.metricValue, { color: colors.success }]}>{item.sales || 0}</Text>
-              <Text style={[styles.metricLabel, { color: colors.textSecondary }]}>
+              <Text style={[styles.metricValue, { color: theme.success }]}>{item.sales || 0}</Text>
+              <Text style={[styles.metricLabel, { color: theme.textSecondary }]}>
                 {item.isService ? 'Bookings' : 'Sold'}
               </Text>
             </View>
@@ -630,7 +628,7 @@ const SellerDashboardScreen = () => {
                   key={star}
                   name={star <= Math.floor(item.rating || 0) ? "star" : star <= (item.rating || 0) ? "star-half-o" : "star-o"} 
                   size={14} 
-                  color={colors.warning} 
+                  color={theme.warning} 
                   style={styles.starIcon}
                 />
               ))}
@@ -640,7 +638,7 @@ const SellerDashboardScreen = () => {
         <View style={styles.productActions}>
           {/* Only allow editing if product is not approved yet */}
           <TouchableOpacity 
-            style={[styles.actionButton, styles.editButton, { backgroundColor: colors.highlight }]}
+            style={[styles.actionButton, styles.editButton, { backgroundColor: theme.highlight }]}
             onPress={() => handleEditProduct(item)}
             disabled={item.status === 'approved'}
           >
@@ -1157,9 +1155,9 @@ const SellerDashboardScreen = () => {
       };
       
       console.log('Request headers:', headers);
-      console.log('Request URL:', `${API_URL}/api/seller/profile`);
+      console.log('Request URL:', `${API_BASE_URL}/api/seller/profile`);
       
-      const response = await fetch(`${API_URL}/api/seller/profile`, {
+      const response = await fetch(`${API_BASE_URL}/api/seller/profile`, {
         method: 'PUT',
         headers: headers,
         body: JSON.stringify({
@@ -1264,7 +1262,7 @@ const SellerDashboardScreen = () => {
         name: 'profile-image.jpg',
       });
       
-      const response = await fetch(`${API_URL}/api/users/profile/avatar`, {
+      const response = await fetch(`${API_BASE_URL}/api/users/profile/avatar`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -1304,7 +1302,7 @@ const SellerDashboardScreen = () => {
       navigation.navigate('PremiumUpgrade');
       
       // Alternatively, you could implement the premium upgrade flow directly here
-      // const response = await fetch(`${API_URL}/api/users/premium-upgrade`, {
+      // const response = await fetch(`${API_BASE_URL}/api/users/premium-upgrade`, {
       //   method: 'POST',
       //   headers: {
       //     'Authorization': `Bearer ${token}`,

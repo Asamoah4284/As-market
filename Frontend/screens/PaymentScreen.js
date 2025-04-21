@@ -231,14 +231,7 @@ const PaymentScreen = ({ navigation, route }) => {
       console.log('Order placed notification sent:', notificationId);
       
       // Add notification to Redux store
-      dispatch(addNotification({
-        title: 'Order Placed',
-        body: `Your pay-on-delivery order #${orderNumber} has been placed successfully.`,
-        data: { 
-          type: 'ORDER_PLACED',
-          orderId: orderResult._id
-        }
-      }));
+    
       
       // Clear cart after successful order creation
       dispatch(clearCart());
@@ -250,7 +243,7 @@ const PaymentScreen = ({ navigation, route }) => {
           name: 'PaymentSuccess',
           params: {
             orderNumber: orderNumber,
-            amount: amount/100,
+            amount: amount,
             orderId: orderResult._id,
             isPOD: true
           }
@@ -312,7 +305,7 @@ const PaymentScreen = ({ navigation, route }) => {
       
       const notificationId2 = await handlePaymentSuccessfulNotification(
         orderNumber,
-        `Thank you for your purchase! Your payment of GHS ${amount/100} has been confirmed.`
+        `Thank you for your purchase! Your payment of GHS ${amount} has been confirmed.`
       );
       console.log('Payment successful notification sent:', notificationId2);
       
@@ -328,11 +321,11 @@ const PaymentScreen = ({ navigation, route }) => {
       
       dispatch(addNotification({
         title: 'Payment Successful',
-        body: `Your payment of GHS ${amount/100} for order #${orderNumber} has been confirmed.`,
+        body: `Your payment of GHS ${amount} for order #${orderNumber} has been confirmed.`,
         data: { 
           type: 'PAYMENT_SUCCESSFUL',
           orderId: orderResult._id,
-          amount: amount/100
+          amount: amount
         }
       }));
       
@@ -344,7 +337,7 @@ const PaymentScreen = ({ navigation, route }) => {
           name: 'PaymentSuccess',
           params: {
             orderNumber: orderNumber,
-            amount: amount/100,
+            amount: amount,
             orderId: orderResult._id
           }
         }],
@@ -468,7 +461,7 @@ const PaymentScreen = ({ navigation, route }) => {
       <ScrollView style={styles.container}>
         <View style={styles.paymentMethodContainer}>
           <Text style={styles.pageTitle}>Choose Payment Method</Text>
-          <Text style={styles.amountText}>Total: GHS {(amount/100).toFixed(2)}</Text>
+          <Text style={styles.amountText}>Total: GHS {(amount).toFixed(2)}</Text>
           
           <TouchableOpacity 
             style={styles.paymentOption}

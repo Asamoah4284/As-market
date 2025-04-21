@@ -18,7 +18,7 @@ const PaymentSuccessScreen = ({ navigation, route }) => {
       : "Thank you for your purchase. Your order has been successfully placed and will be processed shortly."
   );
   const orderNumber = route.params?.orderNumber || Math.floor(100000 + Math.random() * 900000);
-  const amount = route.params?.amount || 0;
+  const amount = (route.params?.amount || 0) ;
 
   // Prevent going back with hardware back button
   useEffect(() => {
@@ -138,12 +138,11 @@ const PaymentSuccessScreen = ({ navigation, route }) => {
         </View>
 
         <View style={styles.infoContainer}>
-          <Ionicons name="mail-outline" size={24} color="#666" style={styles.infoIcon} />
+          <Ionicons name="call-outline" size={24} color="#666" style={styles.infoIcon} />
           <Text style={styles.infoText}>
-            A confirmation email will be sent to your registered email address.
+           For any delivery concerns, please call our support line at +233 542343069.
           </Text>
         </View>
-
         {isPOD && (
           <View style={styles.infoContainer}>
             <Ionicons name="cash-outline" size={24} color="#666" style={styles.infoIcon} />

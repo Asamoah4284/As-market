@@ -14,6 +14,7 @@ import {
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
+import { API_BASE_URL } from '../config/api';
 
 const CategoryScreen = ({ route, navigation }) => {
   // Add default values to prevent undefined errors
@@ -31,14 +32,14 @@ const CategoryScreen = ({ route, navigation }) => {
   useEffect(() => {
     const fetchProducts = async () => {
       try {
-        let endpoint = 'http://172.20.10.3:5000/api/products';
+        let endpoint = `${API_BASE_URL}/api/products`;
         
         if (featuredOnly) {
           // Featured products endpoint
-          endpoint = 'http://172.20.10.3:5000/api/products/featured';
+          endpoint = `${API_BASE_URL}/api/products/featured`;
         } else if (categoryId !== '1' && !isNaN(parseInt(categoryId))) {
           // If categoryId is a valid numeric ID, use category specific endpoint
-          endpoint = `http://172.20.10.3:5000/api/products/category/${categoryId}`;
+          endpoint = `${API_BASE_URL}/api/products/category/${categoryId}`;
         }
         
         console.log('Fetching products from:', endpoint);
@@ -99,7 +100,7 @@ const CategoryScreen = ({ route, navigation }) => {
     // Handle proper image path
     const imageUri = item.image && (item.image.startsWith('http') 
       ? item.image 
-      : `http://172.20.10.3:5000${item.image}`);
+      : `${API_BASE_URL}${item.image}`);
     
     // Determine if the product is on sale (example condition)
     const isOnSale = item.discountPercentage && item.discountPercentage > 0;

@@ -14,15 +14,22 @@ import {
 } from 'react-native';
 import { useSelector, useDispatch } from 'react-redux';
 import { Ionicons } from '@expo/vector-icons';
-import { markNotificationAsRead, markAllNotificationsAsRead, clearNotifications } from '../store/slices/notificationSlice';
-import { NotificationTypes } from '../services/notificationService';
+import { markNotificationAsRead, markAllNotificationsAsRead, clearNotifications, setNotifications } from '../store/slices/notificationSlice';
+import { NotificationTypes, fetchNotifications, markNotificationAsReadOnServer, markAllNotificationsAsReadOnServer } from '../services/notificationService';
 
 const { width, height } = Dimensions.get('window');
 
-const NotificationCenter = ({ visible, onClose, navigation }) => {
+const NotificationCenter = ({ visible, onClose, navigation, isAdmin = false }) => {
   const dispatch = useDispatch();
   const { notifications } = useSelector((state) => state.notifications);
   const [fadeAnim] = useState(new Animated.Value(0));
+  
+  // Filter notifications based on admin status
+  const filteredNotifications = isAdmin ? 
+    notifications.filter(notification => 
+      notification.data?.type === NotificationTypes.ADMIN_PAYMENT_RECEIVED
+    ) : 
+    notifications;
   
   useEffect(() => {
     if (visible) {
@@ -58,9 +65,8 @@ const NotificationCenter = ({ visible, onClose, navigation }) => {
         }
         break;
       case NotificationTypes.ADMIN_PAYMENT_RECEIVED:
-        if (Platform.OS === 'android') {
-          navigation.navigate('Admin', { screen: 'Orders' });
-        }
+        // Navigate to Orders section in Admin dashboard
+        navigation.navigate('Admin', { section: 'orders', filter: 'All Orders' });
         break;
       default:
         break;
@@ -147,7 +153,7 @@ const NotificationCenter = ({ visible, onClose, navigation }) => {
             </TouchableOpacity>
           </View>
           
-          {notifications.length > 0 ? (
+          {filteredNotifications.length > 0 ? (
             <>
               <View style={styles.actions}>
                 <TouchableOpacity style={styles.actionButton} onPress={handleMarkAllAsRead}>
@@ -159,7 +165,7 @@ const NotificationCenter = ({ visible, onClose, navigation }) => {
               </View>
               
               <FlatList
-                data={notifications}
+                data={filteredNotifications}
                 renderItem={renderNotification}
                 keyExtractor={(item) => item.id}
                 contentContainerStyle={styles.notificationList}

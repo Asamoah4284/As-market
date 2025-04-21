@@ -44,6 +44,10 @@ const userSchema = new mongoose.Schema({
     enum: ['buyer', 'seller', 'admin'], 
     required: true 
   },
+  pushToken: {
+    type: String,
+    default: null
+  },
   createdAt: { 
     type: Date, 
     default: Date.now 

@@ -27,8 +27,7 @@ import { fetchProductById } from '../store/slices/productSlice';
 import * as Location from 'expo-location';
 import { handleAddToCartNotification } from '../services/notificationService';
 import { requireAuthentication } from '../App';
-
-const API_URL = 'https://unimarket-ikin.onrender.com';
+import { API_BASE_URL } from '../config/api';
 
 const ProductDetailsScreen = () => {
   const navigation = useNavigation();
@@ -206,7 +205,7 @@ const ProductDetailsScreen = () => {
       console.log("Fetching similar products for category:", currentProduct.category);
       
       // Use the original API endpoint format
-      const apiUrl = API_URL.startsWith('http') ? API_URL : `http://${API_URL}`;
+      const apiUrl = API_BASE_URL.startsWith('http') ? API_BASE_URL : `http://${API_BASE_URL}`;
       const response = await fetch(`${apiUrl}/api/products`);
       
       if (!response.ok) {
@@ -242,7 +241,7 @@ const ProductDetailsScreen = () => {
       console.log("Fetching comments for product:", productId);
       
       // Use the consistent API URL pattern that works
-      const apiUrl = API_URL.startsWith('http') ? API_URL : `http://${API_URL}`;
+      const apiUrl = API_BASE_URL.startsWith('http') ? API_BASE_URL : `http://${API_BASE_URL}`;
       const response = await fetch(
         `${apiUrl}/api/products/${productId}/comments`
       );
@@ -267,19 +266,19 @@ const ProductDetailsScreen = () => {
 
   // Add function to submit a new comment
   const handleSubmitComment = async () => {
-    if (!newComment.trim()) return;
-
     // Check if user is authenticated
-    if (!requireAuthentication(navigation, 'post a comment')) {
+    if (!(await requireAuthentication(navigation, 'post a comment'))) {
       return;
     }
+
+    if (!newComment.trim()) return;
 
     try {
       setSubmittingComment(true);
       const token = await AsyncStorage.getItem("userToken");
       
       // Use the consistent API URL pattern
-      const apiUrl = API_URL.startsWith('http') ? API_URL : `http://${API_URL}`;
+      const apiUrl = API_BASE_URL.startsWith('http') ? API_BASE_URL : `http://${API_BASE_URL}`;
       const response = await fetch(
         `${apiUrl}/api/products/${productId}/comments`,
         {
@@ -315,7 +314,7 @@ const ProductDetailsScreen = () => {
 
   const handleAddToCart = async () => {
     // Check if user is authenticated
-    if (!requireAuthentication(navigation, 'add items to cart')) {
+    if (!(await requireAuthentication(navigation, 'add items to cart'))) {
       return;
     }
 
@@ -324,7 +323,7 @@ const ProductDetailsScreen = () => {
       
       // Add a local loading state for the button
       // Use the consistent API URL pattern
-      const apiUrl = API_URL.startsWith('http') ? API_URL : `http://${API_URL}`;
+      const apiUrl = API_BASE_URL.startsWith('http') ? API_BASE_URL : `http://${API_BASE_URL}`;
       const response = await fetch(`${apiUrl}/api/cart/add`, {
         method: "POST",
         headers: {
@@ -381,9 +380,9 @@ const ProductDetailsScreen = () => {
   };
 
   // Add function to handle contact seller
-  const handleContactSeller = () => {
+  const handleContactSeller = async () => {
     // Check if user is authenticated
-    if (!requireAuthentication(navigation, 'contact the seller')) {
+    if (!(await requireAuthentication(navigation, 'contact the seller'))) {
       return;
     }
     

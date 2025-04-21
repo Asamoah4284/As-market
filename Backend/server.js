@@ -10,6 +10,7 @@ const categoryRoutes = require('./routes/categoryRoutes');
 const sellerRoutes = require('./routes/sellerRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const orderRoutes = require('./routes/orderRoutes');
+const notificationRoutes = require('./routes/notificationRoutes');
 const mongoose = require('mongoose');
 
 dotenv.config();
@@ -38,6 +39,7 @@ app.use('/api/categories', categoryRoutes);
 app.use('/api/seller', sellerRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/orders', orderRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 app.get('/api/test', async (req, res) => {
   try {

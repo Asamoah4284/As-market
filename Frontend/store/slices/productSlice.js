@@ -1,9 +1,8 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_BASE_URL } from '../../config/api';
 
 const CACHE_EXPIRY = 5 * 60 * 1000; // 5 minutes in milliseconds
-const API_URL = 'https://unimarket-ikin.onrender.com';
-
 
 export const fetchProducts = createAsyncThunk(
   'products/fetchProducts',
@@ -21,7 +20,7 @@ export const fetchProducts = createAsyncThunk(
       }
 
       // Fetch fresh data if cache is expired or doesn't exist
-      const response = await fetch(`${API_URL}/api/products`, {
+      const response = await fetch(`${API_BASE_URL}/api/products`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json'
@@ -64,7 +63,7 @@ export const fetchProductById = createAsyncThunk(
       }
 
       // Fetch fresh data if cache is expired or doesn't exist
-      const response = await fetch(`${API_URL}/api/products/${productId}`);
+      const response = await fetch(`${API_BASE_URL}/api/products/${productId}`);
       
       if (!response.ok) {
         throw new Error('Failed to fetch product details');

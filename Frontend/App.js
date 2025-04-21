@@ -53,9 +53,14 @@ export const checkOnboardingStatus = async () => {
 };
 
 // Function to prompt login if user is not authenticated
-export const requireAuthentication = (navigation, actionType) => {
+export const requireAuthentication = async (navigation, actionType) => {
   // Get authentication status from store or AsyncStorage
-  const token = store.getState().auth?.token;
+  let token = store.getState().auth?.token;
+  
+  // If token isn't in Redux state, check AsyncStorage
+  if (!token) {
+    token = await AsyncStorage.getItem('userToken');
+  }
   
   if (!token) {
     Alert.alert(

@@ -4,6 +4,8 @@ import Constants from 'expo-constants';
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { addNotification } from '../store/slices/notificationSlice';
+import axios from 'axios';
+import { API_BASE_URL } from '../config/api';
 
 // Configure notifications
 Notifications.setNotificationHandler({
@@ -75,6 +77,25 @@ export async function registerForPushNotificationsAsync() {
         if (token) {
           await AsyncStorage.setItem('pushToken', token.data);
           console.log('Token saved to AsyncStorage');
+          
+          // Send token to backend if user is logged in
+          const authToken = await AsyncStorage.getItem('userToken');
+          if (authToken) {
+            try {
+              await axios.post(
+                `${API_BASE_URL}/api/notifications/token`,
+                { pushToken: token.data },
+                {
+                  headers: {
+                    Authorization: `Bearer ${authToken}`,
+                  },
+                }
+              );
+              console.log('Push token saved to backend');
+            } catch (error) {
+              console.error('Error saving push token to backend:', error);
+            }
+          }
         }
       } catch (tokenError) {
         console.error('Error getting push token:', tokenError);
@@ -95,13 +116,16 @@ export async function sendLocalNotification(title, body, data = {}) {
   try {
     console.log('Attempting to send notification:', { title, body, data });
     
-    // For Android, ensure notification channel is set
+    // For Android, ensure notification channel is set with highest priority
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync('default', {
         name: 'Default Channel',
-        importance: Notifications.AndroidImportance.HIGH,
+        importance: Notifications.AndroidImportance.MAX, // Maximum importance
         vibrationPattern: [0, 250, 250, 250],
-        lightColor: '#FF4757',
+        lightColor: '#5D3FD3',
+        sound: true,
+        enableLights: true,
+        enableVibrate: true,
       });
     }
     
@@ -122,8 +146,8 @@ export async function sendLocalNotification(title, body, data = {}) {
         title,
         body,
         data,
-        sound: true,
-        priority: 'high',
+        sound: 'default',
+        priority: 'max',
         vibrate: [0, 250, 250, 250],
         badge: 1,
         color: '#5D3FD3',
@@ -169,19 +193,39 @@ export const NotificationTypes = {
 };
 
 // Create notification handlers for different types
+// Add debounce tracking to prevent duplicate notifications
+let lastNotificationTimestamp = 0;
+const NOTIFICATION_DEBOUNCE_TIME = 2000; // 2 seconds
+
 export const handleAddToCartNotification = async (productName, dispatch) => {
   try {
+    // Check if notification was recently sent
+    const now = Date.now();
+    if (now - lastNotificationTimestamp < NOTIFICATION_DEBOUNCE_TIME) {
+      console.log('Notification debounced - recent notification exists');
+      return false;
+    }
+    
+    // Update timestamp
+    lastNotificationTimestamp = now;
+    
+    // Generate a unique notification ID
+    const uniqueId = `${now}-${Math.floor(Math.random() * 10000)}`;
+    
+    // Explicitly send a local notification for add to cart actions
+    // This ensures the user always sees a notification
     const notificationId = await sendLocalNotification(
       'Item Added to Cart',
       `You've added ${productName} to your cart.`,
       { type: NotificationTypes.ADD_TO_CART }
     );
     
-    // If dispatch is provided, also update Redux store directly
-    // This ensures the notification appears in the UI immediately
+    // If dispatch is provided, only update Redux store
+    // Don't add another notification to the store since the system will
+    // already capture the local notification we just sent
     if (dispatch) {
       dispatch(addNotification({
-        id: notificationId || Date.now().toString(),
+        id: uniqueId,
         title: 'Item Added to Cart',
         body: `You've added ${productName} to your cart.`,
         data: { type: NotificationTypes.ADD_TO_CART },
@@ -205,14 +249,27 @@ export const handleOrderPlacedNotification = (orderNumber) => {
   );
 };
 
-export const handlePaymentSuccessfulNotification = (orderNumber, customMessage = null) => {
-  const defaultMessage = `Your payment for order #${orderNumber} has been processed successfully.`;
+export const handlePaymentSuccessfulNotification = (orderNumber, customMessage = null, isPayOnDelivery = false) => {
+  let defaultMessage;
+  let title;
+  
+  if (isPayOnDelivery) {
+    title = 'Pay on Delivery Order';
+    defaultMessage = `Your order #${orderNumber} has been confirmed. Payment will be collected upon delivery.`;
+  } else {
+    title = 'Order Confirmation';
+    defaultMessage = `Your payment for order #${orderNumber} has been processed successfully.`;
+  }
+  
   const message = customMessage || defaultMessage;
   
   return sendLocalNotification(
-    'Order Confirmation',
+    title,
     message,
-    { type: NotificationTypes.PAYMENT_SUCCESSFUL }
+    { 
+      type: NotificationTypes.PAYMENT_SUCCESSFUL,
+      isPayOnDelivery: isPayOnDelivery 
+    }
   );
 };
 
@@ -224,12 +281,163 @@ export const handleNewProductNotification = (productName, sellerName) => {
   );
 };
 
-export const handleAdminPaymentReceivedNotification = (orderNumber, amount, customTitle = null) => {
+export const handleAdminPaymentReceivedNotification = async (orderNumber, amount, customTitle = null) => {
   const title = customTitle || 'Payment Received';
+  const body = `Payment of GHS${amount} received for order #${orderNumber}`;
   
-  return sendLocalNotification(
-    title,
-    `Payment of $${amount} received for order #${orderNumber}`,
-    { type: NotificationTypes.ADMIN_PAYMENT_RECEIVED }
-  );
-}; 
+  try {
+    // First, try to create a notification via the backend API's public endpoint
+    console.log('Attempting to send admin notification through public endpoint');
+    
+    try {
+      console.log('Sending admin notification to API with data:', { 
+        recipient: 'admin', 
+        title, 
+        body, 
+        type: NotificationTypes.ADMIN_PAYMENT_RECEIVED 
+      });
+      
+      // Use the public endpoint that doesn't require authorization
+      const response = await axios.post(
+        `${API_BASE_URL}/api/notifications/admin-notification`,
+        {
+          recipient: 'admin',
+          title,
+          body,
+          type: NotificationTypes.ADMIN_PAYMENT_RECEIVED,
+          data: { orderNumber, amount }
+        }
+      );
+      console.log('Admin notification created via public API, response:', response.status);
+      return true;
+    } catch (error) {
+      console.error('Error creating admin notification via public API:', error.message);
+      if (error.response) {
+        console.error('API Error response data:', error.response.data);
+        console.error('API Error response status:', error.response.status);
+      } else if (error.request) {
+        console.error('No response received:', error.request);
+      }
+      
+      // Try with authentication as fallback
+      console.log('Trying with authenticated endpoint as fallback');
+      const authToken = await AsyncStorage.getItem('userToken');
+      
+      if (authToken) {
+        try {
+          const response = await axios.post(
+            `${API_BASE_URL}/api/notifications`,
+            {
+              recipient: 'admin',
+              title,
+              body,
+              type: NotificationTypes.ADMIN_PAYMENT_RECEIVED,
+              data: { orderNumber, amount }
+            },
+            {
+              headers: {
+                Authorization: `Bearer ${authToken}`,
+              },
+            }
+          );
+          console.log('Admin notification created via authenticated API, response:', response.status);
+          return true;
+        } catch (error) {
+          console.error('Error creating admin notification via authenticated API:', error.message);
+          // If API call fails, fall back to local notification
+        }
+      }
+    }
+    
+    // Fallback: send a local notification
+    console.log('Falling back to local notification for admin');
+    return sendLocalNotification(
+      title,
+      body,
+      { type: NotificationTypes.ADMIN_PAYMENT_RECEIVED, orderNumber, amount }
+    );
+  } catch (error) {
+    console.error('Error in handleAdminPaymentReceivedNotification:', error.message, error.stack);
+    return false;
+  }
+};
+
+// Fetch notifications from backend
+export async function fetchNotifications(recipient = 'user') {
+  try {
+    const authToken = await AsyncStorage.getItem('userToken');
+    
+    if (!authToken) {
+      console.log('No auth token found, cannot fetch notifications');
+      return [];
+    }
+    
+    const response = await axios.get(
+      `${API_BASE_URL}/api/notifications/${recipient}`,
+      {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      }
+    );
+    
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching notifications:', error);
+    return [];
+  }
+}
+
+// Mark notification as read on backend
+export async function markNotificationAsReadOnServer(notificationId) {
+  try {
+    const authToken = await AsyncStorage.getItem('userToken');
+    
+    if (!authToken) {
+      console.log('No auth token found, cannot mark notification as read');
+      return false;
+    }
+    
+    await axios.put(
+      `${API_BASE_URL}/api/notifications/${notificationId}/read`,
+      {},
+      {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      }
+    );
+    
+    return true;
+  } catch (error) {
+    console.error('Error marking notification as read:', error);
+    return false;
+  }
+}
+
+// Mark all notifications as read on backend
+export async function markAllNotificationsAsReadOnServer(recipient = 'user') {
+  try {
+    const authToken = await AsyncStorage.getItem('userToken');
+    
+    if (!authToken) {
+      console.log('No auth token found, cannot mark all notifications as read');
+      return false;
+    }
+    
+    await axios.put(
+      `${API_BASE_URL}/api/notifications/${recipient}/read-all`,
+      {},
+      {
+        headers: {
+          Authorization: `Bearer ${authToken}`,
+        },
+      }
+    );
+    
+    return true;
+  } catch (error) {
+    console.error('Error marking all notifications as read:', error);
+    return false;
+  }
+} 

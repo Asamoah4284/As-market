@@ -309,7 +309,7 @@ const BuyerHomeScreen = () => {
   // Function to toggle favorite status
   const toggleFavorite = async (productId) => {
     // Check if user is authenticated
-    if (!requireAuthentication(navigation, 'add to favorites')) {
+    if (!(await requireAuthentication(navigation, 'add to favorites'))) {
       return;
     }
     
@@ -341,7 +341,7 @@ const BuyerHomeScreen = () => {
 
   const handleAddToCart = async (product) => {
     // Check if user is authenticated
-    if (!requireAuthentication(navigation, 'add items to cart')) {
+    if (!(await requireAuthentication(navigation, 'add items to cart'))) {
       return;
     }
     

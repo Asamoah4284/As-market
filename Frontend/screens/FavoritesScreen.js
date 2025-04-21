@@ -15,6 +15,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import { API_BASE_URL } from '../config/api';
 
 const FavoritesScreen = () => {
   const [favorites, setFavorites] = useState([]);
@@ -66,7 +67,7 @@ const FavoritesScreen = () => {
       }
 
       // Fetch product details for each favorite ID
-      const response = await fetch('http://172.20.10.3:5000/api/products');
+      const response = await fetch(`${API_BASE_URL}/api/products`);
       if (response.ok) {
         const allProducts = await response.json();
         // Filter products to only include favorites
@@ -107,7 +108,7 @@ const FavoritesScreen = () => {
   const renderFavoriteItem = ({ item }) => {
     const imageUri = item.image && (item.image.startsWith('http') 
       ? item.image 
-      : `http://172.20.10.3:5000${item.image}`);
+      : `${API_BASE_URL}${item.image}`);
 
     return (
       <TouchableOpacity 

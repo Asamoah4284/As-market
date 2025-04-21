@@ -16,10 +16,12 @@
       "supportsTablet": true
     },
     "android": {
+      "icon": "./assets/icon.png",
       "adaptiveIcon": {
-        "foregroundImage": "./assets/adaptive-icon.png",
+        "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#FFFFFF"
-      }
+      },
+      "package": "com.asarion.marketplace"
     },
     "web": {
       "favicon": "./assets/favicon.png"
@@ -28,7 +30,8 @@
     "extra": {
       "eas": {
         "projectId": "987ca341-92d7-4d38-be41-f41cc65182c3"
-      }
+      },
+      "API_URL": "http://172.20.10.3:5000"
     }
   }
 }

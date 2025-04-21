@@ -1,6 +1,10 @@
 // API Configuration
-export const API_BASE_URL = 'https://unimarket-ikin.onrender.com'; // Replace with your actual backend URL
+import Constants from 'expo-constants';
 
+// Get the API URL from environment variables, with a fallback
+const API_URL = Constants.expoConfig?.extra?.API_URL || 'http://172.20.10.3:5000';
+
+export const API_BASE_URL = API_URL;
 export const API_ENDPOINTS = {
   // Auth endpoints
   LOGIN: `${API_BASE_URL}/api/users/login`,

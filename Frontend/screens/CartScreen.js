@@ -25,9 +25,7 @@ import {
 } from '../store/slices/cartSlice';
 import PaystackPayment from '../components/PaystackPayment';
 import { handleAddToCartNotification, sendLocalNotification } from '../services/notificationService';
-
-
-const API_URL = 'https://unimarket-ikin.onrender.com';
+import { API_BASE_URL } from '../config/api';
 
 const CartScreen = ({ navigation }) => {
   const dispatch = useDispatch();
@@ -117,7 +115,7 @@ const CartScreen = ({ navigation }) => {
         return;
       }
 
-      const response = await axios.get(`${API_URL}/api/cart`, {
+      const response = await axios.get(`${API_BASE_URL}/api/cart`, {
         headers: {
           Authorization: `Bearer ${token}`,
         },
@@ -159,7 +157,7 @@ const CartScreen = ({ navigation }) => {
         )
       ));
 
-      const response = await axios.put(`${API_URL}/api/cart/${productId}`, {
+      const response = await axios.put(`${API_BASE_URL}/api/cart/${productId}`, {
         quantity: newQuantity,
       }, {
         headers: {
@@ -202,7 +200,7 @@ const CartScreen = ({ navigation }) => {
               // Remove optimistically
               dispatch(setCartItems(cartItems.filter(item => item.productId !== productId)));
 
-                const response = await axios.delete(`${API_URL}/api/cart/${productId}`, {
+                const response = await axios.delete(`${API_BASE_URL}/api/cart/${productId}`, {
                 headers: {
                   Authorization: `Bearer ${token}`,
                 },
@@ -301,7 +299,7 @@ const CartScreen = ({ navigation }) => {
       console.log('Creating order with reference:', paymentReference);
       
       // Send payment details to your backend
-      const orderResponse = await axios.post(`${API_URL}/api/orders`, {
+      const orderResponse = await axios.post(`${API_BASE_URL}/api/orders`, {
         paymentReference: paymentReference,
         items: cartItems,
         totalAmount: calculateFinalTotal(),
@@ -315,7 +313,7 @@ const CartScreen = ({ navigation }) => {
 
       if (orderResponse.status === 201) {
         // Clear cart on backend
-        await axios.delete(`${API_URL}/api/cart`, {
+        await axios.delete(`${API_BASE_URL}/api/cart`, {
           headers: {
             Authorization: `Bearer ${token}`,
           },
@@ -394,7 +392,7 @@ const CartScreen = ({ navigation }) => {
         // Handle pay on delivery option
         try {
           // Create order with payment status 'pending'
-          const orderResponse = await axios.post(`${API_URL}/api/orders`, {
+          const orderResponse = await axios.post(`${API_BASE_URL}/api/orders`, {
             paymentReference: 'POD-' + Date.now(), // Create a unique reference for pay on delivery
             items: cartItems,
             totalAmount: calculateFinalTotal(),
@@ -409,7 +407,7 @@ const CartScreen = ({ navigation }) => {
 
           if (orderResponse.status === 201) {
             // Clear cart on backend
-            await axios.delete(`${API_URL}/api/cart`, {
+            await axios.delete(`${API_BASE_URL}/api/cart`, {
               headers: {
                 Authorization: `Bearer ${token}`,
               },
