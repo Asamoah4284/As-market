@@ -1,0 +1,2807 @@
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  FlatList,
+  Image,
+  SafeAreaView,
+  ActivityIndicator,
+  Modal,
+  TextInput,
+  ScrollView,
+  Picker,
+  Switch,
+  Alert,
+} from 'react-native';
+import { MaterialIcons, FontAwesome, Ionicons } from '@expo/vector-icons';
+import { useNavigation } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system';
+import { LinearGradient } from 'expo-linear-gradient';
+import { handleNewProductNotification } from '../services/notificationService';
+import { API_BASE_URL } from '../config/api';
+
+const SellerDashboardScreen = () => {
+  const navigation = useNavigation();
+  const theme = {
+    primary: '#5D3FD3',
+    primaryDark: '#3730A3',
+    secondary: '#6c757d',
+    success: '#2EC4B6',
+    danger: '#E63946',
+    warning: '#FF9F1C',
+    background: '#F8FAFC',
+    cardBackground: '#ffffff',
+    text: '#1A1B25',
+    textSecondary: '#64748B',
+    inputBackground: '#f1f3f5',
+    border: '#E2E8F0',
+    highlight: '#F0F4FF',
+  };
+
+  const [activeTab, setActiveTab] = useState('products');
+  const [products, setProducts] = useState([]);
+  const [pendingProducts, setPendingProducts] = useState([]);
+  const [orders, setOrders] = useState([]);
+  const [chats, setChats] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [productForm, setProductForm] = useState({
+    name: '',
+    price: '',
+    description: '',
+    category: '',
+    stock: '',
+    image: 'https://via.placeholder.com/150',
+    additionalImages: [],
+    isService: false,
+    status: 'pending' // Add default status as pending
+  });
+  const [isEditing, setIsEditing] = useState(false);
+  const [currentProductId, setCurrentProductId] = useState(null);
+  const [errorMessage, setErrorMessage] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
+  const [showStatusGuide, setShowStatusGuide] = useState(true);
+  const [categories, setCategories] = useState({
+    PRODUCTS: {
+      CLOTHING_FASHION: 'Clothing & Fashion',
+      ELECTRONICS: 'Electronics & Gadgets',
+      SCHOOL_SUPPLIES: 'School Supplies',
+      FOOD_DRINKS: 'Food & Drinks',
+      BEAUTY_SKINCARE: 'Beauty & Skincare',
+      HEALTH_FITNESS: 'Health & Fitness',
+      FURNITURE_HOME: 'Furniture & Home Items',
+      EVENT_TICKETS: 'Event Tickets & Merchandise'
+    },
+    SERVICES: {
+      HOSTEL_AGENTS: 'Hostel Agents',
+      ASSIGNMENT_HELP: 'Assignment Assistance',
+      GRAPHIC_DESIGN: 'Graphic Design',
+      PHOTO_VIDEO: 'Photography & Videography',
+      LAUNDRY: 'Laundry Services',
+      BARBER_HAIR: 'Barbering & Hairdressing',
+      MC_DJ: 'MCs & DJs for Events',
+      TUTORING: 'Tutoring & Lessons',
+      FREELANCE_WRITING: 'Freelance Writing',
+      TECH_SUPPORT: 'Tech Support'
+    }
+  });
+  const [profileData, setProfileData] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    bio: '',
+    location: '',
+    joinDate: '',
+    totalSales: 0,
+    rating: 0,
+    avatar: null
+  });
+  const [profileModalVisible, setProfileModalVisible] = useState(false);
+  const [profileForm, setProfileForm] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    bio: '',
+    location: '',
+    avatar: null
+  });
+
+  const isTokenExpired = (token) => {
+    try {
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(function(c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+
+      const { exp } = JSON.parse(jsonPayload);
+      const expired = Date.now() >= exp * 1000;
+      
+      console.log('Token expiration:', new Date(exp * 1000));
+      console.log('Token expired:', expired);
+      
+      return expired;
+    } catch (error) {
+      console.error('Error checking token expiration:', error);
+      return true; // Assume expired if we can't verify
+    }
+  };
+
+  // Add this check before making API calls
+  useEffect(() => {
+    const checkAuthStatus = async () => {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        if (!token) {
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'Login' }],
+          });
+          return;
+        }
+
+        if (isTokenExpired(token)) {
+          console.log('Token is expired, logging out...');
+          await AsyncStorage.removeItem('userToken');
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'Login' }],
+          });
+        }
+      } catch (error) {
+        console.error('Error checking auth status:', error);
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Login' }],
+        });
+      }
+    };
+    
+    checkAuthStatus();
+  }, []);
+
+  useEffect(() => {
+    fetchData();
+    fetchProfileData();
+  }, []);
+
+  // Add timer to hide status guide after 30 seconds
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setShowStatusGuide(false);
+    }, 30000); // 30 seconds
+
+    return () => clearTimeout(timer);
+  }, []);
+
+  // Add useEffect for orders
+  useEffect(() => {
+    if (activeTab === 'orders') {
+      fetchOrders();
+    }
+  }, [activeTab]);
+
+  const fetchOrders = async () => {
+    try {
+      setLoading(true);
+      const fetchedOrders = await mockFetchOrders();
+      console.log('Fetched orders:', fetchedOrders);
+      setOrders(fetchedOrders);
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      Alert.alert('Error', 'Failed to fetch orders');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchData = async () => {
+    try {
+      setLoading(true);
+      await Promise.all([
+        fetchProducts(),
+        fetchProfileData(),
+        fetchOrders() // Add orders to initial fetch
+      ]);
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      Alert.alert('Error', 'Failed to fetch data');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchProducts = async () => {
+    try {
+      setLoading(true);
+      const token = await AsyncStorage.getItem('userToken');
+      
+      const requestUrl = `${API_BASE_URL}/api/products/seller`;
+      const headers = {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/json'
+      };
+      
+      const response = await fetch(requestUrl, {
+        method: 'GET',
+        headers: headers
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => null);
+        throw new Error(errorData?.message || `HTTP error! status: ${response.status}`);
+      }
+      
+      const data = await response.json();
+
+      // Ensure each product has a sales count
+      const productsWithSales = data.map(product => ({
+        ...product,
+        sales: product.sales || 0
+      }));
+
+      setProducts(productsWithSales);
+    } catch (error) {
+      console.error('Detailed fetch error:', error);
+      setProducts([]);
+      setErrorMessage(`Failed to fetch products: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const mockFetchOrders = async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        console.log('No token found');
+        return [];
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/orders/seller`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      console.log('Fetched orders:', data);
+      return data;
+    } catch (error) {
+      console.error('Error fetching orders:', error);
+      return [];
+    }
+  };
+
+  const mockFetchChats = () => {
+    return Promise.resolve([
+      { id: '1', customer: 'John Doe', lastMessage: 'Is this product still available?', timestamp: '10:30 AM', unread: 2 },
+      { id: '2', customer: 'Jane Smith', lastMessage: 'Thanks for the quick delivery!', timestamp: 'Yesterday', unread: 0 },
+      { id: '3', customer: 'Bob Johnson', lastMessage: 'When will my order ship?', timestamp: 'May 13', unread: 1 },
+    ]);
+  };
+
+  const fetchProfileData = async () => {
+    try {
+      setLoading(true);
+      const token = await AsyncStorage.getItem('userToken');
+    
+      
+      const response = await fetch(`${API_BASE_URL}/api/seller/profile`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Accept': 'application/json'
+        }
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fetch profile data');
+      }
+      
+      const data = await response.json();
+      setProfileData(data);
+    } catch (error) {
+      // console.error('Error fetching profile data:', error); 
+      // Use mock data as fallback
+      setProfileData({
+        name: 'John Seller',
+        email: 'john.seller@example.com',
+        phone: '+233 XX XXX XXXX',
+        bio: 'Passionate seller offering quality products to the campus community.',
+        location: 'Campus Area',
+        joinDate: 'May 2023',
+        totalSales: 152,
+        rating: 4.8,
+        avatar: null,
+        followers: 87,
+        isPremium: false
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAddProduct = () => {
+    setErrorMessage('');
+    setSuccessMessage('');
+    setIsEditing(false);
+    setProductForm({
+      name: '',
+      price: '',
+      description: '',
+      category: '',
+      stock: '',
+      image: 'https://via.placeholder.com/150',
+      additionalImages: [],
+      isService: false,
+      status: 'pending' // Add default status as pending
+    });
+    setModalVisible(true);
+  };
+
+  const handleEditProduct = (product) => {
+    // Prevent editing approved products
+    if (product.status === 'approved') {
+      Alert.alert(
+        'Cannot Edit Approved Product',
+        'This product has been approved and is live on the marketplace. To make changes, you would need to create a new product.',
+        [{ text: 'OK', style: 'default' }]
+      );
+      return;
+    }
+
+    // For rejected products, show rejection reason in an alert first
+    if (product.status === 'rejected' && product.rejectionReason) {
+      Alert.alert(
+        'Product Rejected',
+        `Your product was rejected for the following reason:\n\n${product.rejectionReason}\n\nYou can edit and resubmit your product.`,
+        [{ text: 'Edit Product', style: 'default', onPress: () => proceedToEdit(product) }]
+      );
+      return;
+    }
+
+    // If not rejected or no rejection reason, proceed to edit directly
+    proceedToEdit(product);
+  };
+
+  // Helper function to set up the edit form
+  const proceedToEdit = (product) => {
+    setIsEditing(true);
+    setCurrentProductId(product._id);
+    setProductForm({
+      name: product.name,
+      price: product.price.toString(),
+      description: product.description,
+      category: product.category,
+      stock: product.stock.toString(),
+      image: product.image,
+      additionalImages: product.additionalImages || [],
+      isService: product.isService || false,
+      rejectionReason: product.rejectionReason || null // Store rejection reason if it exists
+    });
+    setModalVisible(true);
+  };
+
+  const handleDeleteProduct = async (productId) => {
+    try {
+      const token = await AsyncStorage.getItem('userToken'); // Changed from 'token' to 'userToken'
+      const response = await fetch(`${API_BASE_URL}/api/products/${productId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error('Failed to delete product');
+      }
+      
+      // Update local state after successful deletion
+      setProducts(products.filter(product => product._id !== productId));
+      setSuccessMessage('Product deleted successfully');
+    } catch (error) {
+      console.error('Error deleting product:', error);
+      setErrorMessage('Failed to delete product');
+      // Fallback to local state update if API call fails - use _id instead of id
+      setProducts(products.filter(product => product._id !== productId));
+    }
+  };
+
+  const handleSaveProduct = async () => {
+    try {
+      setErrorMessage('');
+      setSuccessMessage('');
+      setLoading(true);
+      
+      // Validate form inputs
+      if (!productForm.name || !productForm.price || !productForm.description || !productForm.category) {
+        setErrorMessage('Please fill in all required fields');
+        setLoading(false);
+        return;
+      }
+      
+      // Validate image
+      if (!productForm.image) {
+        setErrorMessage('Please select a main product image');
+        setLoading(false);
+        return;
+      }
+      
+      // For services, stock might not be required
+      if (!productForm.isService && !productForm.stock) {
+        setErrorMessage('Please enter stock quantity for product');
+        setLoading(false);
+        return;
+      }
+      
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        // throw new Error('Authentication required');
+      }
+      
+      const productData = {
+        name: productForm.name.trim(),
+        description: productForm.description.trim(),
+        price: parseFloat(productForm.price),
+        category: productForm.category,
+        stock: productForm.isService ? 1 : parseInt(productForm.stock),
+        image: productForm.image,
+        additionalImages: productForm.additionalImages.filter(img => img),
+        isService: productForm.isService,
+        status: 'pending', // Always set status to pending for new/edited products
+        rejectionReason: null // Clear any previous rejection reason
+      };
+      
+      // Use the same base URL as fetch products
+      const baseUrl = `${API_BASE_URL}`;
+      const url = isEditing 
+        ? `${baseUrl}/api/products/${currentProductId}`
+        : `${baseUrl}/api/products`;
+      
+      const method = isEditing ? 'PUT' : 'POST';
+      
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(productData)
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to save product');
+      }
+      
+      const savedProduct = await response.json();
+      
+      // Send notification for new product (not for edits)
+      if (!isEditing) {
+        // Get seller name from profile data
+        const sellerName = profileData.name || 'A seller';
+        handleNewProductNotification(productData.name, sellerName);
+      }
+      
+      setSuccessMessage(isEditing 
+        ? 'Product updated successfully! It will be reviewed by admin.' 
+        : 'Product added successfully! It will be reviewed by admin.'
+      );
+      
+      // Close modal after delay to allow user to see success message
+      setTimeout(() => {
+        setModalVisible(false);
+        fetchProducts(); // Refresh the products list
+      }, 1500);
+      
+    } catch (error) {
+      setErrorMessage(error.message || 'Something went wrong, please try again');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUpdateOrderStatus = async (orderId, newStatus) => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        Alert.alert('Error', 'Authentication required');
+        return;
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/orders/${orderId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update order status');
+      }
+
+      // If the order is being marked as completed, update the product sales count
+      if (newStatus === 'completed') {
+        const order = orders.find(o => o._id === orderId);
+        if (order) {
+          // Update the products state with new sales count
+          setProducts(prevProducts => {
+            return prevProducts.map(product => {
+              const orderItem = order.items.find(item => item.product._id === product._id);
+              if (orderItem) {
+                return {
+                  ...product,
+                  sales: (product.sales || 0) + orderItem.quantity
+                };
+              }
+              return product;
+            });
+          });
+        }
+      }
+
+      // Refresh orders after successful update
+      await fetchOrders();
+      Alert.alert('Success', 'Order status updated successfully');
+    } catch (error) {
+      console.error('Error updating order status:', error);
+      Alert.alert('Error', 'Failed to update order status. Please try again later.');
+    }
+  };
+
+  const renderProductItem = ({ item }) => {
+    console.log(item);
+    return (
+      <View style={[styles.card, { backgroundColor: theme.cardBackground }]}>
+        <View style={styles.productImageContainer}>
+          <Image source={{ uri: item.image }} style={styles.productImage} />
+          <View style={styles.productBadge}>
+            <Text style={styles.productBadgeText}>{item.category}</Text>
+          </View>
+          
+          {/* Display appropriate badge based on product status */}
+          {item.status === 'pending' && (
+            <View style={styles.pendingBadge}>
+              <Text style={styles.pendingText}>Pending Approval</Text>
+            </View>
+          )}
+          {item.status === 'approved' && (
+            <View style={styles.approvedBadge}>
+              <Text style={styles.approvedText}>Approved</Text>
+            </View>
+          )}
+          {item.status === 'rejected' && (
+            <View style={styles.rejectedBadge}>
+              <Text style={styles.rejectedText}>Rejected (Click Edit)</Text>
+            </View>
+          )}
+          
+          {/* Only show low stock badge for approved products */}
+          {item.stock < 5 && item.status === 'approved' && !item.isService && (
+            <View style={styles.lowStockBadge}>
+              <Text style={styles.lowStockText}>Low Stock</Text>
+            </View>
+          )}
+        </View>
+        <View style={styles.productInfo}>
+          <Text style={[styles.productName, { color: theme.text }]}>{item.name}</Text>
+          <View style={styles.productMetrics}>
+            <View style={styles.metricItem}>
+              <Text style={[styles.metricValue, { color: theme.primary }]}>GH₵{item.price.toFixed(2)}</Text>
+              <Text style={[styles.metricLabel, { color: theme.textSecondary }]}>Price</Text>
+            </View>
+            <View style={styles.metricDivider} />
+            <View style={styles.metricItem}>
+              <Text style={[styles.metricValue, { color: theme.text }]}>
+                {item.isService ? 'Yes' : item.stock}
+              </Text>
+              <Text style={[styles.metricLabel, { color: theme.textSecondary }]}>
+                {item.isService ? 'Availability' : 'In Stock'}
+              </Text>
+            </View>
+            <View style={styles.metricDivider} />
+            <View style={styles.metricItem}>
+              <Text style={[styles.metricValue, { color: theme.success }]}>{item.sales || 0}</Text>
+              <Text style={[styles.metricLabel, { color: theme.textSecondary }]}>
+                {item.isService ? 'Bookings' : 'Sold'}
+              </Text>
+            </View>
+          </View>
+          <View style={styles.ratingContainer}>
+            <Text style={styles.ratingText}>{item.rating || 0}</Text>
+            <View style={styles.starsContainer}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <FontAwesome 
+                  key={star}
+                  name={star <= Math.floor(item.rating || 0) ? "star" : star <= (item.rating || 0) ? "star-half-o" : "star-o"} 
+                  size={14} 
+                  color={theme.warning} 
+                  style={styles.starIcon}
+                />
+              ))}
+            </View>
+          </View>
+        </View>
+        <View style={styles.productActions}>
+          {/* Only allow editing if product is not approved yet */}
+          <TouchableOpacity 
+            style={[styles.actionButton, styles.editButton, { backgroundColor: theme.highlight }]}
+            onPress={() => handleEditProduct(item)}
+            disabled={item.status === 'approved'}
+          >
+            <MaterialIcons 
+              name="edit" 
+              size={18} 
+              color={item.status === 'approved' ? theme.textSecondary : theme.primary} 
+            />
+            <Text style={[styles.actionButtonText, { color: item.status === 'approved' ? theme.textSecondary : theme.primary }]}>
+              {item.status === 'approved' 
+                ? 'Approved' 
+                : (item.status === 'rejected' ? 'View Reason' : 'Edit')}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={[styles.actionButton, styles.deleteButton, { backgroundColor: theme.danger + '15' }]}
+            onPress={() => handleDeleteProduct(item._id)}
+          >
+            <MaterialIcons name="delete" size={18} color={theme.danger} />
+            <Text style={[styles.actionButtonText, { color: theme.danger }]}>Delete</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
+
+  const renderOrderItem = ({ item }) => {
+    if (!item) return null;
+
+    return (
+      <View style={styles.orderCard}>
+        <View style={styles.orderHeader}>
+          <Text style={styles.orderId}>Order #{item._id?.slice(-6) || 'N/A'}</Text>
+          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.orderStatus || 'pending') }]}>
+            <Text style={styles.statusText}>{item.orderStatus || 'Pending'}</Text>
+          </View>
+        </View>
+        
+        <View style={styles.orderDetails}>
+          <Text style={styles.customerName}>Customer: {item.user?.name || 'Unknown'}</Text>
+          <Text style={styles.orderDate}>Date: {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'N/A'}</Text>
+          <Text style={styles.orderTotal}>Total: GH₵{item.totalAmount?.toFixed(2) || '0.00'}</Text>
+        </View>
+
+        <View style={styles.orderItems}>
+          {(item.items || []).map((orderItem, index) => (
+            <View key={index} style={styles.orderItem}>
+              <Image 
+                source={{ uri: orderItem.product?.image || 'https://via.placeholder.com/50' }} 
+                style={styles.orderItemImage} 
+              />
+              <View style={styles.orderItemDetails}>
+                <Text style={styles.orderItemName}>{orderItem.product?.name || 'Unknown Product'}</Text>
+                <Text style={styles.orderItemPrice}>GH₵{orderItem.price?.toFixed(2) || '0.00'} x {orderItem.quantity || 1}</Text>
+              </View>
+            </View>
+          ))}
+        </View>
+
+        <View style={styles.orderActions}>
+          <TouchableOpacity 
+            style={[styles.actionButton, styles.viewButton]}
+            onPress={() => navigation.navigate('OrderDetails', { orderId: item._id })}
+          >
+            <Text style={styles.actionButtonText}>View Details</Text>
+          </TouchableOpacity>
+          
+          {(item.orderStatus === 'pending' || !item.orderStatus) && (
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.acceptButton]}
+              onPress={() => handleUpdateOrderStatus(item._id, 'processing')}
+            >
+              <Text style={styles.actionButtonText}>Accept Order</Text>
+            </TouchableOpacity>
+          )}
+          
+          {item.orderStatus === 'processing' && (
+            <TouchableOpacity 
+              style={[styles.actionButton, styles.completeButton]}
+              onPress={() => handleUpdateOrderStatus(item._id, 'completed')}
+            >
+              <Text style={styles.actionButtonText}>Mark as Completed</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+    );
+  };
+
+  const renderChatItem = ({ item }) => (
+    <TouchableOpacity 
+      style={[styles.chatCard, { backgroundColor: theme.cardBackground }]}
+      onPress={() => navigation.navigate('Chat', { chatId: item.id, customer: item.customer })}
+    >
+      <View style={[styles.chatAvatar, { backgroundColor: item.unread > 0 ? theme.primary : theme.secondary }]}>
+        <Text style={styles.chatAvatarText}>{item.customer.charAt(0)}</Text>
+        {item.unread > 0 && (
+          <View style={styles.unreadBadge}>
+            <Text style={styles.unreadBadgeText}>{item.unread}</Text>
+          </View>
+        )}
+      </View>
+      <View style={styles.chatInfo}>
+        <View style={styles.chatHeader}>
+          <Text style={[styles.chatCustomer, { color: theme.text }]}>{item.customer}</Text>
+          <Text style={[styles.chatTimestamp, { color: theme.textSecondary }]}>{item.timestamp}</Text>
+        </View>
+        <Text 
+          style={[styles.chatMessage, { color: item.unread > 0 ? theme.text : theme.textSecondary }]}
+          numberOfLines={1}
+        >
+          {item.lastMessage}
+        </Text>
+      </View>
+      <MaterialIcons 
+        name="chevron-right" 
+        size={24} 
+        color={theme.textSecondary} 
+        style={styles.chatArrow}
+      />
+    </TouchableOpacity>
+  );
+
+  const getStatusColor = (status) => {
+    switch (status) {
+      case 'Pending':
+        return { bg: '#FFF3CD', text: '#856404' };
+      case 'Shipped':
+        return { bg: '#D1ECF1', text: '#0C5460' };
+      case 'Delivered':
+        return { bg: '#D4EDDA', text: '#155724' };
+      default:
+        return { bg: '#F8F9FA', text: '#212529' };
+    }
+  };
+
+  const renderTabContent = () => {
+    switch (activeTab) {
+      case 'orders':
+        return (
+          <View style={styles.tabContent}>
+            {orders.length === 0 ? (
+              <View style={styles.emptyState}>
+                <MaterialIcons name="receipt" size={64} color={theme.textSecondary} />
+                <Text style={[styles.emptyStateText, { color: theme.textSecondary }]}>
+                  No orders yet
+                </Text>
+                <Text style={[styles.emptyStateSubText, { color: theme.textSecondary }]}>
+                  When customers purchase your products, their orders will appear here.
+                </Text>
+                <Text style={[styles.emptyStateSubText, { color: theme.textSecondary }]}>
+                  Make sure your products are visible and well-priced to attract buyers.
+                </Text>
+              </View>
+            ) : (
+              <FlatList
+                data={orders}
+                renderItem={renderOrderItem}
+                keyExtractor={(item) => item._id}
+                contentContainerStyle={styles.listContent}
+                ListEmptyComponent={() => (
+                  <View style={styles.emptyState}>
+                    <MaterialIcons name="receipt" size={64} color={theme.textSecondary} />
+                    <Text style={[styles.emptyStateText, { color: theme.textSecondary }]}>
+                      No orders found
+                    </Text>
+                  </View>
+                )}
+              />
+            )}
+          </View>
+        );
+      case 'profile':
+        return (
+          <ScrollView style={styles.profileContainer}>
+            <View style={[styles.profileHeader, { backgroundColor: theme.cardBackground }]}>
+              <View style={styles.profileCover}>
+                <LinearGradient
+                  colors={[theme.primary, theme.primaryDark]}
+                  style={styles.coverGradient}
+                />
+              </View>
+              
+              <View style={styles.profileAvatarSection}>
+                <TouchableOpacity style={styles.avatarContainer}>
+                  {profileData.avatar ? (
+                    <Image 
+                      source={{ uri: profileData.avatar }} 
+                      style={styles.avatarImage} 
+                    />
+                  ) : (
+                    <View style={[styles.avatarPlaceholder, { backgroundColor: theme.primary }]}>
+                      <Text style={styles.avatarText}>
+                        {profileData.name.charAt(0)}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={styles.editAvatarButton}>
+                    <MaterialIcons name="camera-alt" size={16} color="white" />
+                  </View>
+                </TouchableOpacity>
+                
+                {!profileData.isPremium && (
+                  <TouchableOpacity 
+                    style={styles.premiumBadge}
+                    onPress={handlePremiumUpgrade}
+                  >
+                    <MaterialIcons name="workspace-premium" size={16} color={theme.warning} />
+                    <Text style={styles.premiumBadgeText}>Become a Premium Seller</Text>
+                  </TouchableOpacity>
+                )}
+                
+                {profileData.isPremium && (
+                  <View style={styles.premiumSellerBadge}>
+                    <MaterialIcons name="verified" size={16} color="white" />
+                    <Text style={styles.premiumSellerText}>Premium Seller</Text>
+                  </View>
+                )}
+              </View>
+              
+              <View style={styles.profileInfo}>
+                <Text style={[styles.profileName, { color: theme.text }]}>
+                  {profileData.name}
+                </Text>
+                <Text style={[styles.profileEmail, { color: theme.textSecondary }]}>
+                  {profileData.email}
+                </Text>
+                
+                <View style={styles.joinDateContainer}>
+                  <MaterialIcons name="event" size={14} color={theme.textSecondary} />
+                  <Text style={[styles.joinDateText, { color: theme.textSecondary }]}>
+                    Joined {profileData.joinDate}
+                  </Text>
+                </View>
+              </View>
+              
+              <View style={styles.statsContainer}>
+                <View style={styles.statItem}>
+                  <Text style={[styles.statValue, { color: theme.primary }]}>
+                    {profileData.totalSales}
+                  </Text>
+                  <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
+                    Sales
+                  </Text>
+                </View>
+                
+                <View style={styles.statDivider} />
+                
+                <View style={styles.statItem}>
+                  <View style={styles.ratingValue}>
+                    <Text style={[styles.statValue, { color: theme.warning }]}>
+                      {profileData.rating}
+                    </Text>
+                    <MaterialIcons name="star" size={16} color={theme.warning} />
+                  </View>
+                  <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
+                    Rating
+                  </Text>
+                </View>
+                
+                <View style={styles.statDivider} />
+                
+                <View style={styles.statItem}>
+                  <Text style={[styles.statValue, { color: theme.text }]}>
+                    {profileData.followers}
+                  </Text>
+                  <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
+                    Followers
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            <View style={styles.profileContent}>
+              <View style={[styles.profileSection, { backgroundColor: theme.cardBackground }]}>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                  Contact Information
+                </Text>
+                <View style={styles.infoItem}>
+                  <MaterialIcons name="phone" size={20} color={theme.primary} />
+                  <Text style={[styles.infoText, { color: theme.text }]}>
+                    {profileData.phone}
+                  </Text>
+                </View>
+                <View style={styles.infoItem}>
+                  <MaterialIcons name="location-on" size={20} color={theme.primary} />
+                  <Text style={[styles.infoText, { color: theme.text }]}>
+                    {profileData.location}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={[styles.profileSection, { backgroundColor: theme.cardBackground }]}>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                  About Me
+                </Text>
+                <Text style={[styles.bioText, { color: theme.text }]}>
+                  {profileData.bio}
+                </Text>
+              </View>
+              
+              {!profileData.isPremium && (
+                <TouchableOpacity 
+                  style={[styles.premiumButton, { backgroundColor: theme.warning }]}
+                  onPress={handlePremiumUpgrade}
+                >
+                  <MaterialIcons name="workspace-premium" size={20} color="white" />
+                  <Text style={styles.premiumButtonText}>Become a Premium Seller</Text>
+                </TouchableOpacity>
+              )}
+
+              <TouchableOpacity 
+                style={[styles.editProfileButton, { backgroundColor: theme.primary }]}
+                onPress={handleEditProfile}
+              >
+                <MaterialIcons name="edit" size={20} color="white" />
+                <Text style={styles.editProfileText}>Edit Profile</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity 
+                style={[styles.logoutButton, { backgroundColor: theme.danger }]}
+                onPress={handleLogout}
+              >
+                <MaterialIcons name="logout" size={20} color="white" />
+                <Text style={styles.logoutButtonText}>Logout</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        );
+      default:
+        return (
+          <>
+            <View style={styles.tabHeader}>
+              <Text style={[styles.tabTitle, { color: theme.text }]}>My Products</Text>
+              <TouchableOpacity 
+                style={[styles.addButton, { backgroundColor: theme.primary }]}
+                onPress={handleAddProduct}
+              >
+                <Text style={styles.addButtonText}>Add Product</Text>
+                <MaterialIcons name="add" size={18} color="white" />
+              </TouchableOpacity>
+            </View>
+            
+            {/* Status info section */}
+            {showStatusGuide && (
+              <View style={[styles.statusInfoContainer, { 
+                backgroundColor: theme.cardBackground,
+                borderLeftColor: theme.primary 
+              }]}>
+                <Text style={[styles.statusInfoTitle, { color: theme.text }]}>Product Status Guide:</Text>
+                <View style={styles.statusRow}>
+                  <View style={[styles.statusDot, { backgroundColor: 'rgba(255, 159, 28, 0.9)' }]} />
+                  <Text style={[styles.statusText, { color: theme.textSecondary }]}>
+                    <Text style={[styles.statusBold, { color: theme.text }]}>Pending:</Text> Your product is awaiting admin approval.
+                  </Text>
+                </View>
+                <View style={styles.statusRow}>
+                  <View style={[styles.statusDot, { backgroundColor: 'rgba(46, 196, 182, 0.9)' }]} />
+                  <Text style={[styles.statusText, { color: theme.textSecondary }]}>
+                    <Text style={[styles.statusBold, { color: theme.text }]}>Approved:</Text> Product is live on the marketplace.
+                  </Text>
+                </View>
+                <View style={styles.statusRow}>
+                  <View style={[styles.statusDot, { backgroundColor: 'rgba(230, 57, 70, 0.9)' }]} />
+                  <Text style={[styles.statusText, { color: theme.textSecondary }]}>
+                    <Text style={[styles.statusBold, { color: theme.text }]}>Rejected:</Text> Product didn't meet marketplace requirements.
+                  </Text>
+                </View>
+              </View>
+            )}
+            
+            {products.length === 0 ? (
+              <View style={styles.emptyState}>
+                <MaterialIcons name="inventory" size={64} color={theme.textSecondary} />
+                <Text style={[styles.emptyStateText, { color: theme.textSecondary }]}>
+                  Welcome! Start by adding your first product.
+                </Text>
+                <Text style={[styles.emptyStateSubText, { color: theme.textSecondary }]}>
+                  All products will be reviewed by an admin before appearing in the marketplace.
+                </Text>
+                <TouchableOpacity 
+                  style={[styles.emptyStateButton, { backgroundColor: theme.primary }]}
+                  onPress={handleAddProduct}
+                >
+                  <Text style={styles.emptyStateButtonText}>Add New Product</Text>
+                  <MaterialIcons name="add" size={18} color="white" />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <FlatList
+                data={products}
+                renderItem={renderProductItem}
+                keyExtractor={item => item._id || item.id}
+                contentContainerStyle={styles.listContainer}
+              />
+            )}
+          </>
+        );
+    }
+  };
+
+  // Add this to your modal to display error/success messages
+  const renderMessages = () => (
+    <>
+      {errorMessage ? (
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>{errorMessage}</Text>
+        </View>
+      ) : null}
+      
+      {successMessage ? (
+        <View style={styles.successContainer}>
+          <Text style={styles.successText}>{successMessage}</Text>
+        </View>
+      ) : null}
+    </>
+  );
+
+  // Add this new component for the horizontal category selector
+  const CategorySelector = ({ categories, selectedCategory, onSelect, type }) => (
+    <ScrollView 
+      horizontal 
+      showsHorizontalScrollIndicator={false}
+      style={styles.categoryScrollView}
+    >
+      {Object.values(categories[type]).map((category, index) => (
+        <TouchableOpacity
+          key={`${type}-${index}`}
+          style={[
+            styles.categoryItem,
+            selectedCategory === category && styles.categoryItemSelected
+          ]}
+          onPress={() => onSelect(category)}
+        >
+          <Text style={[
+            styles.categoryItemText,
+            selectedCategory === category && styles.categoryItemTextSelected
+          ]}>
+            {category}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  );
+
+  const pickImage = async (isMain, index) => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        alert('Sorry, we need camera roll permissions to make this work!');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [4, 3],
+        quality: 0.5,
+        base64: true,
+      });
+
+      if (!result.canceled) {
+        const asset = result.assets[0];
+        const base64Image = `data:image/jpeg;base64,${asset.base64}`;
+        
+        if (isMain) {
+          setProductForm({ ...productForm, image: base64Image });
+        } else {
+          const newImages = [...productForm.additionalImages];
+          newImages[index] = base64Image;
+          setProductForm({ ...productForm, additionalImages: newImages });
+        }
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      alert('Error selecting image. Please try again.');
+    }
+  };
+
+  const handleEditProfile = () => {
+    // Initialize form with current profile data
+    setProfileForm({
+      name: profileData.name,
+      email: profileData.email,
+      phone: profileData.phone,
+      bio: profileData.bio,
+      location: profileData.location,
+      avatar: profileData.avatar
+    });
+    setProfileModalVisible(true);
+  };
+
+  const handleSaveProfile = async () => {
+    try {
+      setLoading(true);
+      setErrorMessage('');
+      setSuccessMessage('');
+      
+      const token = await AsyncStorage.getItem('userToken');
+      console.log('Token from storage:', token ? 'Token exists' : 'No token');
+      
+      if (!token) {
+        // throw new Error('Authentication required');
+      }
+
+      // Validate form inputs
+      if (!profileForm.name || !profileForm.email || !profileForm.phone) {
+        setErrorMessage('Please fill in all required fields');
+        setLoading(false);
+        return;
+      }
+
+      // Ensure token is properly formatted
+      const headers = {
+        'Authorization': `Bearer ${token.trim()}`, // Add trim() to remove any whitespace
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      };
+      
+      console.log('Request headers:', headers);
+      console.log('Request URL:', `${API_BASE_URL}/api/seller/profile`);
+      
+      const response = await fetch(`${API_BASE_URL}/api/seller/profile`, {
+        method: 'PUT',
+        headers: headers,
+        body: JSON.stringify({
+          name: profileForm.name.trim(),
+          email: profileForm.email.trim(),
+          phone: profileForm.phone.trim(),
+          bio: profileForm.bio ? profileForm.bio.trim() : '',
+          location: profileForm.location ? profileForm.location.trim() : '',
+          avatar: profileForm.avatar
+        })
+      });
+
+      // Log the response status and headers for debugging
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.log('Error response:', errorData);
+        
+        // Check if token is expired
+        if (response.status === 401) {
+          // Clear stored token and redirect to login
+          await AsyncStorage.removeItem('userToken');
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'Login' }],
+          });
+          throw new Error('Session expired. Please login again.');
+        }
+        
+        throw new Error(errorData.message || 'Failed to update profile');
+      }
+
+      const updatedProfile = await response.json();
+      console.log('Server response:', updatedProfile);
+      
+      setProfileData(updatedProfile);
+      setSuccessMessage('Profile updated successfully');
+      
+      setTimeout(() => {
+        setProfileModalVisible(false);
+        setSuccessMessage('');
+      }, 1500);
+      
+    } catch (error) {
+      console.error('Error updating profile:', error);
+      setErrorMessage(error.message || 'Failed to update profile');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const pickProfileImage = async () => {
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        alert('Sorry, we need camera roll permissions to make this work!');
+        return;
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.5,
+        base64: true,
+      });
+
+      if (!result.canceled) {
+        const asset = result.assets[0];
+        const base64Image = `data:image/jpeg;base64,${asset.base64}`;
+        
+        // Option 1: Store the base64 image to send with the profile update
+        setProfileForm({ ...profileForm, avatar: base64Image });
+        
+        // Option 2: Upload the image immediately to get a URL
+        // This is useful if your API doesn't accept base64 images
+        // await uploadProfileImage(asset);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      alert('Error selecting image. Please try again.');
+    }
+  };
+
+  // Optional: Separate function to upload profile image
+  const uploadProfileImage = async (imageAsset) => {
+    try {
+      setLoading(true);
+      const token = await AsyncStorage.getItem('userToken');
+      
+      if (!token) {
+        // throw new Error('Authentication required');
+      }
+      
+      // Create form data for the image upload
+      const formData = new FormData();
+      formData.append('avatar', {
+        uri: imageAsset.uri,
+        type: 'image/jpeg',
+        name: 'profile-image.jpg',
+      });
+      
+      const response = await fetch(`${API_BASE_URL}/api/users/profile/avatar`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'multipart/form-data',
+        },
+        body: formData,
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to upload image');
+      }
+      
+      const data = await response.json();
+      
+      // Update the form with the image URL returned from the server
+      setProfileForm({ ...profileForm, avatar: data.avatarUrl });
+      
+    } catch (error) {
+      console.error('Error uploading profile image:', error);
+      alert('Failed to upload image. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Add a function to handle premium upgrade
+  const handlePremiumUpgrade = async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      
+      if (!token) {
+        // throw new Error('Authentication required');
+      }
+      
+      // Navigate to premium upgrade screen or show payment modal
+      navigation.navigate('PremiumUpgrade');
+      
+      // Alternatively, you could implement the premium upgrade flow directly here
+      // const response = await fetch(`${API_BASE_URL}/api/users/premium-upgrade`, {
+      //   method: 'POST',
+      //   headers: {
+      //     'Authorization': `Bearer ${token}`,
+      //     'Content-Type': 'application/json',
+      //   },
+      // });
+      
+      // if (!response.ok) {
+      //   const errorData = await response.json();
+      //   throw new Error(errorData.message || 'Failed to upgrade to premium');
+      // }
+      
+      // const data = await response.json();
+      // setProfileData({ ...profileData, isPremium: true });
+      // alert('Successfully upgraded to Premium Seller!');
+      
+    } catch (error) {
+      console.error('Error upgrading to premium:', error);
+      alert('Failed to upgrade to premium. Please try again.');
+    }
+  };
+
+  // Add a logout function
+  const handleLogout = async () => {
+    try {
+      // Clear all auth-related storage
+      await AsyncStorage.multiRemove(['userToken', 'userId', 'userRole']);
+      
+      // Navigate to login screen
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Login' }],
+      });
+    } catch (error) {
+      console.error('Error during logout:', error);
+      // Force navigation even if storage clear fails
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Login' }],
+      });
+    }
+  };
+
+  return (
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={[styles.header, { backgroundColor: theme.primary }]}>
+        <Text style={styles.headerTitle}>Seller Dashboard</Text>
+        <TouchableOpacity style={styles.headerButton}>
+          <MaterialIcons name="notifications" size={24} color="white" />
+        </TouchableOpacity>
+      </View>
+      
+      <View style={styles.content}>
+        {renderTabContent()}
+      </View>
+      
+      <View style={[styles.tabBar, { backgroundColor: theme.cardBackground }]}>
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'products' && styles.activeTab]}
+          onPress={() => setActiveTab('products')}
+        >
+          <MaterialIcons 
+            name="inventory" 
+            size={24} 
+            color={activeTab === 'products' ? theme.primary : theme.textSecondary} 
+          />
+          <Text style={[styles.tabText, { color: activeTab === 'products' ? theme.primary : theme.textSecondary }]}>
+            Products
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'orders' && styles.activeTab]}
+          onPress={() => setActiveTab('orders')}
+        >
+          <MaterialIcons 
+            name="shopping-bag" 
+            size={24} 
+            color={activeTab === 'orders' ? theme.primary : theme.textSecondary} 
+          />
+          <Text style={[styles.tabText, { color: activeTab === 'orders' ? theme.primary : theme.textSecondary }]}>
+            Orders
+          </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={[styles.tab, activeTab === 'profile' && styles.activeTab]}
+          onPress={() => setActiveTab('profile')}
+        >
+          <MaterialIcons 
+            name="person" 
+            size={24} 
+            color={activeTab === 'profile' ? theme.primary : theme.textSecondary} 
+          />
+          <Text style={[styles.tabText, { color: activeTab === 'profile' ? theme.primary : theme.textSecondary }]}>
+            Profile
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Product Form Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.cardBackground }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>
+                {isEditing ? 'Edit Product' : 'Add New Product'}
+              </Text>
+              <TouchableOpacity onPress={() => setModalVisible(false)}>
+                <MaterialIcons name="close" size={24} color={theme.text} />
+              </TouchableOpacity>
+            </View>
+            
+            {renderMessages()}
+            
+            <ScrollView style={styles.formScrollView}>
+              {/* Render rejection reason if editing a rejected product */}
+              {isEditing && productForm.rejectionReason && (
+                <View style={styles.rejectionReasonContainer}>
+                  <Text style={[styles.sectionTitle, { color: theme.danger }]}>
+                    Rejection Reason:
+                  </Text>
+                  <View style={styles.rejectionReasonBox}>
+                    <Text style={styles.rejectionReasonText}>
+                      {productForm.rejectionReason}
+                    </Text>
+                  </View>
+                  <Text style={styles.rejectionInstructions}>
+                    Please address the issues above, then resubmit your product.
+                  </Text>
+                </View>
+              )}
+
+              <View style={styles.formSection}>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>Type</Text>
+                <View style={styles.typeSelector}>
+                  <TouchableOpacity 
+                    style={[
+                      styles.typeButton,
+                      !productForm.isService && styles.typeButtonSelected
+                    ]}
+                    onPress={() => setProductForm({...productForm, isService: false, category: ''})}
+                  >
+                    <MaterialIcons 
+                      name="inventory" 
+                      size={24} 
+                      color={!productForm.isService ? theme.primary : theme.textSecondary} 
+                    />
+                    <Text style={[
+                      styles.typeButtonText,
+                      !productForm.isService && styles.typeButtonTextSelected
+                    ]}>Product</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity 
+                    style={[
+                      styles.typeButton,
+                      productForm.isService && styles.typeButtonSelected
+                    ]}
+                    onPress={() => setProductForm({...productForm, isService: true, category: ''})}
+                  >
+                    <MaterialIcons 
+                      name="miscellaneous-services" 
+                      size={24} 
+                      color={productForm.isService ? theme.primary : theme.textSecondary} 
+                    />
+                    <Text style={[
+                      styles.typeButtonText,
+                      productForm.isService && styles.typeButtonTextSelected
+                    ]}>Service</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+
+              <View style={styles.formSection}>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>Category</Text>
+                <CategorySelector 
+                  categories={categories}
+                  selectedCategory={productForm.category}
+                  onSelect={(category) => setProductForm({...productForm, category})}
+                  type={productForm.isService ? 'SERVICES' : 'PRODUCTS'}
+                />
+              </View>
+
+              <View style={styles.formSection}>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>Basic Information</Text>
+                <View style={styles.basicInfoContainer}>
+                  <View style={styles.inputWrapper}>
+                    <Text style={[styles.inputLabel, { color: theme.text }]}>Name</Text>
+                    <TextInput
+                      style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
+                      value={productForm.name}
+                      onChangeText={(text) => setProductForm({...productForm, name: text})}
+                      placeholder={productForm.isService ? "Enter service name (e.g. Graphic Design)" : "Enter product name"}
+                      placeholderTextColor={theme.textSecondary}
+                    />
+                  </View>
+                  
+                  <View style={styles.inputWrapper}>
+                    <Text style={[styles.inputLabel, { color: theme.text }]}>Price</Text>
+                    <TextInput
+                      style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
+                      value={productForm.price}
+                      onChangeText={(text) => setProductForm({...productForm, price: text})}
+                      placeholder={productForm.isService ? "Enter service fee (e.g. 50 for hourly rate)" : "Enter price"}
+                      placeholderTextColor={theme.textSecondary}
+                      keyboardType="numeric"
+                    />
+                  </View>
+                  
+                  {!productForm.isService && (
+                    <View style={styles.inputWrapper}>
+                      <Text style={[styles.inputLabel, { color: theme.text }]}>Stock Quantity</Text>
+                      <TextInput
+                        style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
+                        value={productForm.stock}
+                        onChangeText={(text) => setProductForm({...productForm, stock: text})}
+                        placeholder="Enter stock quantity"
+                        placeholderTextColor={theme.textSecondary}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                  )}
+                  
+                  <View style={styles.inputWrapper}>
+                    <Text style={[styles.inputLabel, { color: theme.text }]}>Description</Text>
+                    <TextInput
+                      style={[styles.textArea, { backgroundColor: theme.inputBackground, color: theme.text }]}
+                      value={productForm.description}
+                      onChangeText={(text) => setProductForm({...productForm, description: text})}
+                      placeholder={productForm.isService ? 
+                        "Describe your service in detail (e.g. I offer professional graphic design services including logo design, brand identity, and social media graphics. 3-day turnaround time.)" : 
+                        "Enter product description"}
+                      placeholderTextColor={theme.textSecondary}
+                      multiline
+                      numberOfLines={4}
+                      textAlignVertical="top"
+                    />
+                  </View>
+                </View>
+              </View>
+
+              <View style={styles.formSection}>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>
+                  {productForm.isService ? 'Service Images' : 'Product Images'}
+                </Text>
+                
+                {/* Main Image */}
+                <View style={styles.mainImageContainer}>
+                  <TouchableOpacity 
+                    style={[
+                      styles.mainImagePicker,
+                      { backgroundColor: theme.inputBackground }
+                    ]}
+                    onPress={() => pickImage(true, null)}
+                  >
+                    {productForm.image ? (
+                      <Image 
+                        source={{ uri: productForm.image }}
+                        style={styles.mainImagePreview}
+                      />
+                    ) : (
+                      <View style={styles.mainImagePlaceholder}>
+                        <MaterialIcons name="add-photo-alternate" size={40} color={theme.primary} />
+                        <Text style={[styles.placeholderText, { color: theme.textSecondary }]}>
+                          {productForm.isService ? 'Add Service Image' : 'Add Main Product Image'}
+                        </Text>
+                      </View>
+                    )}
+                    {productForm.image && (
+                      <View style={styles.imageOverlay}>
+                        <TouchableOpacity 
+                          style={styles.changeImageButton}
+                          onPress={() => pickImage(true, null)}
+                        >
+                          <MaterialIcons name="edit" size={20} color="white" />
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </TouchableOpacity>
+                </View>
+
+                {/* Additional Images */}
+                <View style={styles.additionalImagesContainer}>
+                  <Text style={[styles.subTitle, { color: theme.textSecondary }]}>
+                    Additional Images (Optional)
+                  </Text>
+                  <View style={styles.imageGrid}>
+                    {[0, 1, 2].map((index) => (
+                      <TouchableOpacity
+                        key={index}
+                        style={[
+                          styles.additionalImagePicker,
+                          { backgroundColor: theme.inputBackground }
+                        ]}
+                        onPress={() => pickImage(false, index)}
+                      >
+                        {productForm.additionalImages[index] ? (
+                          <>
+                            <Image
+                              source={{ uri: productForm.additionalImages[index] }}
+                              style={styles.additionalImagePreview}
+                            />
+                            <View style={styles.imageOverlay}>
+                              <TouchableOpacity 
+                                style={styles.changeImageButton}
+                                onPress={() => pickImage(false, index)}
+                              >
+                                <MaterialIcons name="edit" size={16} color="white" />
+                              </TouchableOpacity>
+                            </View>
+                          </>
+                        ) : (
+                          <View style={styles.additionalImagePlaceholder}>
+                            <MaterialIcons name="add-photo-alternate" size={24} color={theme.textSecondary} />
+                          </View>
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              </View>
+
+              <TouchableOpacity 
+                style={[styles.saveButton, { backgroundColor: theme.primary }]}
+                onPress={handleSaveProduct}
+              >
+                <Text style={styles.saveButtonText}>
+                  {isEditing ? 'Update Product' : 'Create Product'}
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Profile Edit Modal */}
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={profileModalVisible}
+        onRequestClose={() => setProfileModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.cardBackground }]}>
+            <View style={styles.modalHeader}>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>
+                Edit Profile
+              </Text>
+              <TouchableOpacity onPress={() => setProfileModalVisible(false)}>
+                <MaterialIcons name="close" size={24} color={theme.text} />
+              </TouchableOpacity>
+            </View>
+            
+            {renderMessages()}
+            
+            <ScrollView style={styles.formContainer}>
+              <View style={styles.profileImagePickerContainer}>
+                <TouchableOpacity 
+                  style={styles.profileImagePicker}
+                  onPress={pickProfileImage}
+                >
+                  {profileForm.avatar ? (
+                    <Image 
+                      source={{ uri: profileForm.avatar }} 
+                      style={styles.profileImagePreview} 
+                    />
+                  ) : (
+                    <View style={[styles.profileImagePlaceholder, { backgroundColor: theme.primary }]}>
+                      <Text style={styles.profileImagePlaceholderText}>
+                        {profileForm.name.charAt(0)}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={styles.profileImageOverlay}>
+                    <MaterialIcons name="camera-alt" size={24} color="white" />
+                    <Text style={styles.profileImageOverlayText}>Change Photo</Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
+              
+              <View style={styles.formSection}>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>Personal Information</Text>
+                
+                <View style={styles.inputWrapper}>
+                  <Text style={[styles.inputLabel, { color: theme.text }]}>Full Name *</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
+                    value={profileForm.name}
+                    onChangeText={(text) => setProfileForm({...profileForm, name: text})}
+                    placeholder="Enter your full name"
+                    placeholderTextColor={theme.textSecondary}
+                  />
+                </View>
+                
+                <View style={styles.inputWrapper}>
+                  <Text style={[styles.inputLabel, { color: theme.text }]}>Email Address *</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
+                    value={profileForm.email}
+                    onChangeText={(text) => setProfileForm({...profileForm, email: text})}
+                    placeholder="Enter your email"
+                    placeholderTextColor={theme.textSecondary}
+                    keyboardType="email-address"
+                  />
+                </View>
+                
+                <View style={styles.inputWrapper}>
+                  <Text style={[styles.inputLabel, { color: theme.text }]}>Phone Number *</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
+                    value={profileForm.phone}
+                    onChangeText={(text) => setProfileForm({...profileForm, phone: text})}
+                    placeholder="Enter your phone number"
+                    placeholderTextColor={theme.textSecondary}
+                    keyboardType="phone-pad"
+                  />
+                </View>
+                
+                <View style={styles.inputWrapper}>
+                  <Text style={[styles.inputLabel, { color: theme.text }]}>Location</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
+                    value={profileForm.location}
+                    onChangeText={(text) => setProfileForm({...profileForm, location: text})}
+                    placeholder="Enter your location"
+                    placeholderTextColor={theme.textSecondary}
+                  />
+                </View>
+                
+                <View style={styles.inputWrapper}>
+                  <Text style={[styles.inputLabel, { color: theme.text }]}>Bio</Text>
+                  <TextInput
+                    style={[styles.textArea, { backgroundColor: theme.inputBackground, color: theme.text }]}
+                    value={profileForm.bio}
+                    onChangeText={(text) => setProfileForm({...profileForm, bio: text})}
+                    placeholder="Tell buyers about yourself"
+                    placeholderTextColor={theme.textSecondary}
+                    multiline
+                    numberOfLines={4}
+                    textAlignVertical="top"
+                  />
+                </View>
+              </View>
+              
+              <TouchableOpacity 
+                style={[styles.saveButton, { backgroundColor: theme.primary }]}
+                onPress={handleSaveProfile}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color="white" size="small" />
+                ) : (
+                  <Text style={styles.saveButtonText}>Save Changes</Text>
+                )}
+              </TouchableOpacity>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  headerTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: 'white',
+  },
+  headerButton: {
+    padding: 4,
+  },
+  content: {
+    flex: 1,
+    padding: 16,
+  },
+  tabBar: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#e0e0e0',
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  tab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+  },
+  activeTab: {
+    borderTopWidth: 3,
+  },
+  tabText: {
+    fontSize: 12,
+    marginTop: 4,
+    fontWeight: '500',
+  },
+  tabHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  tabTitle: {
+    fontSize: 22,
+    fontWeight: 'bold',
+  },
+  addButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 24,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  addButtonText: {
+    color: 'white',
+    marginRight: 6,
+    fontWeight: '600',
+  },
+  listContainer: {
+    paddingBottom: 16,
+  },
+  card: {
+    borderRadius: 12,
+    marginBottom: 16,
+    overflow: 'hidden',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  productImageContainer: {
+    position: 'relative',
+  },
+  productImage: {
+    width: '100%',
+    height: 180,
+  },
+  productBadge: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+  },
+  productBadgeText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  lowStockBadge: {
+    position: 'absolute',
+    top: 52, // Position below the status badge
+    right: 12,
+    backgroundColor: 'rgba(230, 57, 70, 0.8)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+  },
+  lowStockText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  productInfo: {
+    padding: 16,
+  },
+  productName: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  productMetrics: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  metricItem: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  metricValue: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  metricLabel: {
+    fontSize: 12,
+  },
+  metricDivider: {
+    width: 1,
+    backgroundColor: '#E2E8F0',
+  },
+  ratingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 8,
+  },
+  ratingText: {
+    fontSize: 14,
+    fontWeight: 'bold',
+    color: '#FF9F1C',
+    marginRight: 6,
+  },
+  starsContainer: {
+    flexDirection: 'row',
+  },
+  starIcon: {
+    marginRight: 2,
+  },
+  productActions: {
+    flexDirection: 'row',
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  actionButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+  },
+  editButton: {
+    borderRightWidth: 1,
+    borderRightColor: '#E2E8F0',
+  },
+  actionButtonText: {
+    fontWeight: '600',
+    marginLeft: 6,
+  },
+  orderHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+  },
+  orderCustomerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  orderAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#4361EE',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  orderAvatarText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  orderCustomer: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  orderDate: {
+    fontSize: 14,
+  },
+  orderStatus: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  orderStatusText: {
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  orderDivider: {
+    height: 1,
+    backgroundColor: '#E2E8F0',
+    marginHorizontal: 16,
+  },
+  orderDetails: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+  },
+  orderItemCount: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  orderItemCountText: {
+    marginLeft: 6,
+  },
+  orderTotal: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  orderActions: {
+    flexDirection: 'row',
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+    justifyContent: 'flex-end',
+    gap: 10,
+  },
+  statusButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+  },
+  statusButtonText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
+    marginLeft: 6,
+  },
+  viewButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  viewButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  chatCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    marginBottom: 12,
+    padding: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
+  },
+  chatAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  chatAvatarText: {
+    color: 'white',
+    fontSize: 20,
+    fontWeight: 'bold',
+  },
+  unreadBadge: {
+    position: 'absolute',
+    top: -5,
+    right: -5,
+    backgroundColor: '#E63946',
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'white',
+  },
+  unreadBadgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
+  },
+  chatInfo: {
+    flex: 1,
+  },
+  chatHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  chatCustomer: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  chatTimestamp: {
+    fontSize: 12,
+  },
+  chatMessage: {
+    fontSize: 14,
+  },
+  chatArrow: {
+    marginLeft: 8,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyState: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  emptyStateText: {
+    fontSize: 16,
+    textAlign: 'center',
+    marginTop: 16,
+  },
+  emptyStateSubText: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginTop: 8,
+    marginBottom: 8,
+    fontStyle: 'italic',
+  },
+  emptyStateButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 24,
+    marginTop: 20,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.2,
+    shadowRadius: 2,
+  },
+  emptyStateButtonText: {
+    color: 'white',
+    marginRight: 8,
+    fontWeight: '600',
+    fontSize: 16,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    width: '90%',
+    maxHeight: '80%',
+    borderRadius: 8,
+    padding: 16,
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+  },
+  formScrollView: {
+    maxHeight: '90%',
+  },
+  formSection: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+  },
+  typeSelector: {
+    flexDirection: 'row',
+    gap: 12,
+    marginBottom: 16,
+  },
+  typeButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 12,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    gap: 8,
+  },
+  typeButtonSelected: {
+    backgroundColor: '#F0F4FF',
+    borderColor: '#4361EE',
+  },
+  typeButtonText: {
+    fontSize: 16,
+    color: '#6c757d',
+  },
+  typeButtonTextSelected: {
+    color: '#4361EE',
+    fontWeight: '600',
+  },
+  categoryScrollView: {
+    flexGrow: 0,
+  },
+  categoryItem: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#F1F3F5',
+    marginRight: 8,
+  },
+  categoryItemSelected: {
+    backgroundColor: '#4361EE',
+  },
+  categoryItemText: {
+    color: '#6c757d',
+    fontSize: 14,
+  },
+  categoryItemTextSelected: {
+    color: 'white',
+    fontWeight: '600',
+  },
+  imageInputsContainer: {
+    gap: 16,
+  },
+  mainImageContainer: {
+    marginBottom: 24,
+  },
+  mainImagePicker: {
+    width: '100%',
+    height: 200,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
+    borderStyle: 'dashed',
+  },
+  mainImagePreview: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  mainImagePlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  placeholderText: {
+    marginTop: 12,
+    fontSize: 16,
+    fontWeight: '500',
+  },
+  additionalImagesContainer: {
+    marginBottom: 24,
+  },
+  subTitle: {
+    fontSize: 14,
+    marginBottom: 12,
+    fontWeight: '500',
+  },
+  imageGrid: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  additionalImagePicker: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+    overflow: 'hidden',
+    borderWidth: 2,
+    borderColor: '#E2E8F0',
+    borderStyle: 'dashed',
+  },
+  additionalImagePreview: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  additionalImagePlaceholder: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  imageOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    opacity: 0,
+  },
+  changeImageButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  saveButton: {
+    padding: 12,
+    borderRadius: 4,
+    alignItems: 'center',
+    marginTop: 8,
+    marginBottom: 24,
+  },
+  saveButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  errorContainer: {
+    backgroundColor: '#FFEBEE',
+    padding: 10,
+    borderRadius: 4,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#E63946',
+  },
+  errorText: {
+    color: '#B71C1C',
+  },
+  successContainer: {
+    backgroundColor: '#E8F5E9',
+    padding: 10,
+    borderRadius: 4,
+    marginBottom: 16,
+    borderLeftWidth: 4,
+    borderLeftColor: '#2EC4B6',
+  },
+  successText: {
+    color: '#1B5E20',
+  },
+  basicInfoContainer: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+  },
+  inputWrapper: {
+    marginBottom: 16,
+  },
+  inputLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+  },
+  textArea: {
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    borderRadius: 8,
+    padding: 12,
+    fontSize: 16,
+    minHeight: 100,
+  },
+  profileContainer: {
+    flex: 1,
+  },
+  profileHeader: {
+    borderRadius: 12,
+    marginBottom: 16,
+    overflow: 'hidden',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  profileCover: {
+    height: 100,
+    width: '100%',
+    position: 'relative',
+  },
+  coverGradient: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    top: 0,
+    height: '100%',
+  },
+  profileAvatarSection: {
+    alignItems: 'center',
+    marginTop: -50,
+    marginBottom: 10,
+  },
+  avatarContainer: {
+    position: 'relative',
+    marginBottom: 8,
+  },
+  avatarImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 4,
+    borderColor: 'white',
+  },
+  avatarPlaceholder: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 4,
+    borderColor: 'white',
+  },
+  avatarText: {
+    fontSize: 36,
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  editAvatarButton: {
+    position: 'absolute',
+    right: 0,
+    bottom: 0,
+    backgroundColor: '#4361EE',
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: 'white',
+  },
+  premiumBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 159, 28, 0.15)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginTop: 8,
+  },
+  premiumBadgeText: {
+    color: '#FF9F1C',
+    fontWeight: '600',
+    marginLeft: 4,
+    fontSize: 12,
+  },
+  premiumSellerBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FF9F1C',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+    marginTop: 8,
+  },
+  premiumSellerText: {
+    color: 'white',
+    fontWeight: '600',
+    marginLeft: 4,
+    fontSize: 12,
+  },
+  profileInfo: {
+    alignItems: 'center',
+    padding: 16,
+  },
+  profileName: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  profileEmail: {
+    fontSize: 16,
+    marginBottom: 8,
+  },
+  joinDateContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  joinDateText: {
+    fontSize: 14,
+    marginLeft: 4,
+  },
+  statsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-around',
+    width: '100%',
+    paddingVertical: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  statItem: {
+    alignItems: 'center',
+  },
+  statDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: '#E2E8F0',
+  },
+  statValue: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  ratingValue: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statLabel: {
+    fontSize: 14,
+  },
+  profileContent: {
+    padding: 16,
+  },
+  profileSection: {
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  infoItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    gap: 12,
+  },
+  infoText: {
+    fontSize: 16,
+  },
+  bioText: {
+    fontSize: 16,
+    lineHeight: 24,
+  },
+  premiumButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    gap: 8,
+  },
+  premiumButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  editProfileButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    gap: 8,
+  },
+  editProfileText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  logoutButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 16,
+    borderRadius: 12,
+    gap: 8,
+  },
+  logoutButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  profileImagePickerContainer: {
+    alignItems: 'center',
+    marginVertical: 20,
+  },
+  profileImagePicker: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    overflow: 'hidden',
+    position: 'relative',
+  },
+  profileImagePreview: {
+    width: '100%',
+    height: '100%',
+  },
+  profileImagePlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileImagePlaceholderText: {
+    fontSize: 48,
+    color: 'white',
+    fontWeight: 'bold',
+  },
+  profileImageOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  profileImageOverlayText: {
+    color: 'white',
+    marginTop: 8,
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  pendingBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(255, 159, 28, 0.9)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+  },
+  pendingText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  rejectedBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(230, 57, 70, 0.9)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+  },
+  rejectedText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  approvedBadge: {
+    position: 'absolute',
+    top: 12,
+    right: 12,
+    backgroundColor: 'rgba(46, 196, 182, 0.9)',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+  },
+  approvedText: {
+    color: 'white',
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  statusInfoContainer: {
+    borderRadius: 12,
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    elevation: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    borderLeftWidth: 3
+  },
+  statusInfoTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 12
+  },
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8
+  },
+  statusDot: {
+    width: 12,
+    height: 12,
+    borderRadius: 6,
+    marginRight: 8
+  },
+  statusText: {
+    fontSize: 14,
+    flex: 1
+  },
+  statusBold: {
+    fontWeight: 'bold'
+  },
+  rejectionReasonContainer: {
+    marginBottom: 24,
+  },
+  rejectionReasonBox: {
+    backgroundColor: '#FFEBEE',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+  },
+  rejectionReasonText: {
+    color: '#B71C1C',
+  },
+  rejectionInstructions: {
+    color: '#6c757d',
+    fontSize: 14,
+  },
+  orderCard: {
+    borderRadius: 12,
+    marginBottom: 16,
+    overflow: 'hidden',
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+  },
+  orderId: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    marginBottom: 4,
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  orderItems: {
+    marginBottom: 16,
+  },
+  orderItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 8,
+  },
+  orderItemImage: {
+    width: 50,
+    height: 50,
+    borderRadius: 8,
+    marginRight: 12,
+  },
+  orderItemDetails: {
+    flex: 1,
+  },
+  orderItemName: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  orderItemPrice: {
+    fontSize: 14,
+    color: '#6c757d',
+  },
+  acceptButton: {
+    backgroundColor: '#2EC4B6',
+  },
+  completeButton: {
+    backgroundColor: '#1B5E20',
+  },
+  tabContent: {
+    flex: 1,
+  },
+  listContent: {
+    paddingBottom: 16,
+  },
+});
+
+export default SellerDashboardScreen;
