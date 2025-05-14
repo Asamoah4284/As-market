@@ -642,19 +642,23 @@ const SellerDashboardScreen = () => {
             onPress={() => handleEditProduct(item)}
             disabled={item.status === 'approved'}
           >
-            <MaterialIcons name="edit" size={18} color={item.status === 'approved' ? colors.textSecondary : colors.primary} />
-            <Text style={[styles.actionButtonText, { color: item.status === 'approved' ? colors.textSecondary : colors.primary }]}>
+            <MaterialIcons 
+              name="edit" 
+              size={18} 
+              color={item.status === 'approved' ? theme.textSecondary : theme.primary} 
+            />
+            <Text style={[styles.actionButtonText, { color: item.status === 'approved' ? theme.textSecondary : theme.primary }]}>
               {item.status === 'approved' 
                 ? 'Approved' 
                 : (item.status === 'rejected' ? 'View Reason' : 'Edit')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity 
-            style={[styles.actionButton, styles.deleteButton, { backgroundColor: colors.danger + '15' }]}
+            style={[styles.actionButton, styles.deleteButton, { backgroundColor: theme.danger + '15' }]}
             onPress={() => handleDeleteProduct(item._id)}
           >
-            <MaterialIcons name="delete" size={18} color={colors.danger} />
-            <Text style={[styles.actionButtonText, { color: colors.danger }]}>Delete</Text>
+            <MaterialIcons name="delete" size={18} color={theme.danger} />
+            <Text style={[styles.actionButtonText, { color: theme.danger }]}>Delete</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -726,10 +730,10 @@ const SellerDashboardScreen = () => {
 
   const renderChatItem = ({ item }) => (
     <TouchableOpacity 
-      style={[styles.chatCard, { backgroundColor: colors.cardBackground }]}
+      style={[styles.chatCard, { backgroundColor: theme.cardBackground }]}
       onPress={() => navigation.navigate('Chat', { chatId: item.id, customer: item.customer })}
     >
-      <View style={[styles.chatAvatar, { backgroundColor: item.unread > 0 ? colors.primary : colors.secondary }]}>
+      <View style={[styles.chatAvatar, { backgroundColor: item.unread > 0 ? theme.primary : theme.secondary }]}>
         <Text style={styles.chatAvatarText}>{item.customer.charAt(0)}</Text>
         {item.unread > 0 && (
           <View style={styles.unreadBadge}>
@@ -739,11 +743,11 @@ const SellerDashboardScreen = () => {
       </View>
       <View style={styles.chatInfo}>
         <View style={styles.chatHeader}>
-          <Text style={[styles.chatCustomer, { color: colors.text }]}>{item.customer}</Text>
-          <Text style={[styles.chatTimestamp, { color: colors.textSecondary }]}>{item.timestamp}</Text>
+          <Text style={[styles.chatCustomer, { color: theme.text }]}>{item.customer}</Text>
+          <Text style={[styles.chatTimestamp, { color: theme.textSecondary }]}>{item.timestamp}</Text>
         </View>
         <Text 
-          style={[styles.chatMessage, { color: item.unread > 0 ? colors.text : colors.textSecondary }]}
+          style={[styles.chatMessage, { color: item.unread > 0 ? theme.text : theme.textSecondary }]}
           numberOfLines={1}
         >
           {item.lastMessage}
@@ -752,7 +756,7 @@ const SellerDashboardScreen = () => {
       <MaterialIcons 
         name="chevron-right" 
         size={24} 
-        color={colors.textSecondary} 
+        color={theme.textSecondary} 
         style={styles.chatArrow}
       />
     </TouchableOpacity>
@@ -778,14 +782,14 @@ const SellerDashboardScreen = () => {
           <View style={styles.tabContent}>
             {orders.length === 0 ? (
               <View style={styles.emptyState}>
-                <MaterialIcons name="receipt" size={64} color={colors.textSecondary} />
-                <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>
+                <MaterialIcons name="receipt" size={64} color={theme.textSecondary} />
+                <Text style={[styles.emptyStateText, { color: theme.textSecondary }]}>
                   No orders yet
                 </Text>
-                <Text style={[styles.emptyStateSubText, { color: colors.textSecondary }]}>
+                <Text style={[styles.emptyStateSubText, { color: theme.textSecondary }]}>
                   When customers purchase your products, their orders will appear here.
                 </Text>
-                <Text style={[styles.emptyStateSubText, { color: colors.textSecondary }]}>
+                <Text style={[styles.emptyStateSubText, { color: theme.textSecondary }]}>
                   Make sure your products are visible and well-priced to attract buyers.
                 </Text>
               </View>
@@ -797,8 +801,8 @@ const SellerDashboardScreen = () => {
                 contentContainerStyle={styles.listContent}
                 ListEmptyComponent={() => (
                   <View style={styles.emptyState}>
-                    <MaterialIcons name="receipt" size={64} color={colors.textSecondary} />
-                    <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>
+                    <MaterialIcons name="receipt" size={64} color={theme.textSecondary} />
+                    <Text style={[styles.emptyStateText, { color: theme.textSecondary }]}>
                       No orders found
                     </Text>
                   </View>
@@ -810,10 +814,10 @@ const SellerDashboardScreen = () => {
       case 'profile':
         return (
           <ScrollView style={styles.profileContainer}>
-            <View style={[styles.profileHeader, { backgroundColor: colors.cardBackground }]}>
+            <View style={[styles.profileHeader, { backgroundColor: theme.cardBackground }]}>
               <View style={styles.profileCover}>
                 <LinearGradient
-                  colors={[colors.primary, colors.primaryDark]}
+                  colors={[theme.primary, theme.primaryDark]}
                   style={styles.coverGradient}
                 />
               </View>
@@ -826,7 +830,7 @@ const SellerDashboardScreen = () => {
                       style={styles.avatarImage} 
                     />
                   ) : (
-                    <View style={[styles.avatarPlaceholder, { backgroundColor: colors.primary }]}>
+                    <View style={[styles.avatarPlaceholder, { backgroundColor: theme.primary }]}>
                       <Text style={styles.avatarText}>
                         {profileData.name.charAt(0)}
                       </Text>
@@ -842,7 +846,7 @@ const SellerDashboardScreen = () => {
                     style={styles.premiumBadge}
                     onPress={handlePremiumUpgrade}
                   >
-                    <MaterialIcons name="workspace-premium" size={16} color={colors.warning} />
+                    <MaterialIcons name="workspace-premium" size={16} color={theme.warning} />
                     <Text style={styles.premiumBadgeText}>Become a Premium Seller</Text>
                   </TouchableOpacity>
                 )}
@@ -856,16 +860,16 @@ const SellerDashboardScreen = () => {
               </View>
               
               <View style={styles.profileInfo}>
-                <Text style={[styles.profileName, { color: colors.text }]}>
+                <Text style={[styles.profileName, { color: theme.text }]}>
                   {profileData.name}
                 </Text>
-                <Text style={[styles.profileEmail, { color: colors.textSecondary }]}>
+                <Text style={[styles.profileEmail, { color: theme.textSecondary }]}>
                   {profileData.email}
                 </Text>
                 
                 <View style={styles.joinDateContainer}>
-                  <MaterialIcons name="event" size={14} color={colors.textSecondary} />
-                  <Text style={[styles.joinDateText, { color: colors.textSecondary }]}>
+                  <MaterialIcons name="event" size={14} color={theme.textSecondary} />
+                  <Text style={[styles.joinDateText, { color: theme.textSecondary }]}>
                     Joined {profileData.joinDate}
                   </Text>
                 </View>
@@ -873,10 +877,10 @@ const SellerDashboardScreen = () => {
               
               <View style={styles.statsContainer}>
                 <View style={styles.statItem}>
-                  <Text style={[styles.statValue, { color: colors.primary }]}>
+                  <Text style={[styles.statValue, { color: theme.primary }]}>
                     {profileData.totalSales}
                   </Text>
-                  <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
+                  <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
                     Sales
                   </Text>
                 </View>
@@ -885,12 +889,12 @@ const SellerDashboardScreen = () => {
                 
                 <View style={styles.statItem}>
                   <View style={styles.ratingValue}>
-                    <Text style={[styles.statValue, { color: colors.warning }]}>
+                    <Text style={[styles.statValue, { color: theme.warning }]}>
                       {profileData.rating}
                     </Text>
-                    <MaterialIcons name="star" size={16} color={colors.warning} />
+                    <MaterialIcons name="star" size={16} color={theme.warning} />
                   </View>
-                  <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
+                  <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
                     Rating
                   </Text>
                 </View>
@@ -898,10 +902,10 @@ const SellerDashboardScreen = () => {
                 <View style={styles.statDivider} />
                 
                 <View style={styles.statItem}>
-                  <Text style={[styles.statValue, { color: colors.text }]}>
+                  <Text style={[styles.statValue, { color: theme.text }]}>
                     {profileData.followers}
                   </Text>
-                  <Text style={[styles.statLabel, { color: colors.textSecondary }]}>
+                  <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
                     Followers
                   </Text>
                 </View>
@@ -909,36 +913,36 @@ const SellerDashboardScreen = () => {
             </View>
 
             <View style={styles.profileContent}>
-              <View style={[styles.profileSection, { backgroundColor: colors.cardBackground }]}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              <View style={[styles.profileSection, { backgroundColor: theme.cardBackground }]}>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>
                   Contact Information
                 </Text>
                 <View style={styles.infoItem}>
-                  <MaterialIcons name="phone" size={20} color={colors.primary} />
-                  <Text style={[styles.infoText, { color: colors.text }]}>
+                  <MaterialIcons name="phone" size={20} color={theme.primary} />
+                  <Text style={[styles.infoText, { color: theme.text }]}>
                     {profileData.phone}
                   </Text>
                 </View>
                 <View style={styles.infoItem}>
-                  <MaterialIcons name="location-on" size={20} color={colors.primary} />
-                  <Text style={[styles.infoText, { color: colors.text }]}>
+                  <MaterialIcons name="location-on" size={20} color={theme.primary} />
+                  <Text style={[styles.infoText, { color: theme.text }]}>
                     {profileData.location}
                   </Text>
                 </View>
               </View>
 
-              <View style={[styles.profileSection, { backgroundColor: colors.cardBackground }]}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+              <View style={[styles.profileSection, { backgroundColor: theme.cardBackground }]}>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>
                   About Me
                 </Text>
-                <Text style={[styles.bioText, { color: colors.text }]}>
+                <Text style={[styles.bioText, { color: theme.text }]}>
                   {profileData.bio}
                 </Text>
               </View>
               
               {!profileData.isPremium && (
                 <TouchableOpacity 
-                  style={[styles.premiumButton, { backgroundColor: colors.warning }]}
+                  style={[styles.premiumButton, { backgroundColor: theme.warning }]}
                   onPress={handlePremiumUpgrade}
                 >
                   <MaterialIcons name="workspace-premium" size={20} color="white" />
@@ -947,7 +951,7 @@ const SellerDashboardScreen = () => {
               )}
 
               <TouchableOpacity 
-                style={[styles.editProfileButton, { backgroundColor: colors.primary }]}
+                style={[styles.editProfileButton, { backgroundColor: theme.primary }]}
                 onPress={handleEditProfile}
               >
                 <MaterialIcons name="edit" size={20} color="white" />
@@ -955,7 +959,7 @@ const SellerDashboardScreen = () => {
               </TouchableOpacity>
 
               <TouchableOpacity 
-                style={[styles.logoutButton, { backgroundColor: colors.danger }]}
+                style={[styles.logoutButton, { backgroundColor: theme.danger }]}
                 onPress={handleLogout}
               >
                 <MaterialIcons name="logout" size={20} color="white" />
@@ -968,9 +972,9 @@ const SellerDashboardScreen = () => {
         return (
           <>
             <View style={styles.tabHeader}>
-              <Text style={[styles.tabTitle, { color: colors.text }]}>My Products</Text>
+              <Text style={[styles.tabTitle, { color: theme.text }]}>My Products</Text>
               <TouchableOpacity 
-                style={[styles.addButton, { backgroundColor: colors.primary }]}
+                style={[styles.addButton, { backgroundColor: theme.primary }]}
                 onPress={handleAddProduct}
               >
                 <Text style={styles.addButtonText}>Add Product</Text>
@@ -981,26 +985,26 @@ const SellerDashboardScreen = () => {
             {/* Status info section */}
             {showStatusGuide && (
               <View style={[styles.statusInfoContainer, { 
-                backgroundColor: colors.cardBackground,
-                borderLeftColor: colors.primary 
+                backgroundColor: theme.cardBackground,
+                borderLeftColor: theme.primary 
               }]}>
-                <Text style={[styles.statusInfoTitle, { color: colors.text }]}>Product Status Guide:</Text>
+                <Text style={[styles.statusInfoTitle, { color: theme.text }]}>Product Status Guide:</Text>
                 <View style={styles.statusRow}>
                   <View style={[styles.statusDot, { backgroundColor: 'rgba(255, 159, 28, 0.9)' }]} />
-                  <Text style={[styles.statusText, { color: colors.textSecondary }]}>
-                    <Text style={[styles.statusBold, { color: colors.text }]}>Pending:</Text> Your product is awaiting admin approval.
+                  <Text style={[styles.statusText, { color: theme.textSecondary }]}>
+                    <Text style={[styles.statusBold, { color: theme.text }]}>Pending:</Text> Your product is awaiting admin approval.
                   </Text>
                 </View>
                 <View style={styles.statusRow}>
                   <View style={[styles.statusDot, { backgroundColor: 'rgba(46, 196, 182, 0.9)' }]} />
-                  <Text style={[styles.statusText, { color: colors.textSecondary }]}>
-                    <Text style={[styles.statusBold, { color: colors.text }]}>Approved:</Text> Product is live on the marketplace.
+                  <Text style={[styles.statusText, { color: theme.textSecondary }]}>
+                    <Text style={[styles.statusBold, { color: theme.text }]}>Approved:</Text> Product is live on the marketplace.
                   </Text>
                 </View>
                 <View style={styles.statusRow}>
                   <View style={[styles.statusDot, { backgroundColor: 'rgba(230, 57, 70, 0.9)' }]} />
-                  <Text style={[styles.statusText, { color: colors.textSecondary }]}>
-                    <Text style={[styles.statusBold, { color: colors.text }]}>Rejected:</Text> Product didn't meet marketplace requirements.
+                  <Text style={[styles.statusText, { color: theme.textSecondary }]}>
+                    <Text style={[styles.statusBold, { color: theme.text }]}>Rejected:</Text> Product didn't meet marketplace requirements.
                   </Text>
                 </View>
               </View>
@@ -1008,15 +1012,15 @@ const SellerDashboardScreen = () => {
             
             {products.length === 0 ? (
               <View style={styles.emptyState}>
-                <MaterialIcons name="inventory" size={64} color={colors.textSecondary} />
-                <Text style={[styles.emptyStateText, { color: colors.textSecondary }]}>
+                <MaterialIcons name="inventory" size={64} color={theme.textSecondary} />
+                <Text style={[styles.emptyStateText, { color: theme.textSecondary }]}>
                   Welcome! Start by adding your first product.
                 </Text>
-                <Text style={[styles.emptyStateSubText, { color: colors.textSecondary }]}>
+                <Text style={[styles.emptyStateSubText, { color: theme.textSecondary }]}>
                   All products will be reviewed by an admin before appearing in the marketplace.
                 </Text>
                 <TouchableOpacity 
-                  style={[styles.emptyStateButton, { backgroundColor: colors.primary }]}
+                  style={[styles.emptyStateButton, { backgroundColor: theme.primary }]}
                   onPress={handleAddProduct}
                 >
                   <Text style={styles.emptyStateButtonText}>Add New Product</Text>
@@ -1347,8 +1351,8 @@ const SellerDashboardScreen = () => {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
-      <View style={[styles.header, { backgroundColor: colors.primary }]}>
+    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
+      <View style={[styles.header, { backgroundColor: theme.primary }]}>
         <Text style={styles.headerTitle}>Seller Dashboard</Text>
         <TouchableOpacity style={styles.headerButton}>
           <MaterialIcons name="notifications" size={24} color="white" />
@@ -1359,7 +1363,7 @@ const SellerDashboardScreen = () => {
         {renderTabContent()}
       </View>
       
-      <View style={[styles.tabBar, { backgroundColor: colors.cardBackground }]}>
+      <View style={[styles.tabBar, { backgroundColor: theme.cardBackground }]}>
         <TouchableOpacity 
           style={[styles.tab, activeTab === 'products' && styles.activeTab]}
           onPress={() => setActiveTab('products')}
@@ -1367,9 +1371,9 @@ const SellerDashboardScreen = () => {
           <MaterialIcons 
             name="inventory" 
             size={24} 
-            color={activeTab === 'products' ? colors.primary : colors.textSecondary} 
+            color={activeTab === 'products' ? theme.primary : theme.textSecondary} 
           />
-          <Text style={[styles.tabText, { color: activeTab === 'products' ? colors.primary : colors.textSecondary }]}>
+          <Text style={[styles.tabText, { color: activeTab === 'products' ? theme.primary : theme.textSecondary }]}>
             Products
           </Text>
         </TouchableOpacity>
@@ -1381,9 +1385,9 @@ const SellerDashboardScreen = () => {
           <MaterialIcons 
             name="shopping-bag" 
             size={24} 
-            color={activeTab === 'orders' ? colors.primary : colors.textSecondary} 
+            color={activeTab === 'orders' ? theme.primary : theme.textSecondary} 
           />
-          <Text style={[styles.tabText, { color: activeTab === 'orders' ? colors.primary : colors.textSecondary }]}>
+          <Text style={[styles.tabText, { color: activeTab === 'orders' ? theme.primary : theme.textSecondary }]}>
             Orders
           </Text>
         </TouchableOpacity>
@@ -1395,9 +1399,9 @@ const SellerDashboardScreen = () => {
           <MaterialIcons 
             name="person" 
             size={24} 
-            color={activeTab === 'profile' ? colors.primary : colors.textSecondary} 
+            color={activeTab === 'profile' ? theme.primary : theme.textSecondary} 
           />
-          <Text style={[styles.tabText, { color: activeTab === 'profile' ? colors.primary : colors.textSecondary }]}>
+          <Text style={[styles.tabText, { color: activeTab === 'profile' ? theme.primary : theme.textSecondary }]}>
             Profile
           </Text>
         </TouchableOpacity>
@@ -1411,13 +1415,13 @@ const SellerDashboardScreen = () => {
         onRequestClose={() => setModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.cardBackground }]}>
+          <View style={[styles.modalContent, { backgroundColor: theme.cardBackground }]}>
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>
                 {isEditing ? 'Edit Product' : 'Add New Product'}
               </Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
-                <MaterialIcons name="close" size={24} color={colors.text} />
+                <MaterialIcons name="close" size={24} color={theme.text} />
               </TouchableOpacity>
             </View>
             
@@ -1427,7 +1431,7 @@ const SellerDashboardScreen = () => {
               {/* Render rejection reason if editing a rejected product */}
               {isEditing && productForm.rejectionReason && (
                 <View style={styles.rejectionReasonContainer}>
-                  <Text style={[styles.sectionTitle, { color: colors.danger }]}>
+                  <Text style={[styles.sectionTitle, { color: theme.danger }]}>
                     Rejection Reason:
                   </Text>
                   <View style={styles.rejectionReasonBox}>
@@ -1442,7 +1446,7 @@ const SellerDashboardScreen = () => {
               )}
 
               <View style={styles.formSection}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Type</Text>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>Type</Text>
                 <View style={styles.typeSelector}>
                   <TouchableOpacity 
                     style={[
@@ -1454,7 +1458,7 @@ const SellerDashboardScreen = () => {
                     <MaterialIcons 
                       name="inventory" 
                       size={24} 
-                      color={!productForm.isService ? colors.primary : colors.textSecondary} 
+                      color={!productForm.isService ? theme.primary : theme.textSecondary} 
                     />
                     <Text style={[
                       styles.typeButtonText,
@@ -1471,7 +1475,7 @@ const SellerDashboardScreen = () => {
                     <MaterialIcons 
                       name="miscellaneous-services" 
                       size={24} 
-                      color={productForm.isService ? colors.primary : colors.textSecondary} 
+                      color={productForm.isService ? theme.primary : theme.textSecondary} 
                     />
                     <Text style={[
                       styles.typeButtonText,
@@ -1482,7 +1486,7 @@ const SellerDashboardScreen = () => {
               </View>
 
               <View style={styles.formSection}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Category</Text>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>Category</Text>
                 <CategorySelector 
                   categories={categories}
                   selectedCategory={productForm.category}
@@ -1492,55 +1496,55 @@ const SellerDashboardScreen = () => {
               </View>
 
               <View style={styles.formSection}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Basic Information</Text>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>Basic Information</Text>
                 <View style={styles.basicInfoContainer}>
                   <View style={styles.inputWrapper}>
-                    <Text style={[styles.inputLabel, { color: colors.text }]}>Name</Text>
+                    <Text style={[styles.inputLabel, { color: theme.text }]}>Name</Text>
                     <TextInput
-                      style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text }]}
+                      style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
                       value={productForm.name}
                       onChangeText={(text) => setProductForm({...productForm, name: text})}
                       placeholder={productForm.isService ? "Enter service name (e.g. Graphic Design)" : "Enter product name"}
-                      placeholderTextColor={colors.textSecondary}
+                      placeholderTextColor={theme.textSecondary}
                     />
                   </View>
                   
                   <View style={styles.inputWrapper}>
-                    <Text style={[styles.inputLabel, { color: colors.text }]}>Price</Text>
+                    <Text style={[styles.inputLabel, { color: theme.text }]}>Price</Text>
                     <TextInput
-                      style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text }]}
+                      style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
                       value={productForm.price}
                       onChangeText={(text) => setProductForm({...productForm, price: text})}
                       placeholder={productForm.isService ? "Enter service fee (e.g. 50 for hourly rate)" : "Enter price"}
-                      placeholderTextColor={colors.textSecondary}
+                      placeholderTextColor={theme.textSecondary}
                       keyboardType="numeric"
                     />
                   </View>
                   
                   {!productForm.isService && (
                     <View style={styles.inputWrapper}>
-                      <Text style={[styles.inputLabel, { color: colors.text }]}>Stock Quantity</Text>
+                      <Text style={[styles.inputLabel, { color: theme.text }]}>Stock Quantity</Text>
                       <TextInput
-                        style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text }]}
+                        style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
                         value={productForm.stock}
                         onChangeText={(text) => setProductForm({...productForm, stock: text})}
                         placeholder="Enter stock quantity"
-                        placeholderTextColor={colors.textSecondary}
+                        placeholderTextColor={theme.textSecondary}
                         keyboardType="numeric"
                       />
                     </View>
                   )}
                   
                   <View style={styles.inputWrapper}>
-                    <Text style={[styles.inputLabel, { color: colors.text }]}>Description</Text>
+                    <Text style={[styles.inputLabel, { color: theme.text }]}>Description</Text>
                     <TextInput
-                      style={[styles.textArea, { backgroundColor: colors.inputBackground, color: colors.text }]}
+                      style={[styles.textArea, { backgroundColor: theme.inputBackground, color: theme.text }]}
                       value={productForm.description}
                       onChangeText={(text) => setProductForm({...productForm, description: text})}
                       placeholder={productForm.isService ? 
                         "Describe your service in detail (e.g. I offer professional graphic design services including logo design, brand identity, and social media graphics. 3-day turnaround time.)" : 
                         "Enter product description"}
-                      placeholderTextColor={colors.textSecondary}
+                      placeholderTextColor={theme.textSecondary}
                       multiline
                       numberOfLines={4}
                       textAlignVertical="top"
@@ -1550,7 +1554,7 @@ const SellerDashboardScreen = () => {
               </View>
 
               <View style={styles.formSection}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>
                   {productForm.isService ? 'Service Images' : 'Product Images'}
                 </Text>
                 
@@ -1559,7 +1563,7 @@ const SellerDashboardScreen = () => {
                   <TouchableOpacity 
                     style={[
                       styles.mainImagePicker,
-                      { backgroundColor: colors.inputBackground }
+                      { backgroundColor: theme.inputBackground }
                     ]}
                     onPress={() => pickImage(true, null)}
                   >
@@ -1570,8 +1574,8 @@ const SellerDashboardScreen = () => {
                       />
                     ) : (
                       <View style={styles.mainImagePlaceholder}>
-                        <MaterialIcons name="add-photo-alternate" size={40} color={colors.primary} />
-                        <Text style={[styles.placeholderText, { color: colors.textSecondary }]}>
+                        <MaterialIcons name="add-photo-alternate" size={40} color={theme.primary} />
+                        <Text style={[styles.placeholderText, { color: theme.textSecondary }]}>
                           {productForm.isService ? 'Add Service Image' : 'Add Main Product Image'}
                         </Text>
                       </View>
@@ -1591,7 +1595,7 @@ const SellerDashboardScreen = () => {
 
                 {/* Additional Images */}
                 <View style={styles.additionalImagesContainer}>
-                  <Text style={[styles.subTitle, { color: colors.textSecondary }]}>
+                  <Text style={[styles.subTitle, { color: theme.textSecondary }]}>
                     Additional Images (Optional)
                   </Text>
                   <View style={styles.imageGrid}>
@@ -1600,7 +1604,7 @@ const SellerDashboardScreen = () => {
                         key={index}
                         style={[
                           styles.additionalImagePicker,
-                          { backgroundColor: colors.inputBackground }
+                          { backgroundColor: theme.inputBackground }
                         ]}
                         onPress={() => pickImage(false, index)}
                       >
@@ -1621,7 +1625,7 @@ const SellerDashboardScreen = () => {
                           </>
                         ) : (
                           <View style={styles.additionalImagePlaceholder}>
-                            <MaterialIcons name="add-photo-alternate" size={24} color={colors.textSecondary} />
+                            <MaterialIcons name="add-photo-alternate" size={24} color={theme.textSecondary} />
                           </View>
                         )}
                       </TouchableOpacity>
@@ -1631,7 +1635,7 @@ const SellerDashboardScreen = () => {
               </View>
 
               <TouchableOpacity 
-                style={[styles.saveButton, { backgroundColor: colors.primary }]}
+                style={[styles.saveButton, { backgroundColor: theme.primary }]}
                 onPress={handleSaveProduct}
               >
                 <Text style={styles.saveButtonText}>
@@ -1651,13 +1655,13 @@ const SellerDashboardScreen = () => {
         onRequestClose={() => setProfileModalVisible(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: colors.cardBackground }]}>
+          <View style={[styles.modalContent, { backgroundColor: theme.cardBackground }]}>
             <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: colors.text }]}>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>
                 Edit Profile
               </Text>
               <TouchableOpacity onPress={() => setProfileModalVisible(false)}>
-                <MaterialIcons name="close" size={24} color={colors.text} />
+                <MaterialIcons name="close" size={24} color={theme.text} />
               </TouchableOpacity>
             </View>
             
@@ -1675,7 +1679,7 @@ const SellerDashboardScreen = () => {
                       style={styles.profileImagePreview} 
                     />
                   ) : (
-                    <View style={[styles.profileImagePlaceholder, { backgroundColor: colors.primary }]}>
+                    <View style={[styles.profileImagePlaceholder, { backgroundColor: theme.primary }]}>
                       <Text style={styles.profileImagePlaceholderText}>
                         {profileForm.name.charAt(0)}
                       </Text>
@@ -1689,62 +1693,62 @@ const SellerDashboardScreen = () => {
               </View>
               
               <View style={styles.formSection}>
-                <Text style={[styles.sectionTitle, { color: colors.text }]}>Personal Information</Text>
+                <Text style={[styles.sectionTitle, { color: theme.text }]}>Personal Information</Text>
                 
                 <View style={styles.inputWrapper}>
-                  <Text style={[styles.inputLabel, { color: colors.text }]}>Full Name *</Text>
+                  <Text style={[styles.inputLabel, { color: theme.text }]}>Full Name *</Text>
                   <TextInput
-                    style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text }]}
+                    style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
                     value={profileForm.name}
                     onChangeText={(text) => setProfileForm({...profileForm, name: text})}
                     placeholder="Enter your full name"
-                    placeholderTextColor={colors.textSecondary}
+                    placeholderTextColor={theme.textSecondary}
                   />
                 </View>
                 
                 <View style={styles.inputWrapper}>
-                  <Text style={[styles.inputLabel, { color: colors.text }]}>Email Address *</Text>
+                  <Text style={[styles.inputLabel, { color: theme.text }]}>Email Address *</Text>
                   <TextInput
-                    style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text }]}
+                    style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
                     value={profileForm.email}
                     onChangeText={(text) => setProfileForm({...profileForm, email: text})}
                     placeholder="Enter your email"
-                    placeholderTextColor={colors.textSecondary}
+                    placeholderTextColor={theme.textSecondary}
                     keyboardType="email-address"
                   />
                 </View>
                 
                 <View style={styles.inputWrapper}>
-                  <Text style={[styles.inputLabel, { color: colors.text }]}>Phone Number *</Text>
+                  <Text style={[styles.inputLabel, { color: theme.text }]}>Phone Number *</Text>
                   <TextInput
-                    style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text }]}
+                    style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
                     value={profileForm.phone}
                     onChangeText={(text) => setProfileForm({...profileForm, phone: text})}
                     placeholder="Enter your phone number"
-                    placeholderTextColor={colors.textSecondary}
+                    placeholderTextColor={theme.textSecondary}
                     keyboardType="phone-pad"
                   />
                 </View>
                 
                 <View style={styles.inputWrapper}>
-                  <Text style={[styles.inputLabel, { color: colors.text }]}>Location</Text>
+                  <Text style={[styles.inputLabel, { color: theme.text }]}>Location</Text>
                   <TextInput
-                    style={[styles.input, { backgroundColor: colors.inputBackground, color: colors.text }]}
+                    style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
                     value={profileForm.location}
                     onChangeText={(text) => setProfileForm({...profileForm, location: text})}
                     placeholder="Enter your location"
-                    placeholderTextColor={colors.textSecondary}
+                    placeholderTextColor={theme.textSecondary}
                   />
                 </View>
                 
                 <View style={styles.inputWrapper}>
-                  <Text style={[styles.inputLabel, { color: colors.text }]}>Bio</Text>
+                  <Text style={[styles.inputLabel, { color: theme.text }]}>Bio</Text>
                   <TextInput
-                    style={[styles.textArea, { backgroundColor: colors.inputBackground, color: colors.text }]}
+                    style={[styles.textArea, { backgroundColor: theme.inputBackground, color: theme.text }]}
                     value={profileForm.bio}
                     onChangeText={(text) => setProfileForm({...profileForm, bio: text})}
                     placeholder="Tell buyers about yourself"
-                    placeholderTextColor={colors.textSecondary}
+                    placeholderTextColor={theme.textSecondary}
                     multiline
                     numberOfLines={4}
                     textAlignVertical="top"
@@ -1753,7 +1757,7 @@ const SellerDashboardScreen = () => {
               </View>
               
               <TouchableOpacity 
-                style={[styles.saveButton, { backgroundColor: colors.primary }]}
+                style={[styles.saveButton, { backgroundColor: theme.primary }]}
                 onPress={handleSaveProfile}
                 disabled={loading}
               >
