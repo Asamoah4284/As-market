@@ -913,50 +913,6 @@ const SellerDashboardScreen = () => {
             </View>
 
             <View style={styles.profileContent}>
-              <View style={[styles.profileSection, { backgroundColor: theme.cardBackground }]}>
-                <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                  Contact Information
-                </Text>
-                <View style={styles.infoItem}>
-                  <MaterialIcons name="phone" size={20} color={theme.primary} />
-                  <Text style={[styles.infoText, { color: theme.text }]}>
-                    {profileData.phone}
-                  </Text>
-                </View>
-                <View style={styles.infoItem}>
-                  <MaterialIcons name="location-on" size={20} color={theme.primary} />
-                  <Text style={[styles.infoText, { color: theme.text }]}>
-                    {profileData.location}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={[styles.profileSection, { backgroundColor: theme.cardBackground }]}>
-                <Text style={[styles.sectionTitle, { color: theme.text }]}>
-                  About Me
-                </Text>
-                <Text style={[styles.bioText, { color: theme.text }]}>
-                  {profileData.bio}
-                </Text>
-              </View>
-              
-              {!profileData.isPremium && (
-                <TouchableOpacity 
-                  style={[styles.premiumButton, { backgroundColor: theme.warning }]}
-                  onPress={handlePremiumUpgrade}
-                >
-                  <MaterialIcons name="workspace-premium" size={20} color="white" />
-                  <Text style={styles.premiumButtonText}>Become a Premium Seller</Text>
-                </TouchableOpacity>
-              )}
-
-              <TouchableOpacity 
-                style={[styles.editProfileButton, { backgroundColor: theme.primary }]}
-                onPress={handleEditProfile}
-              >
-                <MaterialIcons name="edit" size={20} color="white" />
-                <Text style={styles.editProfileText}>Edit Profile</Text>
-              </TouchableOpacity>
 
               <TouchableOpacity 
                 style={[styles.logoutButton, { backgroundColor: theme.danger }]}
@@ -1354,9 +1310,17 @@ const SellerDashboardScreen = () => {
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={[styles.header, { backgroundColor: theme.primary }]}>
         <Text style={styles.headerTitle}>Seller Dashboard</Text>
-        <TouchableOpacity style={styles.headerButton}>
-          <MaterialIcons name="notifications" size={24} color="white" />
-        </TouchableOpacity>
+        <View style={styles.headerIcons}>
+          <TouchableOpacity 
+            style={styles.headerButton}
+            onPress={() => navigation.navigate('PromoteStore')} // Navigate to PromoteStore screen
+          >
+            <MaterialIcons name="campaign" size={24} color="white" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.headerButton}>
+            <MaterialIcons name="notifications" size={24} color="white" />
+          </TouchableOpacity>
+        </View>
       </View>
       
       <View style={styles.content}>
@@ -1647,130 +1611,7 @@ const SellerDashboardScreen = () => {
         </View>
       </Modal>
 
-      {/* Profile Edit Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={profileModalVisible}
-        onRequestClose={() => setProfileModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={[styles.modalContent, { backgroundColor: theme.cardBackground }]}>
-            <View style={styles.modalHeader}>
-              <Text style={[styles.modalTitle, { color: theme.text }]}>
-                Edit Profile
-              </Text>
-              <TouchableOpacity onPress={() => setProfileModalVisible(false)}>
-                <MaterialIcons name="close" size={24} color={theme.text} />
-              </TouchableOpacity>
-            </View>
-            
-            {renderMessages()}
-            
-            <ScrollView style={styles.formContainer}>
-              <View style={styles.profileImagePickerContainer}>
-                <TouchableOpacity 
-                  style={styles.profileImagePicker}
-                  onPress={pickProfileImage}
-                >
-                  {profileForm.avatar ? (
-                    <Image 
-                      source={{ uri: profileForm.avatar }} 
-                      style={styles.profileImagePreview} 
-                    />
-                  ) : (
-                    <View style={[styles.profileImagePlaceholder, { backgroundColor: theme.primary }]}>
-                      <Text style={styles.profileImagePlaceholderText}>
-                        {profileForm.name.charAt(0)}
-                      </Text>
-                    </View>
-                  )}
-                  <View style={styles.profileImageOverlay}>
-                    <MaterialIcons name="camera-alt" size={24} color="white" />
-                    <Text style={styles.profileImageOverlayText}>Change Photo</Text>
-                  </View>
-                </TouchableOpacity>
-              </View>
-              
-              <View style={styles.formSection}>
-                <Text style={[styles.sectionTitle, { color: theme.text }]}>Personal Information</Text>
-                
-                <View style={styles.inputWrapper}>
-                  <Text style={[styles.inputLabel, { color: theme.text }]}>Full Name *</Text>
-                  <TextInput
-                    style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
-                    value={profileForm.name}
-                    onChangeText={(text) => setProfileForm({...profileForm, name: text})}
-                    placeholder="Enter your full name"
-                    placeholderTextColor={theme.textSecondary}
-                  />
-                </View>
-                
-                <View style={styles.inputWrapper}>
-                  <Text style={[styles.inputLabel, { color: theme.text }]}>Email Address *</Text>
-                  <TextInput
-                    style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
-                    value={profileForm.email}
-                    onChangeText={(text) => setProfileForm({...profileForm, email: text})}
-                    placeholder="Enter your email"
-                    placeholderTextColor={theme.textSecondary}
-                    keyboardType="email-address"
-                  />
-                </View>
-                
-                <View style={styles.inputWrapper}>
-                  <Text style={[styles.inputLabel, { color: theme.text }]}>Phone Number *</Text>
-                  <TextInput
-                    style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
-                    value={profileForm.phone}
-                    onChangeText={(text) => setProfileForm({...profileForm, phone: text})}
-                    placeholder="Enter your phone number"
-                    placeholderTextColor={theme.textSecondary}
-                    keyboardType="phone-pad"
-                  />
-                </View>
-                
-                <View style={styles.inputWrapper}>
-                  <Text style={[styles.inputLabel, { color: theme.text }]}>Location</Text>
-                  <TextInput
-                    style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
-                    value={profileForm.location}
-                    onChangeText={(text) => setProfileForm({...profileForm, location: text})}
-                    placeholder="Enter your location"
-                    placeholderTextColor={theme.textSecondary}
-                  />
-                </View>
-                
-                <View style={styles.inputWrapper}>
-                  <Text style={[styles.inputLabel, { color: theme.text }]}>Bio</Text>
-                  <TextInput
-                    style={[styles.textArea, { backgroundColor: theme.inputBackground, color: theme.text }]}
-                    value={profileForm.bio}
-                    onChangeText={(text) => setProfileForm({...profileForm, bio: text})}
-                    placeholder="Tell buyers about yourself"
-                    placeholderTextColor={theme.textSecondary}
-                    multiline
-                    numberOfLines={4}
-                    textAlignVertical="top"
-                  />
-                </View>
-              </View>
-              
-              <TouchableOpacity 
-                style={[styles.saveButton, { backgroundColor: theme.primary }]}
-                onPress={handleSaveProfile}
-                disabled={loading}
-              >
-                {loading ? (
-                  <ActivityIndicator color="white" size="small" />
-                ) : (
-                  <Text style={styles.saveButtonText}>Save Changes</Text>
-                )}
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
+
     </SafeAreaView>
   );
 };
@@ -1783,7 +1624,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 12, // Adjusted padding
     elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -1795,8 +1637,12 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: 'white',
   },
+  headerIcons: { // Added style for icon container
+    flexDirection: 'row',
+  },
   headerButton: {
-    padding: 4,
+    padding: 8, // Adjusted padding for touchable area
+    marginLeft: 8, // Add some space between icons
   },
   content: {
     flex: 1,

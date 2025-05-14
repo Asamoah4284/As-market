@@ -11,6 +11,7 @@ const sellerRoutes = require('./routes/sellerRoutes');
 const adminRoutes = require('./routes/adminRoutes');
 const orderRoutes = require('./routes/orderRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const promotionRoutes = require('./routes/promotionRoutes');
 const mongoose = require('mongoose');
 
 dotenv.config();
@@ -40,6 +41,7 @@ app.use('/api/seller', sellerRoutes);
 app.use('/api/admin', adminRoutes);
 app.use('/api/orders', orderRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/store-promotions', promotionRoutes);
 
 app.get('/api/test', async (req, res) => {
   try {

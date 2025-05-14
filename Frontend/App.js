@@ -29,6 +29,7 @@ import PaymentSuccessScreen from './screens/PaymentSuccessScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
 import FavoritesScreen from './screens/FavoritesScreen';
 import { Platform, Alert, Text, View, Button } from 'react-native';
+import PromoteStoreScreen from './screens/PromoteStoreScreen';
 
 const Stack = createStackNavigator();
 
@@ -304,6 +305,7 @@ function AppContent() {
           <Stack.Screen name="CategoriesScreen" component={CategoriesScreen} />
           <Stack.Screen name="SellerProfile" component={SellerProfileScreen} />
           <Stack.Screen name="Payment" component={PaymentScreen} />
+          <Stack.Screen name="PromoteStore" component={PromoteStoreScreen} />
           <Stack.Screen name="PaymentSuccess" component={PaymentSuccessScreen} options={{ gestureEnabled: false }} />
           <Stack.Screen name="Favorites" component={FavoritesScreen} />
         </Stack.Navigator>
