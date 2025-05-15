@@ -25,6 +25,7 @@ import NotificationCenter from '../components/NotificationCenter';
 import NotificationBadge from '../components/NotificationBadge';
 import { handleAddToCartNotification } from '../services/notificationService';
 import { requireAuthentication } from '../App'; // Import the authentication helper
+import { API_BASE_URL } from '../config/api';
 
 // Mock data - replace with actual API calls
 const FEATURED_PRODUCTS = [
@@ -99,6 +100,9 @@ const BuyerHomeScreen = () => {
   const [locationPermission, setLocationPermission] = useState(false);
   const [favorites, setFavorites] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
+  const [banners, setBanners] = useState([]);
+  const bannersScrollViewRef = useRef(null);
+  const [activeBannerIndex, setActiveBannerIndex] = useState(0);
   
   // Get cart items from Redux store
   const { items: cartItems } = useSelector(state => state.cart);
@@ -576,6 +580,39 @@ const BuyerHomeScreen = () => {
     );
   };
 
+  useEffect(() => {
+    // Fetch banners from backend
+    const fetchBanners = async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/banners`);
+        const data = await res.json();
+        setBanners(data);
+      } catch (e) {
+        setBanners([]);
+      }
+    };
+    fetchBanners();
+  }, []);
+
+  // Auto-scroll banners
+  useEffect(() => {
+    let interval;
+    if (banners.length > 1) {
+      interval = setInterval(() => {
+        if (bannersScrollViewRef.current) {
+          const nextIndex = (activeBannerIndex + 1) % banners.length;
+          const slideWidth = 280 + 15;
+          bannersScrollViewRef.current.scrollTo({
+            x: nextIndex * slideWidth,
+            animated: true,
+          });
+          setActiveBannerIndex(nextIndex);
+        }
+      }, 3000);
+    }
+    return () => interval && clearInterval(interval);
+  }, [activeBannerIndex, banners.length]);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
@@ -671,7 +708,7 @@ const BuyerHomeScreen = () => {
         </View>
         
         <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollContent}>
-          {/* Special Offers Section - Added based on image reference */}
+          {/* Banner Carousel Section */}
           <View style={styles.specialOffersContainer}>
             <View style={styles.specialOffersHeader}>
               <Text style={styles.specialOffersTitle}>#SpecialForYou</Text>
@@ -679,54 +716,53 @@ const BuyerHomeScreen = () => {
                 <Text style={styles.seeAllLink}>See All</Text>
               </TouchableOpacity>
             </View>
-            
-            <ScrollView 
-              ref={specialOffersScrollViewRef}
-              horizontal 
+            <ScrollView
+              ref={bannersScrollViewRef}
+              horizontal
               showsHorizontalScrollIndicator={false}
               pagingEnabled
               onMomentumScrollEnd={(event) => {
-                const slideWidth = 280 + 15; // card width + margin
+                const slideWidth = 280 + 15;
                 const offsetX = event.nativeEvent.contentOffset.x;
                 const activeIndex = Math.round(offsetX / slideWidth);
-                setActiveOfferIndex(activeIndex);
+                setActiveBannerIndex(activeIndex);
               }}
             >
-              {specialOffers.map((offer) => (
-                <TouchableOpacity key={offer.id} style={styles.specialOfferCard}>
-                  <Image 
-                    source={{ uri: offer.backgroundImage }}
-                    style={styles.offerBackgroundImage}
-                  />
+              {banners.map((banner) => (
+                <TouchableOpacity
+                  key={banner._id}
+                  style={styles.specialOfferCard}
+                  onPress={() => {
+                    if (banner.linkType === 'seller') {
+                      navigation.navigate('CategoriesScreen', { sellerId: banner.linkId });
+                    } else if (banner.linkType === 'product') {
+                      navigation.navigate('ProductDetails', { productId: banner.linkId });
+                    }
+                  }}
+                >
+                  <Image source={{ uri: banner.image }} style={styles.offerBackgroundImage} />
                   <View style={styles.offerContentWrapper}>
-                    <View style={styles.offerImageContainer}>
-                      <Image 
-                        source={{ uri: offer.productImage }}
-                        style={styles.offerImage}
-                        resizeMode="cover"
-                      />
-                    </View>
                     <View style={styles.offerContent}>
-                      <Text style={styles.offerHeading}>{offer.title}</Text>
-                      <Text style={styles.offerDiscount}>{offer.discount}</Text>
-                      <Text style={styles.offerDetails}>{offer.details}</Text>
-                      <TouchableOpacity style={[styles.offerButton, { backgroundColor: offer.buttonColor }]}>
-                        <Text style={styles.offerButtonText}>{offer.buttonText}</Text>
-                      </TouchableOpacity>
+                      <Text style={styles.offerHeading}>{banner.title}</Text>
+                      <Text style={styles.offerDetails}>{banner.description}</Text>
+                      {banner.buttonText ? (
+                        <TouchableOpacity style={styles.offerButton}>
+                          <Text style={styles.offerButtonText}>{banner.buttonText}</Text>
+                        </TouchableOpacity>
+                      ) : null}
                     </View>
                   </View>
                 </TouchableOpacity>
               ))}
             </ScrollView>
-            
             {/* Pagination Dots */}
             <View style={styles.paginationDotsContainer}>
-              {specialOffers.map((_, index) => (
-                <View 
+              {banners.map((_, index) => (
+                <View
                   key={index}
                   style={[
                     styles.paginationDot,
-                    index === activeOfferIndex && styles.paginationDotActive
+                    index === activeBannerIndex && styles.paginationDotActive,
                   ]}
                 />
               ))}

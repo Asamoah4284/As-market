@@ -13,7 +13,8 @@ import {
   Dimensions,
   ActivityIndicator,
   Image,
-  Alert
+  Alert,
+  Modal
 } from 'react-native';
 import { API_BASE_URL } from '../config/api';
 import { Ionicons } from '@expo/vector-icons';
@@ -32,6 +33,8 @@ function SignUpScreen({ navigation }) {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [hidePassword, setHidePassword] = useState(true);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [termsModalVisible, setTermsModalVisible] = useState(false);
 
   const handleSignUp = async () => {
     try {
@@ -40,6 +43,12 @@ function SignUpScreen({ navigation }) {
       
       if (!userType) {
         setError('Please select whether you want to buy or sell items');
+        setIsLoading(false);
+        return;
+      }
+
+      if (userType === 'seller' && !agreedToTerms) {
+        setError('You must agree to the Terms and Conditions before creating an account.');
         setIsLoading(false);
         return;
       }
@@ -254,11 +263,45 @@ function SignUpScreen({ navigation }) {
               </View>
               <Text style={styles.passwordHint}>Password must be at least 6 characters</Text>
             </View>
+
+            {/* Terms and Conditions Section */}
+            {userType === 'seller' && (
+              <View style={styles.termsContainer}>
+                <TouchableOpacity
+                  style={styles.checkboxContainer}
+                  onPress={() => setAgreedToTerms(!agreedToTerms)}
+                  activeOpacity={0.8}
+                >
+                  <View style={[
+                    styles.checkbox,
+                    agreedToTerms && styles.checkboxChecked
+                  ]}>
+                    {agreedToTerms && (
+                      <Ionicons name="checkmark" size={16} color="#fff" />
+                    )}
+                  </View>
+                  <Text style={styles.termsText}>
+                    I agree to the{' '}
+                    <Text
+                      style={styles.termsLink}
+                      onPress={() => setTermsModalVisible(true)}
+                    >
+                      Terms and Conditions
+                    </Text>
+                    :{"\n"}
+                    When you post a product on the marketplace, an additional 5% will be added to your original price and posted as the final price.
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
             
-            <TouchableOpacity 
-              style={styles.submitButton}
+            <TouchableOpacity
+              style={[
+                styles.submitButton,
+                ((userType === 'seller' && !agreedToTerms) || isLoading) && { backgroundColor: '#ccc' }
+              ]}
               onPress={handleSignUp}
-              disabled={isLoading}
+              disabled={(userType === 'seller' && !agreedToTerms) || isLoading}
             >
               {isLoading ? (
                 <ActivityIndicator color="#fff" />
@@ -307,6 +350,32 @@ function SignUpScreen({ navigation }) {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
+      <Modal
+        visible={termsModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setTermsModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <Text style={styles.modalTitle}>Terms and Conditions</Text>
+            <ScrollView style={{maxHeight: 350}}>
+              <Text style={styles.modalText}>
+                {/* Replace this with your actual legal document */}
+                By using this app as a seller, you agree that an additional 5% will be added to your original price and posted as the final price on the marketplace. 
+                {"\n\n"}
+               
+              </Text>
+            </ScrollView>
+            <TouchableOpacity
+              style={styles.closeModalButton}
+              onPress={() => setTermsModalVisible(false)}
+            >
+              <Text style={styles.closeModalButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -437,6 +506,41 @@ const styles = StyleSheet.create({
     marginTop: 4,
     marginLeft: 4,
   },
+  termsContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    marginBottom: 15,
+  },
+  checkboxContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  checkbox: {
+    width: 22,
+    height: 22,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: '#5D3FD3',
+    backgroundColor: '#fff',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 10,
+    marginTop: 2,
+  },
+  checkboxChecked: {
+    backgroundColor: '#5D3FD3',
+    borderColor: '#5D3FD3',
+  },
+  termsText: {
+    flex: 1,
+    color: '#333',
+    fontSize: 13,
+  },
+  termsLink: {
+    color: '#5D3FD3',
+    textDecorationLine: 'underline',
+    fontWeight: 'bold',
+  },
   submitButton: {
     backgroundColor: '#5D3FD3',
     paddingVertical: 16,
@@ -503,6 +607,44 @@ const styles = StyleSheet.create({
     color: '#5D3FD3',
     fontWeight: 'bold',
     marginLeft: 5,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 20,
+    width: '85%',
+    maxWidth: 400,
+    alignItems: 'center',
+  },
+  modalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 10,
+    color: '#5D3FD3',
+  },
+  modalText: {
+    fontSize: 14,
+    color: '#333',
+    marginBottom: 20,
+  },
+  closeModalButton: {
+    backgroundColor: '#5D3FD3',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 30,
+    alignItems: 'center',
+    marginTop: 10,
+  },
+  closeModalButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
+    fontSize: 15,
   },
 });
 

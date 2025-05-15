@@ -34,6 +34,7 @@ const cartController = {
                 price: cartItem.product.price,
                 image: cartItem.product.images?.[0] || cartItem.product.image,
                 quantity: cartItem.quantity,
+                sellerId: cartItem.product.seller
             };
 
             res.status(200).json(transformedItem);
@@ -71,6 +72,7 @@ const cartController = {
                     price: item.product.price,
                     image: item.product.images?.[0] || item.product.image,
                     quantity: item.quantity,
+                    sellerId: item.product.seller
                 }));
 
             // Optionally clean up cart items with null products
@@ -110,6 +112,7 @@ const cartController = {
                 price: cartItem.product.price,
                 image: cartItem.product.images?.[0] || cartItem.product.image,
                 quantity: cartItem.quantity,
+                sellerId: cartItem.product.seller
                 // Add any other product fields you need
             };
 

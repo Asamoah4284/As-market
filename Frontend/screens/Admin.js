@@ -22,6 +22,7 @@ import NotificationBadge from '../components/NotificationBadge';
 import { registerForPushNotificationsAsync } from '../services/notificationService';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
+import BannerManagement from './BannerManagement';
 // Ignore specific SVG-related warnings
 LogBox.ignoreLogs([
   'Invariant Violation: Tried to register two views with the same name RNSVGFeFlood',
@@ -175,6 +176,12 @@ const Admin = () => {
         { title: 'Special Offers',  params: { filter: 'Special Offers' } },
         { title: 'Premium',  params: { filter: 'Premium' } }
       ]
+    },
+    {
+      title: 'Banner Management',
+      icon: 'image',
+      section: 'banners',
+      description: 'Manage homepage banners'
     },
     {
       title: 'Settings',
@@ -512,6 +519,12 @@ const Admin = () => {
             </View>
           </View>
         );
+      case 'banners':
+        return (
+          <View style={[styles.sectionContainer, {flex: 1, padding: 0}]}> 
+            <BannerManagement />
+          </View>
+        );
       case 'settings':
         return (
           <ScrollView>
@@ -571,9 +584,6 @@ const Admin = () => {
           {renderDrawerContent()}
         </Animated.View>
         
-        {activeSection !== 'dashboard' && activeSection !== 'users' && (
-          <Text>Welcome to {adminOptions.find(option => option.section === activeSection)?.title}</Text>
-        )}
         
         <View style={[styles.content, drawerOpen && styles.contentWithDrawer]}>
           {renderContent()}

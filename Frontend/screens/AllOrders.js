@@ -175,6 +175,17 @@ const AllOrders = () => {
         <Text style={styles.date}>Date: {formatDate(item.createdAt)}</Text>
         <Text style={styles.total}>Total: ${item.totalAmount?.toFixed(2) || '0.00'}</Text>
       </View>
+      {/* Seller Phones Section */}
+      {Array.isArray(item.items) && item.items.length > 0 && (
+        <View style={styles.sellerPhonesSection}>
+          <Text style={styles.sellerPhonesTitle}>Seller Phone(s):</Text>
+          {item.items.map((orderItem, idx) => (
+            <Text key={idx} style={styles.sellerPhoneText}>
+             {orderItem.sellerPhone}
+            </Text>
+          ))}
+        </View>
+      )}
       <View style={styles.actions}>
         <TouchableOpacity 
           style={styles.actionButton}
@@ -294,6 +305,23 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     color: '#0066cc',
     fontSize: 14,
+  },
+  sellerPhonesSection: {
+    marginBottom: 8,
+    backgroundColor: '#f8f8f8',
+    borderRadius: 6,
+    padding: 8,
+  },
+  sellerPhonesTitle: {
+    fontWeight: 'bold',
+    color: '#333',
+    fontSize: 13,
+    marginBottom: 2,
+  },
+  sellerPhoneText: {
+    fontSize: 13,
+    color: '#444',
+    marginLeft: 4,
   },
 });
 

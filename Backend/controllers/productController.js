@@ -78,6 +78,9 @@ const createProduct = asyncHandler(async (req, res) => {
     throw new Error('Not authorized as a seller');
   }
 
+  // Add 5% to the original price
+  const finalPrice = Math.round((Number(price) * 1.05) * 100) / 100;
+
   // Upload main image to Cloudinary
   let mainImageUrl;
   if (image) {
@@ -95,7 +98,7 @@ const createProduct = asyncHandler(async (req, res) => {
   const product = await Product.create({
     name,
     description,
-    price,
+    price: finalPrice,
     category,
     stock: isService ? 1 : stock, // Services always have stock of 1
     image: mainImageUrl,

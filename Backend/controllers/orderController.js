@@ -3,6 +3,7 @@ const Cart = require('../models/cartModel');
 const https = require('https');
 const asyncHandler = require('express-async-handler');
 const Product = require('../models/productModel');
+const User = require('../models/User');
 
 // Paystack secret key
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
@@ -237,17 +238,38 @@ const createOrder = asyncHandler(async (req, res) => {
       }
     }
 
-    // Create order
-    const orderData = {
-      user: req.user._id,
-      items: items.map(item => ({
+    // Prepare items with seller phone numbers
+    const itemsWithSellerPhone = await Promise.all((items || []).map(async item => {
+      let sellerPhone = '';
+      try {
+        // Try to get sellerId from item, fallback to product lookup if missing
+        let sellerId = item.sellerId;
+        if (!sellerId && item.productId) {
+          const product = await Product.findById(item.productId).select('seller');
+          if (product && product.seller) sellerId = product.seller;
+        }
+        if (sellerId) {
+          const sellerUser = await User.findById(sellerId).select('phone');
+          if (sellerUser && sellerUser.phone) sellerPhone = sellerUser.phone;
+        }
+      } catch (e) {
+        console.error('Error fetching seller phone:', e);
+      }
+      return {
         product: item.productId,
         quantity: item.quantity,
         price: item.price,
         name: item.name,
         image: item.image,
-        sellerId: item.sellerId
-      })),
+        sellerId: item.sellerId,
+        sellerPhone
+      };
+    }));
+
+    // Create order
+    const orderData = {
+      user: req.user._id,
+      items: itemsWithSellerPhone,
       paymentInfo: {
         reference: req.body.paymentReference || paymentReference,
         status: paymentMethod === 'pay_on_delivery' ? 'pending' : 'success',
