@@ -1,10 +1,9 @@
 // API Configuration
 import Constants from 'expo-constants';
 
-// Get the API URL from environment variables, with a fallback
-const API_URL = Constants.expoConfig?.extra?.API_URL || 'http://172.20.10.3:5000';
+// Get the API URL from app.json or use a fallback
+export const API_BASE_URL = Constants.expoConfig?.extra?.API_URL || 'https://unimarket-ikin.onrender.com';
 
-export const API_BASE_URL = API_URL;
 export const API_ENDPOINTS = {
   // Auth endpoints
   LOGIN: `${API_BASE_URL}/api/users/login`,
@@ -24,4 +23,6 @@ export const API_ENDPOINTS = {
   UPDATE_CART: `${API_BASE_URL}/api/cart`,
 };
 
-export default API_ENDPOINTS; 
+export default {
+  API_BASE_URL
+}; 

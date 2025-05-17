@@ -30,6 +30,9 @@ import OnboardingScreen from './screens/OnboardingScreen';
 import FavoritesScreen from './screens/FavoritesScreen';
 import { Platform, Alert, Text, View, Button } from 'react-native';
 import PromoteStoreScreen from './screens/PromoteStoreScreen';
+import Bookings from './screens/Bookings';
+import ServiceBooking from './screens/ServiceBooking';
+import ServiceDetails from './screens/ServiceDetails';
 
 const Stack = createStackNavigator();
 
@@ -302,6 +305,9 @@ function AppContent() {
             options={{ headerShown: false }}
           />
           <Stack.Screen name="Categories" component={Categories} />
+          <Stack.Screen name="Bookings" component={Bookings} />
+          <Stack.Screen name="ServiceBooking" component={ServiceBooking} />
+          <Stack.Screen name="ServiceDetails" component={ServiceDetails} />
           <Stack.Screen name="CategoriesScreen" component={CategoriesScreen} />
           <Stack.Screen name="SellerProfile" component={SellerProfileScreen} />
           <Stack.Screen name="Payment" component={PaymentScreen} />

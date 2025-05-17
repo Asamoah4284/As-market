@@ -33,7 +33,7 @@ app.get('/', (req, res) => {
 });
 
 // Routes
-app.use('/api/users', userRoutes);
+app.use('y', userRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api', commentRoutes);
 app.use('/api/cart', cartRoutes);

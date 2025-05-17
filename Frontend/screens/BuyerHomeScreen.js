@@ -380,6 +380,18 @@ const BuyerHomeScreen = () => {
     }
   };
 
+  const handleBookService = async (service) => {
+    // Check if user is authenticated
+    if (!(await requireAuthentication(navigation, 'book a service'))) {
+      return;
+    }
+    
+    // Navigate to service booking screen with service details
+    navigation.navigate('ServiceBooking', {
+      service: service
+    });
+  };
+
   const renderFeaturedProduct = ({ item }) => {
     const imageUri = item.image && (item.image.startsWith('http') 
       ? item.image 
@@ -512,9 +524,9 @@ const BuyerHomeScreen = () => {
       <TouchableOpacity 
         style={styles.productCard}
         onPress={() => {
-          console.log('Navigating to product details with ID:', item._id);
-          navigation.navigate('ProductDetails', { 
-            productId: item._id
+          console.log('Navigating to service details with ID:', item._id);
+          navigation.navigate('ServiceDetails', { 
+            serviceId: item._id
           });
         }}
       >
@@ -569,10 +581,10 @@ const BuyerHomeScreen = () => {
               <Text style={styles.sellerText}>Available Now</Text>
             </View>
             <TouchableOpacity 
-              style={styles.addToCartButton}
-              onPress={() => handleAddToCart(item)}
+              style={styles.bookServiceButton}
+              onPress={() => handleBookService(item)}
             >
-              <Ionicons name="add-circle" size={20} color="#3498db" />
+              <Ionicons name="calendar" size={20} color="#4ECDC4" />
             </TouchableOpacity>
           </View>
         </View>
@@ -1539,6 +1551,14 @@ const styles = StyleSheet.create({
     height: 28,
     borderRadius: 14,
     backgroundColor: 'rgba(52, 152, 219, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  bookServiceButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(78, 205, 196, 0.1)',
     justifyContent: 'center',
     alignItems: 'center',
   },
