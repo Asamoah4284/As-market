@@ -21,7 +21,17 @@ const PaymentScreen = ({ navigation, route }) => {
   const [isProcessing, setIsProcessing] = useState(false);
   const dispatch = useDispatch();
   const { items: cartItems } = useSelector(state => state.cart);
-  const { amount } = route.params;
+  const { amount, shippingDetails, paymentMethod: initialPaymentMethod } = route.params || {};
+
+  // Only set initial payment method if it's provided
+  useEffect(() => {
+    if (initialPaymentMethod) {
+      setPaymentMethod(initialPaymentMethod);
+    } else {
+      // Ensure paymentMethod is null to show payment options
+      setPaymentMethod(null);
+    }
+  }, [initialPaymentMethod]);
 
   // Debug cart state
   useEffect(() => {
@@ -68,142 +78,6 @@ const PaymentScreen = ({ navigation, route }) => {
     getUserEmail();
   }, []);
 
-  const createOrder = async (reference, forcePaymentMethod = null) => {
-    try {
-      const token = await AsyncStorage.getItem('userToken');
-      if (!token) {
-        throw new Error('Authentication token not found. Please log in again.');
-      }
-      
-      console.log('Token available:', !!token);
-      
-      // Ensure we have cart items
-      if (!cartItems || cartItems.length === 0) {
-        console.error('Cart items are empty or undefined:', cartItems);
-        throw new Error('Your cart is empty. Please add items before checkout.');
-      }
-      
-      // Debug: Check cart items structure
-      try {
-        console.log('Cart items type:', typeof cartItems);
-        console.log('Cart items count:', cartItems.length);
-        console.log('First item keys:', Object.keys(cartItems[0] || {}));
-        console.log('Raw cart items:', JSON.stringify(cartItems, null, 2));
-      } catch (e) {
-        console.error('Error inspecting cart items:', e);
-      }
-      
-      // Prepare order items from cart with proper validation
-      const orderItems = cartItems.map(item => {
-        const productId = item.product?._id || item._id;
-        const name = item.product?.name || item.name;
-        const price = item.product?.price || item.price;
-        const image = item.product?.image || item.image;
-        const sellerId = item.product?.seller || item.seller;
-        
-        // Log each item for debugging
-        console.log('Processing cart item:', { 
-          productId, name, price, quantity: item.quantity, image, sellerId 
-        });
-        
-        if (!productId || !name || !price) {
-          console.error('Invalid item data:', item);
-          throw new Error('Invalid product data in cart');
-        }
-        
-        return {
-          productId,
-          name,
-          quantity: item.quantity,
-          price,
-          image,
-          sellerId
-        };
-      });
-
-      // Final validation of order items
-      if (!orderItems.length) {
-        throw new Error('Failed to prepare order items from cart');
-      }
-
-      // Log the order details for debugging
-      console.log('Prepared order items:', JSON.stringify(orderItems));
-      console.log('Total amount:', amount);
-      console.log('Payment reference:', reference);
-      console.log('Payment method:', forcePaymentMethod || paymentMethod);
-
-      // Use API_ENDPOINTS if available, otherwise construct URL from base
-      const orderUrl = API_ENDPOINTS.CREATE_ORDER || `${API_BASE_URL}/api/orders`;
-      console.log('Sending order to:', orderUrl);
-      
-      // Prepare the order payload - make sure orderItems is the property name used
-      const orderPayload = {
-        paymentReference: reference,
-        orderItems: orderItems,  // This must match what backend expects
-        totalAmount: amount,
-        paymentMethod: forcePaymentMethod || paymentMethod,
-        paymentStatus: (forcePaymentMethod || paymentMethod) === 'pay_on_delivery' ? 'pending' : 'success'
-      };
-      
-      // Log the final payload being sent
-      console.log('Final order payload:', JSON.stringify(orderPayload, null, 2));
-      console.log('Payment method in payload:', forcePaymentMethod || paymentMethod);
-
-      const response = await fetch(orderUrl, {
-        method: 'POST',
-        headers: { 
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(orderPayload)
-      });
-      
-      // First check the content type to determine how to parse the response
-      const contentType = response.headers.get('content-type');
-      
-      if (!response.ok) {
-        let errorMessage = `Server error: ${response.status}`;
-        try {
-          if (contentType && contentType.includes('application/json')) {
-            const errorData = await response.json();
-            console.error('Server error details:', errorData);
-            
-            // Special handling for specific known errors
-            if (errorData.message && errorData.message.includes('No order items')) {
-              throw new Error('Cart validation failed. Please refresh your cart and try again.');
-            }
-            
-            errorMessage = errorData.message || errorMessage;
-          } else {
-            // Handle non-JSON responses (like HTML error pages)
-            const errorText = await response.text();
-            console.error('Non-JSON error response:', errorText);
-            errorMessage = 'Server returned an unexpected response format';
-          }
-        } catch (parseError) {
-          console.error('Error parsing response:', parseError);
-          errorMessage = 'Unable to parse server response';
-        }
-        throw new Error(errorMessage);
-      }
-      
-      // Check for proper JSON response before parsing
-      if (!contentType || !contentType.includes('application/json')) {
-        const responseText = await response.text();
-        console.error('Unexpected content type:', contentType);
-        console.error('Response body:', responseText);
-        throw new Error('Server returned an unexpected response format');
-      }
-      
-      const data = await response.json();
-      console.log('Order created successfully:', data);
-      return data;  // Return the created order data
-    } catch (error) {
-      console.error('Error creating order:', error);
-      throw new Error(error.message || 'Error processing order');
-    }
-  };
-
   const handlePayOnDelivery = async () => {
     try {
       setIsProcessing(true);
@@ -219,19 +93,113 @@ const PaymentScreen = ({ navigation, route }) => {
       const payOnDeliveryRef = `POD-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
       console.log('Generated POD reference:', payOnDeliveryRef);
       
-      // Create the order with the POD reference
-      const orderResult = await createOrder(payOnDeliveryRef, 'pay_on_delivery');
-      console.log('POD Order created:', orderResult);
+      // Debug: Log cartItems before preparing the order
+      console.log('Cart items before preparing order:', JSON.stringify(cartItems, null, 2));
+      
+      // Format the order items according to what backend expects
+      const formattedOrderItems = cartItems.map(item => {
+        return {
+          productId: item.product?._id || item._id || item.productId,
+          name: item.product?.name || item.name,
+          price: item.product?.price || item.price,
+          quantity: item.quantity,
+          image: item.product?.image || item.image,
+          sellerId: item.product?.seller || item.seller || item.sellerId
+        };
+      });
+      
+      console.log('Formatted order items:', JSON.stringify(formattedOrderItems, null, 2));
+      
+      // Get the token for authentication
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) throw new Error('Authentication token not found');
+      
+      // Ensure location is never empty and is one of the required enum values
+      let locationValue = shippingDetails?.shippingAddress?.location || '';
+      
+      // Define valid locations based on backend schema
+      const validLocations = [
+        'OLD SITE', 'NEW SITE', 'AYENSU', 'AMAMOMA', 'KWAPRO', 
+        'VALCO', 'ADEHYE3', 'SUPERNUATION', 'SRC', 'CASLEY HAYFORD', 
+        'ATL', 'OGUAA', 'KNH'
+      ];
+      
+      // Check if location needs to be normalized (uppercase)
+      if (locationValue && !validLocations.includes(locationValue)) {
+        // Try to normalize it
+        const normalizedLocation = locationValue.toUpperCase();
+        if (validLocations.includes(normalizedLocation)) {
+          locationValue = normalizedLocation;
+        }
+      }
+
+      // Validate location before sending
+      if (!locationValue || !validLocations.includes(locationValue)) {
+        console.error('Invalid location:', locationValue);
+        throw new Error(`Invalid delivery location. Please go back and select from the available locations.`);
+      }
+      
+      console.log('DEBUG - Using location value:', locationValue);
+      console.log('DEBUG - Is location valid:', validLocations.includes(locationValue));
+      
+      // Debug shipping details
+      console.log('DEBUG - Full shipping details object:', JSON.stringify(shippingDetails, null, 2));
+      
+      // Prepare the order payload
+      const orderPayload = {
+        paymentReference: payOnDeliveryRef,
+        orderItems: formattedOrderItems,
+        totalAmount: amount,
+        paymentMethod: 'pay_on_delivery',
+        shippingAddress: {
+          location: locationValue,
+          roomNumber: shippingDetails?.shippingAddress?.roomNumber || '',
+          additionalInfo: shippingDetails?.shippingAddress?.additionalInfo || ''
+        },
+        buyerContact: {
+          phone: shippingDetails?.buyerContact?.phone || '',
+          alternativePhone: shippingDetails?.buyerContact?.alternativePhone || ''
+        },
+        preferredDeliveryDay: shippingDetails?.preferredDeliveryDay || new Date()
+      };
+      
+      console.log('Order payload for POD:', JSON.stringify(orderPayload, null, 2));
+      
+      // Send the create order request
+      const response = await fetch(`${API_BASE_URL}/api/orders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(orderPayload)
+      });
+      
+      const responseData = await response.json();
+      
+      if (!response.ok) {
+        console.error('Server responded with error:', responseData);
+        throw new Error(responseData.message || 'Failed to create order');
+      }
+      
+      console.log('POD Order created:', responseData);
       
       // Generate an order number from the order ID
-      const orderNumber = orderResult._id.substring(orderResult._id.length - 6).toUpperCase();
+      const orderNumber = responseData._id.substring(responseData._id.length - 6).toUpperCase();
       
       // Send local notifications
       const notificationId = await handleOrderPlacedNotification(orderNumber);
       console.log('Order placed notification sent:', notificationId);
       
       // Add notification to Redux store
-    
+      dispatch(addNotification({
+        title: 'Order Placed',
+        body: `Your order #${orderNumber} has been placed successfully.`,
+        data: { 
+          type: 'ORDER_PLACED',
+          orderId: responseData._id
+        }
+      }));
       
       // Clear cart after successful order creation
       dispatch(clearCart());
@@ -244,7 +212,7 @@ const PaymentScreen = ({ navigation, route }) => {
           params: {
             orderNumber: orderNumber,
             amount: amount,
-            orderId: orderResult._id,
+            orderId: responseData._id,
             isPOD: true
           }
         }],
@@ -292,12 +260,98 @@ const PaymentScreen = ({ navigation, route }) => {
         throw new Error('No payment reference received from Paystack');
       }
 
-      console.log('Creating order with payment reference:', paymentReference);
-      const orderResult = await createOrder(paymentReference, 'online');
-      console.log('Order created:', orderResult);
+      console.log('Payment reference received:', paymentReference);
       
-      // Generate a order number from the order ID (could be any unique value)
-      const orderNumber = orderResult._id.substring(orderResult._id.length - 6).toUpperCase();
+      // Format the order items according to what backend expects
+      const formattedOrderItems = cartItems.map(item => {
+        return {
+          productId: item.product?._id || item._id || item.productId,
+          name: item.product?.name || item.name,
+          price: item.product?.price || item.price,
+          quantity: item.quantity,
+          image: item.product?.image || item.image,
+          sellerId: item.product?.seller || item.seller || item.sellerId
+        };
+      });
+      
+      console.log('Formatted order items:', JSON.stringify(formattedOrderItems, null, 2));
+      
+      // Get the token for authentication
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) throw new Error('Authentication token not found');
+      
+      // Ensure location is never empty and is one of the required enum values
+      let locationValue = shippingDetails?.shippingAddress?.location || '';
+      
+      // Define valid locations based on backend schema
+      const validLocations = [
+        'OLD SITE', 'NEW SITE', 'AYENSU', 'AMAMOMA', 'KWAPRO', 
+        'VALCO', 'ADEHYE3', 'SUPERNUATION', 'SRC', 'CASLEY HAYFORD', 
+        'ATL', 'OGUAA', 'KNH'
+      ];
+      
+      // Check if location needs to be normalized (uppercase)
+      if (locationValue && !validLocations.includes(locationValue)) {
+        // Try to normalize it
+        const normalizedLocation = locationValue.toUpperCase();
+        if (validLocations.includes(normalizedLocation)) {
+          locationValue = normalizedLocation;
+        }
+      }
+
+      // Validate location before sending
+      if (!locationValue || !validLocations.includes(locationValue)) {
+        console.error('Invalid location:', locationValue);
+        throw new Error(`Invalid delivery location. Please go back and select from the available locations.`);
+      }
+      
+      console.log('DEBUG - Using location value:', locationValue);
+      console.log('DEBUG - Is location valid:', validLocations.includes(locationValue));
+      
+      // Debug shipping details
+      console.log('DEBUG - Full shipping details object:', JSON.stringify(shippingDetails, null, 2));
+      
+      // Prepare the order payload
+      const orderPayload = {
+        paymentReference: paymentReference,
+        orderItems: formattedOrderItems,
+        totalAmount: amount,
+        paymentMethod: 'online',
+        shippingAddress: {
+          location: locationValue,
+          roomNumber: shippingDetails?.shippingAddress?.roomNumber || '',
+          additionalInfo: shippingDetails?.shippingAddress?.additionalInfo || ''
+        },
+        buyerContact: {
+          phone: shippingDetails?.buyerContact?.phone || '',
+          alternativePhone: shippingDetails?.buyerContact?.alternativePhone || ''
+        },
+        preferredDeliveryDay: shippingDetails?.preferredDeliveryDay || new Date()
+      };
+      
+      console.log('Order payload for online payment:', JSON.stringify(orderPayload, null, 2));
+      
+      // Send the create order request
+      const orderResponse = await fetch(`${API_BASE_URL}/api/orders`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(orderPayload)
+      });
+      
+      const responseData = await orderResponse.json();
+      
+      if (!orderResponse.ok) {
+        console.error('Server responded with error:', responseData);
+        throw new Error(responseData.message || 'Failed to create order');
+      }
+      
+      console.log('Online payment order created:', responseData);
+      
+      // Generate an order number from the order ID
+      const orderNumber = responseData._id.substring(responseData._id.length - 6).toUpperCase();
       
       // Send local notifications
       const notificationId1 = await handleOrderPlacedNotification(orderNumber);
@@ -315,7 +369,7 @@ const PaymentScreen = ({ navigation, route }) => {
         body: `Your order #${orderNumber} has been placed successfully.`,
         data: { 
           type: 'ORDER_PLACED',
-          orderId: orderResult._id
+          orderId: responseData._id
         }
       }));
       
@@ -324,13 +378,21 @@ const PaymentScreen = ({ navigation, route }) => {
         body: `Your payment of GHS ${amount} for order #${orderNumber} has been confirmed.`,
         data: { 
           type: 'PAYMENT_SUCCESSFUL',
-          orderId: orderResult._id,
+          orderId: responseData._id,
           amount: amount
         }
       }));
       
       // Only clear cart after successful order creation
       dispatch(clearCart());
+      
+      // For debugging - log the order data to console
+      console.log('%c 🔍 ORDER DEBUG INFO', 'background: #222; color: #bada55; padding: 5px; border-radius: 5px;');
+      console.log('Cart Items:', cartItems);
+      console.log('Total Amount:', amount);
+      console.log('Payment Method:', paymentMethod);
+      console.log('Shipping Details:', shippingDetails);
+      
       navigation.reset({
         index: 0,
         routes: [{ 
@@ -338,7 +400,7 @@ const PaymentScreen = ({ navigation, route }) => {
           params: {
             orderNumber: orderNumber,
             amount: amount,
-            orderId: orderResult._id
+            orderId: responseData._id
           }
         }],
       });
@@ -463,6 +525,40 @@ const PaymentScreen = ({ navigation, route }) => {
           <Text style={styles.pageTitle}>Choose Payment Method</Text>
           <Text style={styles.amountText}>Total: GHS {(amount).toFixed(2)}</Text>
           
+          {/* Display shipping info summary */}
+          {shippingDetails && (
+            <View style={styles.shippingSummary}>
+              <Text style={styles.sectionTitle}>Delivery Information</Text>
+              <View style={styles.shippingDetail}>
+                <Text style={styles.shippingLabel}>Location:</Text>
+                <Text style={styles.shippingValue}>{shippingDetails.shippingAddress.location}</Text>
+              </View>
+              {shippingDetails.shippingAddress.roomNumber && (
+                <View style={styles.shippingDetail}>
+                  <Text style={styles.shippingLabel}>Room:</Text>
+                  <Text style={styles.shippingValue}>{shippingDetails.shippingAddress.roomNumber}</Text>
+                </View>
+              )}
+              <View style={styles.shippingDetail}>
+                <Text style={styles.shippingLabel}>Phone:</Text>
+                <Text style={styles.shippingValue}>{shippingDetails.buyerContact.phone}</Text>
+              </View>
+              <View style={styles.shippingDetail}>
+                <Text style={styles.shippingLabel}>Delivery Date:</Text>
+                <Text style={styles.shippingValue}>
+                  {new Date(shippingDetails.preferredDeliveryDay).toLocaleDateString('en-US', {
+                    weekday: 'long',
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                  })}
+                </Text>
+              </View>
+            </View>
+          )}
+
+          <Text style={styles.sectionTitle}>Select Payment Method</Text>
+          
           <TouchableOpacity 
             style={styles.paymentOption}
             onPress={() => setPaymentMethod('online')}
@@ -500,9 +596,9 @@ const PaymentScreen = ({ navigation, route }) => {
           
           <TouchableOpacity 
             style={styles.backButton}
-            onPress={handlePaymentCancel}
+            onPress={() => navigation.goBack()}
           >
-            <Text style={styles.backButtonText}>Back to Cart</Text>
+            <Text style={styles.backButtonText}>Back to Checkout</Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -597,6 +693,36 @@ const styles = StyleSheet.create({
     marginBottom: 30,
     textAlign: 'center',
     color: '#5D3FD3'
+  },
+  shippingSummary: {
+    marginVertical: 20,
+    padding: 15,
+    backgroundColor: '#f7f7f7',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0'
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    marginBottom: 12,
+    color: '#333'
+  },
+  shippingDetail: {
+    flexDirection: 'row',
+    marginBottom: 8,
+    paddingVertical: 4
+  },
+  shippingLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#666',
+    width: 100
+  },
+  shippingValue: {
+    fontSize: 14,
+    color: '#333',
+    flex: 1
   },
   paymentOption: {
     flexDirection: 'row',

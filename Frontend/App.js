@@ -19,11 +19,13 @@ import BuyerHomeScreen from './screens/BuyerHomeScreen';
 import BuyerProfileScreen from './screens/BuyerprofileScreen';
 import CartScreen from './screens/CartScreen';
 import ProductDetailsScreen from './screens/ProductDetailsScreen';
-import Categories from './screens/Categories';
+import Categories from './screens/Categories';  
 import SellerDashboardScreen from './screens/SellerDashboardScreen';
 import SellerProfileScreen from './screens/SellerProfileScreen';
-import CategoriesScreen from './screens/CategoriesScreen';
 import Admin from './screens/Admin';
+import CheckoutForm from './screens/CheckoutForm';
+
+
 import PaymentScreen from './screens/PaymentScreen';
 import PaymentSuccessScreen from './screens/PaymentSuccessScreen';
 import OnboardingScreen from './screens/OnboardingScreen';
@@ -297,6 +299,21 @@ function AppContent() {
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="BuyerHome" component={BuyerHomeScreen} />
           <Stack.Screen name="Admin" component={Admin} />
+          <Stack.Screen 
+            name="Checkout" 
+            component={CheckoutForm}
+            options={{
+              title: 'Checkout',
+              headerShown: true,
+              headerStyle: {
+                backgroundColor: '#fff',
+              },
+              headerTintColor: '#333',
+              headerTitleStyle: {
+                fontWeight: 'bold',
+              },
+            }} 
+          />
           <Stack.Screen name="Profile" component={BuyerProfileScreen} />
           <Stack.Screen name="SellerDashboard" component={SellerDashboardScreen} />
           <Stack.Screen 
@@ -308,9 +325,11 @@ function AppContent() {
           <Stack.Screen name="Bookings" component={Bookings} />
           <Stack.Screen name="ServiceBooking" component={ServiceBooking} />
           <Stack.Screen name="ServiceDetails" component={ServiceDetails} />
-          <Stack.Screen name="CategoriesScreen" component={CategoriesScreen} />
           <Stack.Screen name="SellerProfile" component={SellerProfileScreen} />
           <Stack.Screen name="Payment" component={PaymentScreen} />
+
+
+          
           <Stack.Screen name="PromoteStore" component={PromoteStoreScreen} />
           <Stack.Screen name="PaymentSuccess" component={PaymentSuccessScreen} options={{ gestureEnabled: false }} />
           <Stack.Screen name="Favorites" component={FavoritesScreen} />

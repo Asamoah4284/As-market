@@ -493,7 +493,7 @@ const BuyerHomeScreen = () => {
   const renderCategory = ({ item }) => (
     <TouchableOpacity 
       style={styles.categoryCard}
-      onPress={() => navigation.navigate('CategoriesScreen', { 
+      onPress={() => navigation.navigate('Categories', { 
         categoryId: item.id,
         categoryName: item.name 
       })}

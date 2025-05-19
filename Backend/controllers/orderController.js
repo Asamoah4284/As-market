@@ -166,10 +166,14 @@ const createOrder = asyncHandler(async (req, res) => {
       paymentReference,
       orderItems,
       totalAmount,
-      paymentMethod
+      paymentMethod,
+      shippingAddress,
+      buyerContact,
+      preferredDeliveryDay
     } = req.body;
 
     console.log('Payment method from request:', paymentMethod);
+    console.log('Shipping address from request:', shippingAddress);
 
     // Check for either orderItems or items property
     const items = orderItems || req.body.items;
@@ -183,6 +187,12 @@ const createOrder = asyncHandler(async (req, res) => {
     if (!items || items.length === 0) {
       console.error('No order items provided in request:', JSON.stringify(req.body, null, 2));
       return res.status(400).json({ message: 'No order items provided' });
+    }
+
+    // Validate required shipping address
+    if (!shippingAddress || !shippingAddress.location) {
+      console.error('Missing or invalid shipping address:', shippingAddress);
+      return res.status(400).json({ message: 'Shipping address with location is required' });
     }
 
     // For online payments, verify with Paystack
@@ -278,6 +288,9 @@ const createOrder = asyncHandler(async (req, res) => {
         paidAt: paymentMethod === 'pay_on_delivery' ? null : Date.now(),
         paymentMethod: paymentMethod || 'online'
       },
+      shippingAddress: shippingAddress,
+      buyerContact: buyerContact,
+      preferredDeliveryDay: preferredDeliveryDay,
       totalAmount,
       orderStatus: paymentMethod === 'pay_on_delivery' ? 'pending' : 'processing'
     };

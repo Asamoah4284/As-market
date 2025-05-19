@@ -32,10 +32,20 @@ const orderSchema = new mongoose.Schema({
     }
   }],
   shippingAddress: {
-    address: String,
-    city: String,
-    postalCode: String,
-    country: String
+location: {
+      type: String,
+      required: true,
+      enum: ['OLD SITE', 'NEW SITE', 'AYENSU', 'AMAMOMA', 'KWAPRO', 'VALCO', 'ADEHYE3', 'SUPERNUATION', 'SRC', 'CASLEY HAYFORD', 'ATL', 'OGUAA', 'KNH']
+    },
+    roomNumber: String,
+    additionalInfo: String
+  },
+  preferredDeliveryDay: {
+    type: Date
+  },
+  buyerContact: {
+    phone: String,
+    alternativePhone: String
   },
   paymentInfo: {
     reference: {

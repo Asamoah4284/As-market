@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Modal, ScrollView } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
@@ -8,6 +8,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 const AllOrders = () => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [selectedOrder, setSelectedOrder] = useState(null);
 
   useEffect(() => {
     fetchOrders();
@@ -86,15 +88,37 @@ const AllOrders = () => {
         return;
       }
 
+      console.log(`Fetching order details for ID: ${orderId}`);
       const response = await axios.get(`${API_BASE_URL}/api/orders/${orderId}`, {
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
       });
+      
+      if (response.data && 
+          (Array.isArray(response.data) && response.data.length === 0 || 
+           !response.data._id)) {
+        console.log('No valid order data received:', response.data);
+        Alert.alert(
+          'Error',
+          'No order details available for this ID',
+          [{ text: 'OK' }]
+        );
+        return;
+      }
+
       if (response.data) {
-        // TODO: Navigate to order details screen
-        console.log('Order details:', response.data);
+        console.log('Order details received:', response.data);
+        setSelectedOrder(response.data);
+        setModalVisible(true);
+      } else {
+        console.log('No data received from the API');
+        Alert.alert(
+          'Error',
+          'No order details available',
+          [{ text: 'OK' }]
+        );
       }
     } catch (error) {
       console.error('Error fetching order details:', error);
@@ -154,12 +178,19 @@ const AllOrders = () => {
   };
 
   const formatDate = (dateString) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+    if (!dateString) return 'N/A';
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) return 'N/A';
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric'
+      });
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return 'N/A';
+    }
   };
 
   const renderOrderItem = ({ item }) => (
@@ -205,6 +236,176 @@ const AllOrders = () => {
     </TouchableOpacity>
   );
 
+  const renderOrderDetailsModal = () => {
+    
+    const item = selectedOrder;
+    if (!item) return null;
+
+    // Debug the data structure
+    console.log('Selected Order Data:', JSON.stringify(item));
+    
+    return (
+      <Modal
+        animationType="slide"
+        transparent={true}
+        visible={modalVisible}
+        onRequestClose={() => setModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View style={styles.modalHeader}>
+                <Text style={styles.modalTitle}>Order Details</Text>
+                <TouchableOpacity 
+                  onPress={() => setModalVisible(false)} 
+                  style={styles.closeButton}
+                >
+                  <MaterialIcons name="close" size={24} color="#333" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.detailSection}>
+                <Text style={styles.sectionTitle}>Order Information</Text>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Order ID:</Text>
+                  <Text style={styles.detailValue}>{item._id || 'N/A'}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Status:</Text>
+                  <Text style={[styles.detailValue, { color: getStatusColor(item.orderStatus) }]}>
+                    {item.orderStatus || 'Unknown'}
+                  </Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Date:</Text>
+                  <Text style={styles.detailValue}>{formatDate(item.createdAt)}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Total Amount:</Text>
+                  <Text style={styles.detailValue}>
+                    {typeof item.totalAmount === 'number' ? `$${item.totalAmount.toFixed(2)}` : 'N/A'}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.detailSection}>
+                <Text style={styles.sectionTitle}>Buyer Information</Text>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>User ID:</Text>
+                  <Text style={styles.detailValue}>
+                    {item.user?._id || (typeof item.user === 'string' ? item.user : 'N/A')}
+                  </Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Name:</Text>
+                  <Text style={styles.detailValue}>{item.user?.name || 'Unknown'}</Text>
+                </View>
+              </View>
+
+              <View style={styles.detailSection}>
+                <Text style={styles.sectionTitle}>Contact Information</Text>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Phone:</Text>
+                  <Text style={styles.detailValue}>{item.buyerContact?.phone || 'N/A'}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Alternative Phone:</Text>
+                  <Text style={styles.detailValue}>{item.buyerContact?.alternativePhone || 'N/A'}</Text>
+                </View>
+              </View>
+
+              <View style={styles.detailSection}>
+                <Text style={styles.sectionTitle}>Shipping Address</Text>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Location:</Text>
+                  <Text style={styles.detailValue}>{item.shippingAddress?.location || 'N/A'}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Room Number:</Text>
+                  <Text style={styles.detailValue}>{item.shippingAddress?.roomNumber || 'N/A'}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Additional Info:</Text>
+                  <Text style={styles.detailValue}>{item.shippingAddress?.additionalInfo || 'N/A'}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Delivery Date:</Text>
+                  <Text style={styles.detailValue}>
+                    {item.shippingAddress?.preferredDeliveryDay 
+                      ? formatDate(item.shippingAddress.preferredDeliveryDay)
+                      : 'N/A'}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.detailSection}>
+                <Text style={styles.sectionTitle}>Payment Information</Text>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Reference:</Text>
+                  <Text style={styles.detailValue}>{item.paymentInfo?.reference || 'N/A'}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Status:</Text>
+                  <Text style={styles.detailValue}>{item.paymentInfo?.status || 'N/A'}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Amount:</Text>
+                  <Text style={styles.detailValue}>
+                    {item.paymentInfo?.amount 
+                      ? `${item.paymentInfo.currency || 'GHS'} ${item.paymentInfo.amount.toFixed(2)}`
+                      : 'N/A'}
+                  </Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Method:</Text>
+                  <Text style={styles.detailValue}>{item.paymentInfo?.paymentMethod || 'N/A'}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Paid At:</Text>
+                  <Text style={styles.detailValue}>
+                    {item.paymentInfo?.paidAt ? formatDate(item.paymentInfo.paidAt) : 'N/A'}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={styles.detailSection}>
+                <Text style={styles.sectionTitle}>Items</Text>
+                {Array.isArray(item.items) && item.items.map((orderItem, index) => (
+                  <View key={index} style={styles.orderItem}>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Item {index + 1}:</Text>
+                      <Text style={styles.detailValue}>{orderItem.name}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Product ID:</Text>
+                      <Text style={styles.detailValue}>{orderItem.product}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Quantity:</Text>
+                      <Text style={styles.detailValue}>{orderItem.quantity}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Price:</Text>
+                      <Text style={styles.detailValue}>${orderItem.price?.toFixed(2) || '0.00'}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Seller ID:</Text>
+                      <Text style={styles.detailValue}>{orderItem.sellerId}</Text>
+                    </View>
+                    <View style={styles.detailRow}>
+                      <Text style={styles.detailLabel}>Seller Phone:</Text>
+                      <Text style={styles.detailValue}>{orderItem.sellerPhone || 'N/A'}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+
   if (loading) {
     return (
       <View style={styles.loadingContainer}>
@@ -223,6 +424,7 @@ const AllOrders = () => {
         onRefresh={fetchOrders}
         refreshing={loading}
       />
+      {renderOrderDetailsModal()}
     </View>
   );
 };
@@ -322,6 +524,80 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#444',
     marginLeft: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  modalContent: {
+    width: '90%',
+    maxHeight: '80%',
+    backgroundColor: 'white',
+    borderRadius: 10,
+    padding: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 15,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    marginBottom: 15,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  closeButton: {
+    padding: 5,
+  },
+  detailSection: {
+    marginBottom: 20,
+    backgroundColor: '#f9f9f9',
+    padding: 12,
+    borderRadius: 8,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+    paddingBottom: 5,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    paddingVertical: 5,
+    flexWrap: 'wrap',
+  },
+  detailLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#555',
+    width: '40%',
+  },
+  detailValue: {
+    fontSize: 14,
+    color: '#333',
+    width: '60%',
+  },
+  orderItem: {
+    backgroundColor: '#fff',
+    padding: 10,
+    marginBottom: 10,
+    borderRadius: 5,
+    borderLeftWidth: 3,
+    borderLeftColor: '#0066cc',
   },
 });
 

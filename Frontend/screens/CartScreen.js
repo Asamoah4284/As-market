@@ -388,59 +388,12 @@ const CartScreen = ({ navigation }) => {
         return;
       }
 
-      if (isPayOnDelivery) {
-        // Handle pay on delivery option
-        try {
-          // Create order with payment status 'pending'
-          const orderResponse = await axios.post(`${API_BASE_URL}/api/orders`, {
-            paymentReference: 'POD-' + Date.now(), // Create a unique reference for pay on delivery
-            items: cartItems,
-            totalAmount: calculateFinalTotal(),
-            paymentStatus: 'pending',
-            paymentMethod: 'pay_on_delivery'
-          }, {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          });
-
-          if (orderResponse.status === 201) {
-            // Clear cart on backend
-            await axios.delete(`${API_BASE_URL}/api/cart`, {
-              headers: {
-                Authorization: `Bearer ${token}`,
-              },
-            });
-
-            // Clear cart in Redux
-            dispatch(setCartItems([]));
-
-            // Send a notification
-            await sendLocalNotification(
-              'Order Placed', 
-              'Your order has been placed successfully. You will pay on delivery.'
-            );
-
-            navigation.reset({
-              index: 0,
-              routes: [{ 
-                name: 'PaymentSuccess',
-                params: { payOnDelivery: true }
-              }],
-            });
-          }
-        } catch (error) {
-          console.error('Error processing order:', error);
-          Alert.alert('Error', 'There was an error processing your order. Please try again.');
-        }
-      } else {
-        // Navigate to Payment screen with required data
-        navigation.navigate('Payment', {
-          amount: totalAmount,
-          email: user.email
-        });
-      }
+      // In both cases, navigate to Checkout first to collect delivery details
+      navigation.navigate('Checkout', {
+        cartItems: cartItems,
+        totalAmount: totalAmount,
+        isPayOnDelivery: isPayOnDelivery
+      });
     } catch (error) {
       console.error('Checkout error:', error);
       Alert.alert('Error', 'Something went wrong. Please try again.');
