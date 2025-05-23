@@ -6,6 +6,11 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
+    "splash": {
+    
+      "resizeMode": "contain",
+      "backgroundColor": "#5D3FD3"
+    },
     "updates": {
       "fallbackToCacheTimeout": 0
     },
@@ -19,7 +24,7 @@
       "icon": "./assets/icon.png",
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#FFFFFF"
+        "backgroundColor": "#5D3FD3"
       },
       "package": "com.asarion.marketplace"
     },
@@ -35,4 +40,3 @@
     }
   }
 }
-    

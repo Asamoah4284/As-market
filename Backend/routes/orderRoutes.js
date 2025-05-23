@@ -19,19 +19,17 @@ router.post('/initialize-payment', protect, initializePayment);
 // Order routes
 router.route('/')
   .post(protect, createOrder)
-  .get(protect, getAllOrders);
+  .get(protect, admin, getAllOrders);
 
 router.route('/myorders')
   .get(protect, getMyOrders);
 
 // This route must come before /:id to avoid conflicts
-router.route('/:sellerId')
+router.route('/seller/:sellerId')
   .get(protect, getOrdersBySellerId);
 
 router.route('/:id')
-  .get(protect, getOrderById);
-
-router.route('/:id/status')
-  .put(protect, updateOrderStatus);
+  .get(protect, getOrderById)
+  .put(protect, admin, updateOrderStatus);
 
 module.exports = router; 

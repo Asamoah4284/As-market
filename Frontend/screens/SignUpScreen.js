@@ -132,8 +132,10 @@ function SignUpScreen({ navigation }) {
           >
             <View style={styles.logoContainer}>
               <Text style={styles.logoText}>
-                <Text style={{color: '#fff'}}>Uni</Text>
-                <Text style={{color: '#FF4757'}}>Market</Text>
+              <Image 
+                    source={require('../assets/images/logo.png')} 
+                    style={styles.logoImage}
+                  />    
               </Text>
             </View>
             <Text style={styles.welcomeText}>Create Account</Text>
@@ -289,7 +291,7 @@ function SignUpScreen({ navigation }) {
                       Terms and Conditions
                     </Text>
                     :{"\n"}
-                    When you post a product on the marketplace, an additional 5% will be added to your original price and posted as the final price.
+                   
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -395,12 +397,13 @@ const styles = StyleSheet.create({
     paddingTop: 20,
     paddingBottom: 20,
     paddingHorizontal: 20,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+ 
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 10,
+
+    marginTop: 20,
+    marginBottom: -15,
   },
   logoText: {
     fontSize: 28,
@@ -411,6 +414,10 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#fff',
     textAlign: 'center',
+  },
+  logoImage: {
+    width: 100,
+    height: 100,
   },
   subHeaderText: {
     fontSize: 16,
@@ -533,6 +540,7 @@ const styles = StyleSheet.create({
   },
   termsText: {
     flex: 1,
+    marginTop: 4,
     color: '#333',
     fontSize: 13,
   },

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Modal, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, Modal, ScrollView, Image } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
@@ -88,7 +88,9 @@ const AllOrders = () => {
         return;
       }
 
-      console.log(`Fetching order details for ID: ${orderId}`);
+      console.log('Fetching order details for ID:', orderId);
+      console.log('API URL:', `${API_BASE_URL}/api/orders/${orderId}`);
+      
       const response = await axios.get(`${API_BASE_URL}/api/orders/${orderId}`, {
         headers: {
           'Content-Type': 'application/json',
@@ -96,32 +98,51 @@ const AllOrders = () => {
         },
       });
       
-      if (response.data && 
-          (Array.isArray(response.data) && response.data.length === 0 || 
-           !response.data._id)) {
-        console.log('No valid order data received:', response.data);
-        Alert.alert(
-          'Error',
-          'No order details available for this ID',
-          [{ text: 'OK' }]
-        );
-        return;
-      }
-
-      if (response.data) {
-        console.log('Order details received:', response.data);
-        setSelectedOrder(response.data);
-        setModalVisible(true);
-      } else {
-        console.log('No data received from the API');
+      console.log('API Response:', JSON.stringify(response.data, null, 2));
+      
+      if (!response.data) {
+        console.log('No data in response');
         Alert.alert(
           'Error',
           'No order details available',
           [{ text: 'OK' }]
         );
+        return;
       }
+
+      // Check if response.data is an array
+      if (Array.isArray(response.data)) {
+        if (response.data.length === 0) {
+          console.log('Empty array received');
+          Alert.alert(
+            'Error',
+            'No order details available for this ID',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+        // If it's an array with items, use the first item
+        setSelectedOrder(response.data[0]);
+      } else {
+        // If it's a single object
+        if (!response.data._id) {
+          console.log('Response data missing _id:', response.data);
+          Alert.alert(
+            'Error',
+            'Invalid order data received',
+            [{ text: 'OK' }]
+          );
+          return;
+        }
+        setSelectedOrder(response.data);
+      }
+
+      setModalVisible(true);
     } catch (error) {
       console.error('Error fetching order details:', error);
+      console.error('Error response:', error.response?.data);
+      console.error('Error status:', error.response?.status);
+      
       let errorMessage = 'Failed to fetch order details. Please try again later.';
       
       if (error.response) {
@@ -129,6 +150,8 @@ const AllOrders = () => {
           errorMessage = 'Session expired. Please login again.';
         } else if (error.response.status === 403) {
           errorMessage = 'You do not have permission to view this order.';
+        } else if (error.response.status === 404) {
+          errorMessage = 'Order not found.';
         } else {
           errorMessage = error.response.data.message || errorMessage;
         }
@@ -230,20 +253,16 @@ const AllOrders = () => {
           onPress={() => handleUpdateStatus(item._id)}
         >
           <MaterialIcons name="edit" size={20} color="#0066cc" />
-          <Text style={styles.actionText}>Update Status</Text>
+          <Text style={styles.actionText}>Update Status</Text>s
         </TouchableOpacity>
       </View>
     </TouchableOpacity>
   );
 
   const renderOrderDetailsModal = () => {
-    
     const item = selectedOrder;
     if (!item) return null;
 
-    // Debug the data structure
-    console.log('Selected Order Data:', JSON.stringify(item));
-    
     return (
       <Modal
         animationType="slide"
@@ -277,13 +296,17 @@ const AllOrders = () => {
                   </Text>
                 </View>
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Date:</Text>
+                  <Text style={styles.detailLabel}>Created At:</Text>
                   <Text style={styles.detailValue}>{formatDate(item.createdAt)}</Text>
+                </View>
+                <View style={styles.detailRow}>
+                  <Text style={styles.detailLabel}>Updated At:</Text>
+                  <Text style={styles.detailValue}>{formatDate(item.updatedAt)}</Text>
                 </View>
                 <View style={styles.detailRow}>
                   <Text style={styles.detailLabel}>Total Amount:</Text>
                   <Text style={styles.detailValue}>
-                    {typeof item.totalAmount === 'number' ? `$${item.totalAmount.toFixed(2)}` : 'N/A'}
+                    {typeof item.totalAmount === 'number' ? `GHS ${item.totalAmount.toFixed(2)}` : 'N/A'}
                   </Text>
                 </View>
               </View>
@@ -295,10 +318,6 @@ const AllOrders = () => {
                   <Text style={styles.detailValue}>
                     {item.user?._id || (typeof item.user === 'string' ? item.user : 'N/A')}
                   </Text>
-                </View>
-                <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Name:</Text>
-                  <Text style={styles.detailValue}>{item.user?.name || 'Unknown'}</Text>
                 </View>
               </View>
 
@@ -329,11 +348,9 @@ const AllOrders = () => {
                   <Text style={styles.detailValue}>{item.shippingAddress?.additionalInfo || 'N/A'}</Text>
                 </View>
                 <View style={styles.detailRow}>
-                  <Text style={styles.detailLabel}>Delivery Date:</Text>
+                  <Text style={styles.detailLabel}>Preferred Delivery Day:</Text>
                   <Text style={styles.detailValue}>
-                    {item.shippingAddress?.preferredDeliveryDay 
-                      ? formatDate(item.shippingAddress.preferredDeliveryDay)
-                      : 'N/A'}
+                    {item.preferredDeliveryDay ? formatDate(item.preferredDeliveryDay) : 'N/A'}
                   </Text>
                 </View>
               </View>
@@ -386,7 +403,7 @@ const AllOrders = () => {
                     </View>
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>Price:</Text>
-                      <Text style={styles.detailValue}>${orderItem.price?.toFixed(2) || '0.00'}</Text>
+                      <Text style={styles.detailValue}>GHS {orderItem.price?.toFixed(2) || '0.00'}</Text>
                     </View>
                     <View style={styles.detailRow}>
                       <Text style={styles.detailLabel}>Seller ID:</Text>
@@ -396,6 +413,15 @@ const AllOrders = () => {
                       <Text style={styles.detailLabel}>Seller Phone:</Text>
                       <Text style={styles.detailValue}>{orderItem.sellerPhone || 'N/A'}</Text>
                     </View>
+                    {orderItem.image && (
+                      <View style={styles.imageContainer}>
+                        <Image 
+                          source={{ uri: orderItem.image }} 
+                          style={styles.itemImage}
+                          resizeMode="cover"
+                        />
+                      </View>
+                    )}
                   </View>
                 ))}
               </View>
@@ -598,6 +624,15 @@ const styles = StyleSheet.create({
     borderRadius: 5,
     borderLeftWidth: 3,
     borderLeftColor: '#0066cc',
+  },
+  imageContainer: {
+    marginTop: 10,
+    alignItems: 'center',
+  },
+  itemImage: {
+    width: 200,
+    height: 200,
+    borderRadius: 8,
   },
 });
 

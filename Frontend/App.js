@@ -20,6 +20,7 @@ import BuyerProfileScreen from './screens/BuyerprofileScreen';
 import CartScreen from './screens/CartScreen';
 import ProductDetailsScreen from './screens/ProductDetailsScreen';
 import Categories from './screens/Categories';  
+import CategoryScreen from './screens/CategoriesScreen';
 import SellerDashboardScreen from './screens/SellerDashboardScreen';
 import SellerProfileScreen from './screens/SellerProfileScreen';
 import Admin from './screens/Admin';
@@ -322,11 +323,14 @@ function AppContent() {
             options={{ headerShown: false }}
           />
           <Stack.Screen name="Categories" component={Categories} />
+          <Stack.Screen name="CategoriesScreen" component={CategoryScreen} />
+
           <Stack.Screen name="Bookings" component={Bookings} />
           <Stack.Screen name="ServiceBooking" component={ServiceBooking} />
           <Stack.Screen name="ServiceDetails" component={ServiceDetails} />
           <Stack.Screen name="SellerProfile" component={SellerProfileScreen} />
           <Stack.Screen name="Payment" component={PaymentScreen} />
+
 
 
           

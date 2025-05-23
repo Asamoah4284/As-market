@@ -388,15 +388,34 @@ const createOrder = asyncHandler(async (req, res) => {
 // @route   GET /api/orders/:id
 // @access  Private
 const getOrderById = asyncHandler(async (req, res) => {
-  const order = await Order.findById(req.params.id)
-    .populate('user', 'name email')
-    .populate('items.product', 'name image');
+  try {
+    console.log('Fetching order with ID:', req.params.id);
+    console.log('User ID:', req.user._id);
+    console.log('User Role:', req.user.role);
 
-  if (order && (order.user._id.toString() === req.user._id.toString())) {
-    res.json(order);
-  } else {
-    res.status(404);
-    throw new Error('Order not found');
+    const order = await Order.findById(req.params.id)
+      .populate('user', 'name email phone')
+      .populate('items.product', 'name image price seller');
+
+    if (!order) {
+      console.log('Order not found');
+      res.status(404);
+      throw new Error('Order not found');
+    }
+
+    // Allow access if user is admin or if it's their own order
+    if (req.user.role === 'admin' || order.user._id.toString() === req.user._id.toString()) {
+      console.log('Order found and access granted');
+      res.json(order);
+    } else {
+      console.log('Access denied - not admin or order owner');
+      res.status(403);
+      throw new Error('Not authorized to view this order');
+    }
+  } catch (error) {
+    console.error('Error in getOrderById:', error);
+    res.status(error.status || 500);
+    throw new Error(error.message || 'Error fetching order details');
   }
 });
 

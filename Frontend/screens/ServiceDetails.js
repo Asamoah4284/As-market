@@ -742,15 +742,6 @@ const styles = StyleSheet.create({
   providerContainer: {
     marginBottom: 25,
     padding: 16,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -832,15 +823,7 @@ const styles = StyleSheet.create({
   availabilityContainer: {
     marginBottom: 20,
     padding: 16,
-    backgroundColor: '#fff',
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 5,
-    elevation: 2,
-    borderWidth: 1,
-    borderColor: '#f0f0f0',
+ 
   },
   availabilityText: {
     fontSize: 15,

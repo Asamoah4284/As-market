@@ -187,11 +187,13 @@ function LoginScreen({ navigation, route }) {
             colors={['#5D3FD3', '#7B68EE']}
             style={styles.headerContainer}
           >
+            
             <View style={styles.logoContainer}>
-              <Text style={styles.logoText}>
-                <Text style={{color: '#fff'}}>Uni</Text>
-                <Text style={{color: '#FF4757'}}>Market</Text>
-              </Text>
+             
+              <Image 
+                    source={require('../assets/images/logo.png')} 
+                    style={styles.logoImage}
+                  />
             </View>
             <Text style={styles.welcomeText}>Welcome Back</Text>
             <Text style={styles.subHeaderText}>Sign in to continue</Text>
@@ -376,15 +378,18 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   headerContainer: {
-    paddingTop: 20,
+    // paddingTop: 20,
     paddingBottom: 20,
     paddingHorizontal: 20,
-    borderBottomLeftRadius: 10,
-    borderBottomRightRadius: 10,
   },
   logoContainer: {
     alignItems: 'center',
-    marginBottom: 20,
+    marginTop: 20,
+    marginBottom: -15,
+  },
+  logoImage: {
+    width: 100,
+    height: 100,
   },
   logoText: {
     fontSize: 28,

@@ -633,8 +633,8 @@ const BuyerHomeScreen = () => {
         <View style={styles.header}>
           <View style={styles.headerContent}>
             <View style={styles.brandNameContainer}>
-              <Text style={[styles.greeting, {color: '#fff'}]}>Uni</Text>
-              <Text style={[styles.greeting, {color: '#FF4757'}]}>Market</Text>
+                <Text style={[styles.greeting, {color: '#fff'}]}>Asarion</Text>
+                <Text style={[styles.greeting, {color: '#FF4757'}]}> Marketplace</Text>
             </View>
             <View style={styles.locationContainer}>
               <Ionicons name="location-outline" size={14} color="#fff" />
@@ -674,7 +674,7 @@ const BuyerHomeScreen = () => {
                             
                             setLocation(locationString);
                           } else {
-                            setLocation('New York, USA');
+                            setLocation('Capecoast, Ghana');
                           }
                         }
                       } catch (error) {
@@ -725,7 +725,7 @@ const BuyerHomeScreen = () => {
             <View style={styles.specialOffersHeader}>
               <Text style={styles.specialOffersTitle}>#SpecialForYou</Text>
               <TouchableOpacity>
-                <Text style={styles.seeAllLink}>See All</Text>
+             
               </TouchableOpacity>
             </View>
             <ScrollView
@@ -1335,8 +1335,7 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+
   },
   offerBackgroundImage: {
     position: 'absolute',

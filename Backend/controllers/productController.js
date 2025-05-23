@@ -78,8 +78,15 @@ const createProduct = asyncHandler(async (req, res) => {
     throw new Error('Not authorized as a seller');
   }
 
-  // Add 5% to the original price
-  const finalPrice = Math.round((Number(price) * 1.05) * 100) / 100;
+  // Calculate final price based on whether it's a product or service
+  let finalPrice;
+  if (isService) {
+    finalPrice = Number(price); // Keep original price for services
+  } else {
+    // Add 5% commission + 1 GHS for products and round up to next whole number + .99
+    const basePrice = Number(price) * 1.05 + 1;
+    finalPrice = Math.ceil(basePrice) + 0.99; // Round up and add .99 for marketing strategy
+  }
 
   // Upload main image to Cloudinary
   let mainImageUrl;
