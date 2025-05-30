@@ -11,7 +11,6 @@ import {
   Modal,
   TextInput,
   ScrollView,
-  Picker,
   Switch,
   Alert,
 } from 'react-native';
@@ -19,6 +18,8 @@ import { MaterialIcons, FontAwesome, Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
+import { Picker } from '@react-native-picker/picker';
+
 import * as FileSystem from 'expo-file-system';
 import { LinearGradient } from 'expo-linear-gradient';
 import { handleNewProductNotification } from '../services/notificationService';
@@ -58,7 +59,9 @@ const SellerDashboardScreen = () => {
     image: 'https://via.placeholder.com/150',
     additionalImages: [],
     isService: false,
-    status: 'pending' // Add default status as pending
+    status: 'pending',
+    gender: '',
+    color: '',
   });
   const [isEditing, setIsEditing] = useState(false);
   const [currentProductId, setCurrentProductId] = useState(null);
@@ -238,13 +241,19 @@ const SellerDashboardScreen = () => {
       
       const data = await response.json();
 
-      // Ensure each product has a sales count
-      const productsWithSales = data.map(product => ({
+      // Ensure each product has views and sort by creation date
+      const productsWithViews = data.map(product => ({
         ...product,
-        sales: product.sales || 0
+        views: product.views || 0,
+        createdAt: product.createdAt || new Date().toISOString()
       }));
 
-      setProducts(productsWithSales);
+      // Sort products by creation date (newest first)
+      const sortedProducts = productsWithViews.sort((a, b) => 
+        new Date(b.createdAt) - new Date(a.createdAt)
+      );
+
+      setProducts(sortedProducts);
     } catch (error) {
       console.error('Detailed fetch error:', error);
       setProducts([]);
@@ -345,7 +354,9 @@ const SellerDashboardScreen = () => {
       image: 'https://via.placeholder.com/150',
       additionalImages: [],
       isService: false,
-      status: 'pending' // Add default status as pending
+      status: 'pending',
+      gender: '',
+      color: '',
     });
     setModalVisible(true);
   };
@@ -388,7 +399,9 @@ const SellerDashboardScreen = () => {
       image: product.image,
       additionalImages: product.additionalImages || [],
       isService: product.isService || false,
-      rejectionReason: product.rejectionReason || null // Store rejection reason if it exists
+      rejectionReason: product.rejectionReason || null, // Store rejection reason if it exists
+      gender: product.gender || '',
+      color: product.color || '',
     });
     setModalVisible(true);
   };
@@ -431,6 +444,20 @@ const SellerDashboardScreen = () => {
         return;
       }
       
+      // Add validation for gender and color if it's a product (not a service)
+      if (!productForm.isService) {
+        if (!productForm.gender) {
+          setErrorMessage('Please select a gender for the product');
+          setLoading(false);
+          return;
+        }
+        if (!productForm.color) {
+          setErrorMessage('Please enter a color for the product');
+          setLoading(false);
+          return;
+        }
+      }
+      
       // Validate image
       if (!productForm.image) {
         setErrorMessage('Please select a main product image');
@@ -460,7 +487,9 @@ const SellerDashboardScreen = () => {
         additionalImages: productForm.additionalImages.filter(img => img),
         isService: productForm.isService,
         status: 'pending', // Always set status to pending for new/edited products
-        rejectionReason: null // Clear any previous rejection reason
+        rejectionReason: null, // Clear any previous rejection reason
+        gender: productForm.gender,
+        color: productForm.color,
       };
       
       // Use the same base URL as fetch products
@@ -492,6 +521,23 @@ const SellerDashboardScreen = () => {
         // Get seller name from profile data
         const sellerName = profileData.name || 'A seller';
         handleNewProductNotification(productData.name, sellerName);
+
+        // Add new product to the top of the list
+        setProducts(prevProducts => [
+          {
+            ...savedProduct,
+            views: 0,
+            createdAt: new Date().toISOString()
+          },
+          ...prevProducts
+        ]);
+      } else {
+        // Update existing product in the list
+        setProducts(prevProducts => 
+          prevProducts.map(product => 
+            product._id === currentProductId ? { ...savedProduct, views: product.views || 0 } : product
+          )
+        );
       }
       
       setSuccessMessage(isEditing 
@@ -614,9 +660,9 @@ const SellerDashboardScreen = () => {
             </View>
             <View style={styles.metricDivider} />
             <View style={styles.metricItem}>
-              <Text style={[styles.metricValue, { color: theme.success }]}>{item.sales || 0}</Text>
+              <Text style={[styles.metricValue, { color: theme.success }]}>{item.views || 0}</Text>
               <Text style={[styles.metricLabel, { color: theme.textSecondary }]}>
-                {item.isService ? 'Bookings' : 'Sold'}
+                {item.isService ? 'Profile Views' : 'Product Views'}
               </Text>
             </View>
           </View>
@@ -832,7 +878,6 @@ const SellerDashboardScreen = () => {
                   ) : (
                     <View style={[styles.avatarPlaceholder, { backgroundColor: theme.primary }]}>
                       <Text style={styles.avatarText}>
-                        {profileData.name.charAt(0)}
                       </Text>
                     </View>
                   )}
@@ -847,7 +892,7 @@ const SellerDashboardScreen = () => {
                     onPress={handlePremiumUpgrade}
                   >
                     <MaterialIcons name="workspace-premium" size={16} color={theme.warning} />
-                    <Text style={styles.premiumBadgeText}>Become a Premium Seller</Text>
+                    <Text style={styles.premiumBadgeText}>Promote your Store</Text>
                   </TouchableOpacity>
                 )}
                 
@@ -859,26 +904,11 @@ const SellerDashboardScreen = () => {
                 )}
               </View>
               
-              <View style={styles.profileInfo}>
-                <Text style={[styles.profileName, { color: theme.text }]}>
-                  {profileData.name}
-                </Text>
-                <Text style={[styles.profileEmail, { color: theme.textSecondary }]}>
-                  {profileData.email}
-                </Text>
-                
-                <View style={styles.joinDateContainer}>
-                  <MaterialIcons name="event" size={14} color={theme.textSecondary} />
-                  <Text style={[styles.joinDateText, { color: theme.textSecondary }]}>
-                    Joined {profileData.joinDate}
-                  </Text>
-                </View>
-              </View>
-              
+            
               <View style={styles.statsContainer}>
                 <View style={styles.statItem}>
                   <Text style={[styles.statValue, { color: theme.primary }]}>
-                    {profileData.totalSales}
+                    {/* {profileData.totalSales} */}
                   </Text>
                   <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
                     Sales
@@ -890,9 +920,9 @@ const SellerDashboardScreen = () => {
                 <View style={styles.statItem}>
                   <View style={styles.ratingValue}>
                     <Text style={[styles.statValue, { color: theme.warning }]}>
-                      {profileData.rating}
+                      {/* {profileData.rating} */}
                     </Text>
-                    <MaterialIcons name="star" size={16} color={theme.warning} />
+                    {/* <MaterialIcons name="star" size={16} color={theme.warning} /> */}
                   </View>
                   <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
                     Rating
@@ -903,7 +933,7 @@ const SellerDashboardScreen = () => {
                 
                 <View style={styles.statItem}>
                   <Text style={[styles.statValue, { color: theme.text }]}>
-                    {profileData.followers}
+                    {/* {profileData.followers} */}
                   </Text>
                   <Text style={[styles.statLabel, { color: theme.textSecondary }]}>
                     Followers
@@ -1259,7 +1289,7 @@ const SellerDashboardScreen = () => {
       }
       
       // Navigate to premium upgrade screen or show payment modal
-      navigation.navigate('PremiumUpgrade');
+      navigation.navigate('PromoteStore');
       
       // Alternatively, you could implement the premium upgrade flow directly here
       // const response = await fetch(`${API_BASE_URL}/api/users/premium-upgrade`, {
@@ -1309,7 +1339,7 @@ const SellerDashboardScreen = () => {
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
       <View style={[styles.header, { backgroundColor: theme.primary }]}>
-        <Text style={styles.headerTitle}>Seller Dashboard</Text>
+        <Text style={styles.headerTitle}>Dashboard</Text>
         <View style={styles.headerIcons}>
           <TouchableOpacity 
             style={styles.headerButton}
@@ -1472,6 +1502,37 @@ const SellerDashboardScreen = () => {
                       placeholderTextColor={theme.textSecondary}
                     />
                   </View>
+                  
+                  {!productForm.isService && (
+                    <>
+                      <View style={styles.inputWrapper}>
+                        <Text style={[styles.inputLabel, { color: theme.text }]}>Gender</Text>
+                        <View style={[styles.input, { backgroundColor: theme.inputBackground }]}>
+                          <Picker
+                            selectedValue={productForm.gender}
+                            onValueChange={(value) => setProductForm({...productForm, gender: value})}
+                            style={{ color: theme.text }}
+                          >
+                            <Picker.Item label="Select Gender" value="" />
+                            <Picker.Item label="Men" value="men" />
+                            <Picker.Item label="Women" value="women" />
+                            <Picker.Item label="Unisex" value="unisex" />
+                          </Picker>
+                        </View>
+                      </View>
+
+                      <View style={styles.inputWrapper}>
+                        <Text style={[styles.inputLabel, { color: theme.text }]}>Color</Text>
+                        <TextInput
+                          style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
+                          value={productForm.color}
+                          onChangeText={(text) => setProductForm({...productForm, color: text})}
+                          placeholder="Enter product color"
+                          placeholderTextColor={theme.textSecondary}
+                        />
+                      </View>
+                    </>
+                  )}
                   
                   <View style={styles.inputWrapper}>
                     <Text style={[styles.inputLabel, { color: theme.text }]}>Price</Text>

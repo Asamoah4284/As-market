@@ -14,6 +14,8 @@ import {
   Platform,
   Alert,
   PermissionsAndroid,
+  ActivityIndicator,
+  Animated,
 } from 'react-native';
 import { useState, useEffect, useRef } from 'react';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
@@ -26,6 +28,8 @@ import NotificationBadge from '../components/NotificationBadge';
 import { handleAddToCartNotification } from '../services/notificationService';
 import { requireAuthentication } from '../App'; // Import the authentication helper
 import { API_BASE_URL } from '../config/api';
+import * as Speech from 'expo-speech';
+import { LinearGradient } from 'expo-linear-gradient';
 
 // Mock data - replace with actual API calls
 const FEATURED_PRODUCTS = [
@@ -60,12 +64,12 @@ const FEATURED_PRODUCTS = [
 ];
 
 const CATEGORIES = [
-  { id: '1', name: 'Electronic', icon: 'devices', color: '#FF6B6B' },
-  { id: '2', name: 'Fashion', icon: 'checkroom', color: '#4ECDC4' },
-  { id: '3', name: 'Home', icon: 'home', color: '#FFD166' },
-  { id: '4', name: 'Beauty', icon: 'spa', color: '#FF9F9F' },
-  { id: '5', name: 'Sneakers', icon: 'sports-basketball', color: '#6A0572' },
-  { id: '6', name: 'Books', icon: 'menu-book', color: '#1A535C' },
+  { id: '1', name: 'Electronic', icon: 'devices', color: '#FF6B6B', categoryId: '1' },
+  { id: '2', name: 'Fashion', icon: 'checkroom', color: '#4ECDC4', categoryId: '2' },
+  { id: '3', name: 'Home', icon: 'home', color: '#FFD166', categoryId: '3' },
+  { id: '4', name: 'Beauty', icon: 'spa', color: '#FF9F9F', categoryId: '4' },
+  { id: '5', name: 'Sneakers', icon: 'sports-basketball', color: '#6A0572', categoryId: '5' },
+  { id: '6', name: 'Books', icon: 'menu-book', color: '#1A535C', categoryId: '6' },
 ];
 
 const SPECIAL_OFFERS = [
@@ -83,10 +87,13 @@ const SPECIAL_OFFERS = [
   }
 ];
 
-let url = 'https://unimarket-ikin.onrender.com/api/products';
+let url = `${API_BASE_URL}/api/products`;
 
 const BuyerHomeScreen = () => {
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState(null);
   const [featuredProducts, setFeaturedProducts] = useState([]);
   const [categories, setCategories] = useState(CATEGORIES);
   const navigation = useNavigation();
@@ -103,6 +110,14 @@ const BuyerHomeScreen = () => {
   const [banners, setBanners] = useState([]);
   const bannersScrollViewRef = useRef(null);
   const [activeBannerIndex, setActiveBannerIndex] = useState(0);
+  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
+  const [isLoadingBanners, setIsLoadingBanners] = useState(true);
+  const [isLoadingServices, setIsLoadingServices] = useState(true);
+  const [isLoadingCategories, setIsLoadingCategories] = useState(true);
+  const [isLoadingNewArrivals, setIsLoadingNewArrivals] = useState(true);
+  const [isLoadingDeals, setIsLoadingDeals] = useState(true);
+  const [isLoadingBrands, setIsLoadingBrands] = useState(true);
+  const shimmerValue = useRef(new Animated.Value(0)).current;
   
   // Get cart items from Redux store
   const { items: cartItems } = useSelector(state => state.cart);
@@ -168,9 +183,33 @@ const BuyerHomeScreen = () => {
     getLocation();
   }, []);
 
-  // Add new useEffect to fetch products
+  // Add shimmer animation
+  useEffect(() => {
+    const startShimmerAnimation = () => {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(shimmerValue, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(shimmerValue, {
+            toValue: 0,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    };
+
+    startShimmerAnimation();
+  }, []);
+
+  // Modify the fetchProducts useEffect
   useEffect(() => {
     const fetchProducts = async () => {
+      setIsLoadingProducts(true);
+      setIsLoadingNewArrivals(true);
       try {
         const response = await fetch(`${url}`);
         console.log('Products API Response Status:', response.status);
@@ -178,7 +217,6 @@ const BuyerHomeScreen = () => {
         if (response.ok) {
           const products = await response.json();
           console.log('Fetched products:', products);
-          // Filter out products that have isService set to true
           const nonServiceProducts = products.filter(product => product.isService !== true);
           setFeaturedProducts(nonServiceProducts);
         } else {
@@ -189,6 +227,12 @@ const BuyerHomeScreen = () => {
         console.error('Error fetching products:', error);
         console.log('Using mock data due to error');
         setFeaturedProducts(FEATURED_PRODUCTS);
+      } finally {
+        // Simulate minimum loading time for better UX
+        setTimeout(() => {
+          setIsLoadingProducts(false);
+          setIsLoadingNewArrivals(false);
+        }, 1000);
       }
     };
 
@@ -234,16 +278,16 @@ const BuyerHomeScreen = () => {
     getUserData();
   }, []);
 
-  // Update the useEffect for services to filter products instead of making a new API call
+  // Update the services useEffect
   useEffect(() => {
     const fetchServices = async () => {
+      setIsLoadingServices(true);
       try {
         const response = await fetch(`${url}`);
         console.log('Products API Response Status:', response.status);
         
         if (response.ok) {
           const products = await response.json();
-          // Filter products to get services using isService field OR featuredType field
           const serviceProducts = products.filter(product => 
             product.isService === true || product.featuredType === 'featured-service'
           );
@@ -256,6 +300,10 @@ const BuyerHomeScreen = () => {
       } catch (error) {
         console.error('Error fetching services:', error);
         setServices([]); // Set empty array on error
+      } finally {
+        setTimeout(() => {
+          setIsLoadingServices(false);
+        }, 1000);
       }
     };
 
@@ -338,9 +386,40 @@ const BuyerHomeScreen = () => {
     }
   };
 
-  const handleSearch = (query) => {
+  const handleSearch = async (query) => {
     setSearchQuery(query);
-    // Implement search functionality
+    
+    // If query is empty, return early
+    if (!query.trim()) {
+      return;
+    }
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/assistant/search`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ prompt: query }),
+      });
+
+      const data = await response.json();
+      console.log('Search results:', data);
+
+      if (!response.ok) {
+        throw new Error(data.message || 'Failed to search products');
+      }
+
+      // Update the featured products with search results
+      setFeaturedProducts(data.products);
+      
+      // Optional: Text-to-speech feedback
+      Speech.speak(`Found ${data.products.length} matching products`);
+
+    } catch (err) {
+      console.error('Search error:', err);
+      Alert.alert('Search Error', 'Failed to search products. Please try again.');
+    }
   };
 
   const handleAddToCart = async (product) => {
@@ -413,6 +492,13 @@ const BuyerHomeScreen = () => {
         style={styles.productCard}
         onPress={() => {
           console.log('Navigating to product details with ID:', item._id);
+          // Increment views
+          fetch(`${API_BASE_URL}/api/products/${item._id}/views`, {
+            method: 'POST',
+          })
+          .then(response => response.json())
+          .catch(error => console.error('Error incrementing views:', error));
+          
           navigation.navigate('ProductDetails', { 
             productId: item._id
           });
@@ -460,17 +546,10 @@ const BuyerHomeScreen = () => {
                 <Text style={styles.originalPrice}>GH¢{item.originalPrice.toFixed(2)}</Text>
               )}
             </View>
-            <View style={styles.ratingContainer}>
-              <View style={styles.starsContainer}>
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <Ionicons 
-                    key={star} 
-                    name={star <= 4 ? "star" : "star-outline"} 
-                    size={14} 
-                    color="#FFD700" 
-                  />
-                ))}
-              </View>
+              {/* number of views */}
+            <View style={styles.viewsContainer}>
+              <Ionicons name="eye-outline" size={12} color="#666" />
+              <Text style={styles.viewsText}>{item.views || 0}</Text>
             </View>
           </View>
           <View style={styles.productFooter}>
@@ -478,25 +557,95 @@ const BuyerHomeScreen = () => {
               <Ionicons name="car-outline" size={12} color="#666" />
               <Text style={styles.sellerText}>15% off delivery</Text>
             </View>
-            <TouchableOpacity 
-              style={styles.addToCartButton}
-              onPress={() => handleAddToCart(item)}
-            >
-              <Ionicons name="add-circle" size={20} color="#3498db" />
-            </TouchableOpacity>
+         
           </View>
         </View>
       </TouchableOpacity>
     );
   };
 
+  // Update the fetchProductsByCategory function
+  const fetchProductsByCategory = async (categoryId, categoryName) => {
+    setIsLoadingProducts(true);
+    try {
+      // Fetch all products first
+      const response = await fetch(`${url}`);
+      console.log('Products API Response Status:', response.status);
+      
+      if (response.ok) {
+        const products = await response.json();
+        console.log('Fetched products:', products);
+        
+        // Filter products by category name (case-insensitive)
+        const filteredProducts = products.filter(product => {
+          // Check if product matches the category in any of these fields
+          const matchesCategory = 
+            (product.category && product.category.toLowerCase() === categoryName.toLowerCase()) ||
+            (product.mainCategory && product.mainCategory.toLowerCase() === categoryName.toLowerCase()) ||
+            (product.subcategory && product.subcategory.toLowerCase() === categoryName.toLowerCase());
+
+          // Only include non-service products
+          return matchesCategory && !product.isService;
+        });
+
+        console.log(`Found ${filteredProducts.length} products in category ${categoryName}`);
+        
+        if (filteredProducts.length === 0) {
+          Alert.alert(
+            'No Products Found',
+            `No products found in the ${categoryName} category.`,
+            [{ text: 'OK' }]
+          );
+        }
+
+        return filteredProducts;
+      } else {
+        console.log('Failed to fetch category products');
+        Alert.alert(
+          'Error',
+          'Failed to fetch products. Please try again.',
+          [{ text: 'OK' }]
+        );
+        return [];
+      }
+    } catch (error) {
+      console.error('Error fetching category products:', error);
+      Alert.alert(
+        'Error',
+        'An error occurred while fetching products. Please try again.',
+        [{ text: 'OK' }]
+      );
+      return [];
+    } finally {
+      setIsLoadingProducts(false);
+    }
+  };
+
+  // Update the renderCategory function to handle the category name properly
   const renderCategory = ({ item }) => (
     <TouchableOpacity 
       style={styles.categoryCard}
-      onPress={() => navigation.navigate('Categories', { 
-        categoryId: item.id,
-        categoryName: item.name 
-      })}
+      onPress={async () => {
+        try {
+          // Show loading state
+          setIsLoadingProducts(true);
+          
+          // Navigate to Categories screen with both categoryId and categoryName
+          navigation.navigate('CategoriesScreen', { 
+            categoryId: item.categoryId,
+            categoryName: item.name,
+            filter: {
+              categoryId: item.categoryId,
+              category: item.name
+            }
+          });
+        } catch (error) {
+          console.error('Error handling category tap:', error);
+          Alert.alert('Error', 'Failed to load category products');
+        } finally {
+          setIsLoadingProducts(false);
+        }
+      }}
     >
       <View style={[styles.categoryIconContainer, { backgroundColor: `${item.color}20` }]}>
         <MaterialIcons name={item.icon} size={28} color={item.color} />
@@ -558,7 +707,7 @@ const BuyerHomeScreen = () => {
           <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
           <View style={styles.productDetails}>
             <View style={styles.priceContainer}>
-              <Text style={styles.productPrice}>${item.price.toFixed(2)}</Text>
+              <Text style={styles.productPrice}>GHS{item.price.toFixed(2)}</Text>
             </View>
             {item.rating && (
               <View style={styles.ratingContainer}>
@@ -592,15 +741,21 @@ const BuyerHomeScreen = () => {
     );
   };
 
+  // Modify the fetchBanners useEffect
   useEffect(() => {
-    // Fetch banners from backend
     const fetchBanners = async () => {
+      setIsLoadingBanners(true);
       try {
         const res = await fetch(`${API_BASE_URL}/api/banners`);
         const data = await res.json();
         setBanners(data);
       } catch (e) {
         setBanners([]);
+      } finally {
+        // Simulate minimum loading time for better UX
+        setTimeout(() => {
+          setIsLoadingBanners(false);
+        }, 1000);
       }
     };
     fetchBanners();
@@ -624,6 +779,562 @@ const BuyerHomeScreen = () => {
     }
     return () => interval && clearInterval(interval);
   }, [activeBannerIndex, banners.length]);
+
+  // Add this after the search bar component
+  const renderSearchResults = () => {
+    if (!searchQuery.trim()) return null;
+
+    return (
+      <View style={styles.searchResultsContainer}>
+        {isSearching ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#5D3FD3" />
+            <Text style={styles.loadingText}>Searching...</Text>
+          </View>
+        ) : searchError ? (
+          <Text style={styles.errorText}>{searchError}</Text>
+        ) : searchResults.length > 0 ? (
+          <FlatList
+            data={searchResults}
+            renderItem={renderFeaturedProduct}
+            keyExtractor={(item) => item._id}
+            horizontal={false}
+            numColumns={2}
+            contentContainerStyle={styles.searchResultsList}
+          />
+        ) : searchQuery.trim() ? (
+          <Text style={styles.noResultsText}>No products found</Text>
+        ) : null}
+      </View>
+    );
+  };
+
+  // Add ProductSkeleton component
+  const ProductSkeleton = () => {
+    const translateX = shimmerValue.interpolate({
+      inputRange: [0, 1],
+      outputRange: [-100, 300],
+    });
+
+    return (
+      <View style={styles.productCard}>
+        <View style={styles.productImageContainer}>
+          <View style={styles.skeletonImage}>
+            <Animated.View
+              style={[
+                styles.shimmer,
+                {
+                  transform: [{ translateX }],
+                },
+              ]}
+            />
+          </View>
+        </View>
+        <View style={styles.productInfo}>
+          <View style={styles.skeletonTitle}>
+            <Animated.View
+              style={[
+                styles.shimmer,
+                {
+                  transform: [{ translateX }],
+                },
+              ]}
+            />
+          </View>
+          <View style={styles.skeletonPrice}>
+            <Animated.View
+              style={[
+                styles.shimmer,
+                {
+                  transform: [{ translateX }],
+                },
+              ]}
+            />
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  // Add BannerSkeleton component
+  const BannerSkeleton = () => {
+    const translateX = shimmerValue.interpolate({
+      inputRange: [0, 1],
+      outputRange: [-200, 400],
+    });
+
+    return (
+      <View style={styles.specialOfferCard}>
+        <View style={styles.skeletonBanner}>
+          <Animated.View
+            style={[
+              styles.shimmer,
+              {
+                transform: [{ translateX }],
+              },
+            ]}
+          />
+        </View>
+      </View>
+    );
+  };
+
+  // Add CategorySkeleton component
+  const CategorySkeleton = () => {
+    const translateX = shimmerValue.interpolate({
+      inputRange: [0, 1],
+      outputRange: [-100, 300],
+    });
+
+    return (
+      <View style={styles.categoryCard}>
+        <View style={[styles.categoryIconContainer, { backgroundColor: '#E1E9EE' }]}>
+          <Animated.View
+            style={[
+              styles.shimmer,
+              {
+                transform: [{ translateX }],
+              },
+            ]}
+          />
+        </View>
+        <View style={[styles.skeletonCategoryName, { backgroundColor: '#E1E9EE' }]}>
+          <Animated.View
+            style={[
+              styles.shimmer,
+              {
+                transform: [{ translateX }],
+              },
+            ]}
+          />
+        </View>
+      </View>
+    );
+  };
+
+  // Add ServiceSkeleton component
+  const ServiceSkeleton = () => {
+    const translateX = shimmerValue.interpolate({
+      inputRange: [0, 1],
+      outputRange: [-100, 300],
+    });
+
+    return (
+      <View style={styles.productCard}>
+        <View style={styles.skeletonImage}>
+          <Animated.View
+            style={[
+              styles.shimmer,
+              {
+                transform: [{ translateX }],
+              },
+            ]}
+          />
+        </View>
+        <View style={styles.productInfo}>
+          <View style={styles.skeletonTitle}>
+            <Animated.View
+              style={[
+                styles.shimmer,
+                {
+                  transform: [{ translateX }],
+                },
+              ]}
+            />
+          </View>
+          <View style={styles.skeletonPrice}>
+            <Animated.View
+              style={[
+                styles.shimmer,
+                {
+                  transform: [{ translateX }],
+                },
+              ]}
+            />
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  // Add DealSkeleton component
+  const DealSkeleton = () => {
+    const translateX = shimmerValue.interpolate({
+      inputRange: [0, 1],
+      outputRange: [-100, 300],
+    });
+
+    return (
+      <View style={styles.dealCard}>
+        <View style={styles.skeletonDealImage}>
+          <Animated.View
+            style={[
+              styles.shimmer,
+              {
+                transform: [{ translateX }],
+              },
+            ]}
+          />
+        </View>
+        <View style={styles.dealInfo}>
+          <View style={styles.skeletonDealTitle}>
+            <Animated.View
+              style={[
+                styles.shimmer,
+                {
+                  transform: [{ translateX }],
+                },
+              ]}
+            />
+          </View>
+          <View style={styles.skeletonDealDescription}>
+            <Animated.View
+              style={[
+                styles.shimmer,
+                {
+                  transform: [{ translateX }],
+                },
+              ]}
+            />
+          </View>
+        </View>
+      </View>
+    );
+  };
+
+  // Add BrandSkeleton component
+  const BrandSkeleton = () => {
+    const translateX = shimmerValue.interpolate({
+      inputRange: [0, 1],
+      outputRange: [-100, 300],
+    });
+
+    return (
+      <View style={styles.brandCircle}>
+        <View style={[styles.skeletonBrandLogo, { backgroundColor: '#E1E9EE' }]}>
+          <Animated.View
+            style={[
+              styles.shimmer,
+              {
+                transform: [{ translateX }],
+              },
+            ]}
+          />
+        </View>
+        <View style={[styles.skeletonBrandName, { backgroundColor: '#E1E9EE' }]}>
+          <Animated.View
+            style={[
+              styles.shimmer,
+              {
+                transform: [{ translateX }],
+              },
+            ]}
+          />
+        </View>
+      </View>
+    );
+  };
+
+  // Modify the banner section in render
+  const renderBannerSection = () => {
+    if (isLoadingBanners) {
+      return (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          pagingEnabled
+        >
+          {[1, 2].map((_, index) => (
+            <BannerSkeleton key={index} />
+          ))}
+        </ScrollView>
+      );
+    }
+
+    return (
+      <ScrollView
+        ref={bannersScrollViewRef}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        pagingEnabled
+        onMomentumScrollEnd={(event) => {
+          const slideWidth = 280 + 15;
+          const offsetX = event.nativeEvent.contentOffset.x;
+          const activeIndex = Math.round(offsetX / slideWidth);
+          setActiveBannerIndex(activeIndex);
+        }}
+      >
+        {banners.map((banner) => (
+          <TouchableOpacity
+            key={banner._id}
+            style={styles.specialOfferCard}
+            onPress={() => {
+              if (banner.linkType === 'seller') {
+                navigation.navigate('CategoriesScreen', { sellerId: banner.linkId });
+              } else if (banner.linkType === 'product') {
+                navigation.navigate('ProductDetails', { productId: banner.linkId });
+              }
+            }}
+          >
+            <Image source={{ uri: banner.image }} style={styles.offerBackgroundImage} />
+            <View style={styles.offerContentWrapper}>
+              <View style={styles.offerContent}>
+                <Text style={styles.offerHeading}>{banner.title}</Text>
+                <Text style={styles.offerDetails}>{banner.description}</Text>
+                {banner.buttonText ? (
+                  <TouchableOpacity style={styles.offerButton}>
+                    <Text style={styles.offerButtonText}>{banner.buttonText}</Text>
+                  </TouchableOpacity>
+                ) : null}
+              </View>
+            </View>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    );
+  };
+
+  // Modify the products section in render to include loading state
+  const renderProductsSection = () => {
+    if (isLoadingProducts) {
+      return (
+        <FlatList
+          data={[1, 2, 3, 4]}
+          renderItem={() => <ProductSkeleton />}
+          keyExtractor={(item) => item.toString()}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.productsList}
+        />
+      );
+    }
+
+    return (
+      <FlatList
+        data={featuredProducts}
+        renderItem={renderFeaturedProduct}
+        keyExtractor={(item) => item._id.toString()}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.productsList}
+      />
+    );
+  };
+
+  // Add render functions for other sections with loading states
+  const renderCategoriesSection = () => {
+    if (isLoadingCategories) {
+      return (
+        <FlatList
+          data={[1, 2, 3, 4, 5]}
+          renderItem={() => <CategorySkeleton />}
+          keyExtractor={(item) => item.toString()}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoriesList}
+        />
+      );
+    }
+
+    return (
+      <FlatList
+        data={categories}
+        renderItem={renderCategory}
+        keyExtractor={(item) => item.id}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.categoriesList}
+      />
+    );
+  };
+
+  const renderServicesSection = () => {
+    if (isLoadingServices) {
+      return (
+        <FlatList
+          data={[1, 2, 3]}
+          renderItem={() => <ServiceSkeleton />}
+          keyExtractor={(item) => item.toString()}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.productsList}
+        />
+      );
+    }
+
+    return (
+      <FlatList
+        data={services}
+        renderItem={renderService}
+        keyExtractor={(item) => item._id.toString()}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.productsList}
+        ListEmptyComponent={() => (
+          <View style={styles.emptyStateContainer}>
+            <Text style={styles.emptyStateText}>No services available</Text>
+          </View>
+        )}
+      />
+    );
+  };
+
+  const renderNewArrivalsSection = () => {
+    if (isLoadingNewArrivals) {
+      return (
+        <FlatList
+          data={[1, 2, 3]}
+          renderItem={() => <ProductSkeleton />}
+          keyExtractor={(item) => item.toString()}
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.productsList}
+        />
+      );
+    }
+
+    return (
+      <FlatList
+        data={featuredProducts.slice(-3)}
+        renderItem={renderFeaturedProduct}
+        keyExtractor={(item) => item._id.toString()}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.productsList}
+      />
+    );
+  };
+
+  const renderDealsSection = () => {
+    if (isLoadingDeals) {
+      return (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dealsContainer}>
+          {[1, 2, 3].map((item) => (
+            <DealSkeleton key={item} />
+          ))}
+        </ScrollView>
+      );
+    }
+
+    return (
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dealsContainer}>
+        {/* Flash Sale Card */}
+        <TouchableOpacity style={styles.dealCard}>
+          <View style={[styles.dealBadge, { backgroundColor: '#5D3FD3' }]}>
+            <Text style={styles.dealBadgeText}>50% OFF</Text>
+          </View>
+          <Image 
+            source={{ uri: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30' }}
+            style={styles.dealImage}
+          />
+          <View style={styles.dealInfo}>
+            <Text style={styles.dealTitle}>Flash Sale</Text>
+            <Text style={styles.dealDescription}>Ends in 2 hours</Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Bundle Deal Card */}
+        <TouchableOpacity style={styles.dealCard}>
+          <View style={[styles.dealBadge, { backgroundColor: '#2ecc71' }]}>
+            <Text style={styles.dealBadgeText}>BUNDLE</Text>
+          </View>
+          <Image 
+            source={{ uri: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff' }}
+            style={styles.dealImage}
+          />
+          <View style={styles.dealInfo}>
+            <Text style={styles.dealTitle}>Buy 2 Get 1</Text>
+            <Text style={styles.dealDescription}>Limited time offer</Text>
+          </View>
+        </TouchableOpacity>
+
+        {/* Clearance Card */}
+        <TouchableOpacity style={styles.dealCard}>
+          <View style={[styles.dealBadge, { backgroundColor: '#f1c40f' }]}>
+            <Text style={styles.dealBadgeText}>CLEARANCE</Text>
+          </View>
+          <Image 
+            source={{ uri: 'https://images.unsplash.com/photo-1585386959984-a4155224a1ad' }}
+            style={styles.dealImage}
+          />
+          <View style={styles.dealInfo}>
+            <Text style={styles.dealTitle}>End of Season</Text>
+            <Text style={styles.dealDescription}>Up to 70% off</Text>
+          </View>
+        </TouchableOpacity>
+      </ScrollView>
+    );
+  };
+
+  const renderBrandsSection = () => {
+    if (isLoadingBrands) {
+      return (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {[1, 2, 3, 4].map((item) => (
+            <BrandSkeleton key={item} />
+          ))}
+        </ScrollView>
+      );
+    }
+
+    return (
+      <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+        <TouchableOpacity style={styles.brandCircle}>
+          <Image 
+            source={{ uri: 'https://images.unsplash.com/photo-1515955656352-a1fa3ffcd111?ixlib=rb-4.0.3' }}
+            style={styles.brandLogo}
+          />
+          <Text style={styles.brandName}>Nike</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.brandCircle}>
+          <Image 
+            source={{ uri: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?ixlib=rb-4.0.3' }}
+            style={styles.brandLogo}
+          />
+          <Text style={styles.brandName}>Adidas</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.brandCircle}>
+          <Image 
+            source={{ uri: 'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?ixlib=rb-4.0.3' }}
+            style={styles.brandLogo}
+          />
+          <Text style={styles.brandName}>Puma</Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={styles.brandCircle}>
+          <Image 
+            source={{ uri: 'https://images.unsplash.com/photo-1618354691373-d851c5c3a990?ixlib=rb-4.0.3' }}
+            style={styles.brandLogo}
+          />
+          <Text style={styles.brandName}>Reebok</Text>
+        </TouchableOpacity>
+      </ScrollView>
+    );
+  };
+
+  // Add loading states for static data
+  useEffect(() => {
+    // Simulate loading for categories
+    setIsLoadingCategories(true);
+    setTimeout(() => {
+      setCategories(CATEGORIES);
+      setIsLoadingCategories(false);
+    }, 1000);
+
+    // Simulate loading for deals
+    setIsLoadingDeals(true);
+    setTimeout(() => {
+      setIsLoadingDeals(false);
+    }, 1000);
+
+    // Simulate loading for brands
+    setIsLoadingBrands(true);
+    setTimeout(() => {
+      setIsLoadingBrands(false);
+    }, 1000);
+  }, []);
 
   return (
     <SafeAreaView style={styles.safeArea}>
@@ -704,431 +1415,349 @@ const BuyerHomeScreen = () => {
           <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Search products..."
+            placeholder="Try 'white shoes for men under GHS50'..."
             value={searchQuery}
             onChangeText={handleSearch}
+            onSubmitEditing={() => handleSearch(searchQuery)}
+            returnKeyType="search"
           />
           {searchQuery.length > 0 ? (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <TouchableOpacity onPress={() => {
+              setSearchQuery('');
+              setFeaturedProducts([]); // Clear search results
+            }}>
               <Ionicons name="close-circle" size={20} color="#999" />
             </TouchableOpacity>
           ) : (
             <TouchableOpacity style={styles.searchButton}>
-              <Ionicons name="options-outline" size={20} color="#fff" />
+              <Ionicons name="mic" size={20} color="#fff" />
             </TouchableOpacity>
           )}
         </View>
         
-        <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollContent}>
-          {/* Banner Carousel Section */}
-          <View style={styles.specialOffersContainer}>
-            <View style={styles.specialOffersHeader}>
-              <Text style={styles.specialOffersTitle}>#SpecialForYou</Text>
-              <TouchableOpacity>
-             
-              </TouchableOpacity>
-            </View>
-            <ScrollView
-              ref={bannersScrollViewRef}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              pagingEnabled
-              onMomentumScrollEnd={(event) => {
-                const slideWidth = 280 + 15;
-                const offsetX = event.nativeEvent.contentOffset.x;
-                const activeIndex = Math.round(offsetX / slideWidth);
-                setActiveBannerIndex(activeIndex);
-              }}
-            >
-              {banners.map((banner) => (
-                <TouchableOpacity
-                  key={banner._id}
-                  style={styles.specialOfferCard}
-                  onPress={() => {
-                    if (banner.linkType === 'seller') {
-                      navigation.navigate('CategoriesScreen', { sellerId: banner.linkId });
-                    } else if (banner.linkType === 'product') {
-                      navigation.navigate('ProductDetails', { productId: banner.linkId });
-                    }
-                  }}
-                >
-                  <Image source={{ uri: banner.image }} style={styles.offerBackgroundImage} />
-                  <View style={styles.offerContentWrapper}>
-                    <View style={styles.offerContent}>
-                      <Text style={styles.offerHeading}>{banner.title}</Text>
-                      <Text style={styles.offerDetails}>{banner.description}</Text>
-                      {banner.buttonText ? (
-                        <TouchableOpacity style={styles.offerButton}>
-                          <Text style={styles.offerButtonText}>{banner.buttonText}</Text>
-                        </TouchableOpacity>
-                      ) : null}
-                    </View>
-                  </View>
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-            {/* Pagination Dots */}
-            <View style={styles.paginationDotsContainer}>
-              {banners.map((_, index) => (
-                <View
-                  key={index}
-                  style={[
-                    styles.paginationDot,
-                    index === activeBannerIndex && styles.paginationDotActive,
-                  ]}
-                />
-              ))}
-            </View>
-          </View>
-          
-          {/* Categories */}
-          <View style={styles.sectionContainer}>
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>Categories</Text>
-              <TouchableOpacity onPress={() => navigation.navigate('CategoriesScreen')}>
-                <Text style={styles.seeAllText}>See All</Text>
-              </TouchableOpacity>
-            </View>
-            <FlatList
-              data={categories}
-              renderItem={renderCategory}
-              keyExtractor={(item) => item.id}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.categoriesList}
-            />
-          </View>
-          
-          {/* Featured Products */}
-          <View style={styles.sectionContainer}>
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionTitleContainer}>
-                <View style={styles.sectionTitleAccent}></View>
-                <Text style={styles.sectionTitle}>Featured Products</Text>
-              </View>
-              <TouchableOpacity 
-                style={styles.seeAllButton} 
-                onPress={() => navigation.navigate('CategoriesScreen', { featuredOnly: true })}
-              >
-                <Text style={styles.seeAllText}>See All</Text>
-                <Ionicons name="chevron-forward" size={16} color="#5D3FD3" />
-              </TouchableOpacity>
-            </View>
-            <FlatList
-              data={featuredProducts}
-              renderItem={renderFeaturedProduct}
-              keyExtractor={(item) => item._id.toString()}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.productsList}
-            />
-          </View>
-          
-          {/* New Arrivals */}
-          <View style={[styles.sectionContainer, { marginBottom: 20 }]}>
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionTitleContainer}>
-                <View style={[styles.sectionTitleAccent, {backgroundColor: '#5D3FD3'}]}></View>
-                <Text style={styles.sectionTitle}>New Arrivals</Text>
-              </View>
-              <TouchableOpacity 
-                style={styles.seeAllButton} 
-                onPress={() => navigation.navigate('CategoriesScreen', { newArrivals: true })}
-              >
-                <Text style={styles.seeAllText}>See All</Text>
-                <Ionicons name="chevron-forward" size={16} color="#5D3FD3" />
-              </TouchableOpacity>
-            </View>
-            <FlatList
-              data={featuredProducts.slice(-3)}
-              renderItem={renderFeaturedProduct}
-              keyExtractor={(item) => item._id.toString()}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.productsList}
-            />
-          </View>
-
-          {/* Services */}
-          <View style={[styles.sectionContainer, { marginBottom: 20 }]}>
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionTitleContainer}>
-                <View style={[styles.sectionTitleAccent, {backgroundColor: '#4ECDC4'}]}></View>
-                <Text style={styles.sectionTitle}>Services</Text>
-              </View>
-              <TouchableOpacity 
-                style={styles.seeAllButton} 
-                onPress={() => navigation.navigate('CategoriesScreen', { services: true })}
-              >
-                <Text style={styles.seeAllText}>See All</Text>
-                <Ionicons name="chevron-forward" size={16} color="#5D3FD3" />
-              </TouchableOpacity>
-            </View>
-            <FlatList
-              data={services}
-              renderItem={renderService}
-              keyExtractor={(item) => item._id.toString()}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.productsList}
-              ListEmptyComponent={() => (
-                <View style={styles.emptyStateContainer}>
-                  <Text style={styles.emptyStateText}>No services available</Text>
-                </View>
-              )}
-            />
-          </View>
-
-          {/* Trending Categories Grid */}
-          <View style={[styles.sectionContainer, { marginBottom: 20 }]}>
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionTitleContainer}>
-                <View style={[styles.sectionTitleAccent, {backgroundColor: '#FFD166'}]}></View>
-                <Text style={styles.sectionTitle}>Trending Categories</Text>
-              </View>
-            </View>
-            <View style={styles.gridContainer}>
-              {/* First Row */}
-              <View style={styles.gridRow}>
-                <TouchableOpacity 
-                  style={styles.gridItem}
-                  onPress={() => navigation.navigate('CategoriesScreen', { categoryName: 'New', categoryId: 'new' })}
-                >
-                  <Image 
-                    source={{ uri: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?ixlib=rb-4.0.3' }} 
-                    style={styles.gridImage}
-                  />
-                  <View style={styles.gridOverlay}>
-                    <Text style={styles.gridTitle}>New</Text>
-                  </View>
-                </TouchableOpacity>
-                
-                <TouchableOpacity 
-                  style={styles.gridItem}
-                  onPress={() => navigation.navigate('CategoriesScreen', { categoryName: 'Women', categoryId: 'women' })}
-                >
-                  <Image 
-                    source={{ uri: 'https://images.unsplash.com/photo-1535043934128-cf0b28d52f95?ixlib=rb-4.0.3' }} 
-                    style={styles.gridImage}
-                  />
-                  <View style={styles.gridOverlay}>
-                    <Text style={styles.gridTitle}>Women</Text>
-                  </View>
-                </TouchableOpacity>
-
-                <TouchableOpacity 
-                  style={styles.gridItem}
-                  onPress={() => navigation.navigate('CategoriesScreen', { categoryName: 'Men', categoryId: 'men' })}
-                >
-                  <Image 
-                    source={{ uri: 'https://images.unsplash.com/photo-1550246140-29f40b909e5a?ixlib=rb-4.0.3' }} 
-                    style={styles.gridImage}
-                  />
-                  <View style={styles.gridOverlay}>
-                    <Text style={styles.gridTitle}>Men</Text>
-                  </View>
-                </TouchableOpacity>
-
-                <TouchableOpacity 
-                  style={styles.gridItem}
-                  onPress={() => navigation.navigate('CategoriesScreen', { categoryName: 'Asarion', categoryId: 'Asarion' })}
-                >
-                  <Image 
-                    source={require('../assets/images/Asarion2.png')} 
-                    style={styles.gridImage}
-                  />
-                  <View style={styles.gridOverlay}>
-                    <Text style={styles.gridTitle}>Asarion</Text>
-                  </View>
+        {/* Conditional Rendering: Show either search results or regular content */}
+        {searchQuery.trim() ? (
+          renderSearchResults()
+        ) : (
+          <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollContent}>
+            {/* Banner Carousel Section */}
+            <View style={styles.specialOffersContainer}>
+              <View style={styles.specialOffersHeader}>
+                <Text style={styles.specialOffersTitle}>#SpecialForYou</Text>
+                <TouchableOpacity>
+               
                 </TouchableOpacity>
               </View>
-
-              {/* Second Row */}
-              <View style={styles.gridRow}>
-                <TouchableOpacity 
-                  style={styles.gridItem}
-                  onPress={() => navigation.navigate('CategoriesScreen', { categoryName: 'Shoes', categoryId: 'shoes' })}
-                >
-                  <Image 
-                    source={{ uri: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?ixlib=rb-4.0.3' }} 
-                    style={styles.gridImage}
-                  />
-                  <View style={styles.gridOverlay}>
-                    <Text style={styles.gridTitle}>Shoes</Text>
-                  </View>
-                </TouchableOpacity>
-
-                <TouchableOpacity 
-                  style={styles.gridItem}
-                  onPress={() => navigation.navigate('CategoriesScreen', { categoryName: 'Watches', categoryId: 'watches' })}
-                >
-                  <Image 
-                    source={{ uri: 'https://images.unsplash.com/photo-1524592094714-0f0654e20314?ixlib=rb-4.0.3' }} 
-                    style={styles.gridImage}
-                  />
-                  <View style={styles.gridOverlay}>
-                    <Text style={styles.gridTitle}>Watches</Text>
-                  </View>
-                </TouchableOpacity>
-
-                <TouchableOpacity 
-                  style={styles.gridItem}
-                  onPress={() => navigation.navigate('CategoriesScreen', { categoryName: 'Bags', categoryId: 'bags' })}
-                >
-                  <Image 
-                    source={{ uri: 'https://i.pinimg.com/474x/0b/8f/d9/0b8fd9d0b8f2006f2af7077c273a5375.jpg' }} 
-                    style={styles.gridImage}
-                  />
-                  <View style={styles.gridOverlay}>
-                    <Text style={styles.gridTitle}>Bags</Text>
-                  </View>
-                </TouchableOpacity>
-
-                <TouchableOpacity 
-                  style={styles.gridItem}
-                  onPress={() => navigation.navigate('CategoriesScreen', { categoryName: 'Crop Tops', categoryId: 'crop-tops' })}
-                >
-                  <Image 
-                    source={{ uri: 'https://images.unsplash.com/photo-1583292650898-7d22cd27ca6f?ixlib=rb-4.0.3' }} 
-                    style={styles.gridImage}
-                  />
-                  <View style={styles.gridOverlay}>
-                    <Text style={styles.gridTitle}>Crop Tops</Text>
-                  </View>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-
-          {/* After Trending Categories Grid, add: */}
-          <View style={[styles.sectionContainer, { marginBottom: 20 }]}>
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionTitleContainer}>
-                <View style={[styles.sectionTitleAccent, {backgroundColor: '#5D3FD3'}]}></View>
-                <Text style={styles.sectionTitle}>Special Offers & Deals</Text>
-              </View>
+              {renderBannerSection()}
             </View>
             
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dealsContainer}>
-              {/* Flash Sale Card */}
-              <TouchableOpacity style={styles.dealCard}>
-                <View style={[styles.dealBadge, { backgroundColor: '#5D3FD3' }]}>
-                  <Text style={styles.dealBadgeText}>50% OFF</Text>
+            {/* Categories */}
+            <View style={styles.sectionContainer}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Categories</Text>
+                <TouchableOpacity onPress={() => navigation.navigate('CategoriesScreen')}>
+                  <Text style={styles.seeAllText}>See All</Text>
+                </TouchableOpacity>
+              </View>
+              {renderCategoriesSection()}
+            </View>
+            
+            {/* Featured Products */}
+            <View style={styles.sectionContainer}>
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionTitleContainer}>
+                  <View style={styles.sectionTitleAccent}></View>
+                  <Text style={styles.sectionTitle}>Featured Products</Text>
                 </View>
-                <Image 
-                  source={{ uri: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30' }}
-                  style={styles.dealImage}
-                />
-                <View style={styles.dealInfo}>
-                  <Text style={styles.dealTitle}>Flash Sale</Text>
-                  <Text style={styles.dealDescription}>Ends in 2 hours</Text>
+                <TouchableOpacity 
+                  style={styles.seeAllButton} 
+                  onPress={() => navigation.navigate('CategoriesScreen', { featuredOnly: true })}
+                >
+                  <Text style={styles.seeAllText}>See All</Text>
+                  <Ionicons name="chevron-forward" size={16} color="#5D3FD3" />
+                </TouchableOpacity>
+              </View>
+              {renderProductsSection()}
+            </View>
+            
+            {/* New Arrivals */}
+            <View style={[styles.sectionContainer, { marginBottom: 20 }]}>
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionTitleContainer}>
+                  <View style={[styles.sectionTitleAccent, {backgroundColor: '#5D3FD3'}]}></View>
+                  <Text style={styles.sectionTitle}>New Arrivals</Text>
                 </View>
-              </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.seeAllButton} 
+                  onPress={() => navigation.navigate('CategoriesScreen', { newArrivals: true })}
+                >
+                  <Text style={styles.seeAllText}>See All</Text>
+                  <Ionicons name="chevron-forward" size={16} color="#5D3FD3" />
+                </TouchableOpacity>
+              </View>
+              {renderNewArrivalsSection()}
+            </View>
 
-              {/* Bundle Deal Card */}
-              <TouchableOpacity style={styles.dealCard}>
-                <View style={[styles.dealBadge, { backgroundColor: '#2ecc71' }]}>
-                  <Text style={styles.dealBadgeText}>BUNDLE</Text>
+            {/* Services */}
+            <View style={[styles.sectionContainer, { marginBottom: 20 }]}>
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionTitleContainer}>
+                  <View style={[styles.sectionTitleAccent, {backgroundColor: '#4ECDC4'}]}></View>
+                  <Text style={styles.sectionTitle}>Services</Text>
                 </View>
-                <Image 
-                  source={{ uri: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff' }}
-                  style={styles.dealImage}
-                />
-                <View style={styles.dealInfo}>
-                  <Text style={styles.dealTitle}>Buy 2 Get 1</Text>
-                  <Text style={styles.dealDescription}>Limited time offer</Text>
-                </View>
-              </TouchableOpacity>
+                <TouchableOpacity 
+                  style={styles.seeAllButton} 
+                  onPress={() => navigation.navigate('CategoriesScreen', { services: true })}
+                >
+                  <Text style={styles.seeAllText}>See All</Text>
+                  <Ionicons name="chevron-forward" size={16} color="#5D3FD3" />
+                </TouchableOpacity>
+              </View>
+              {renderServicesSection()}
+            </View>
 
-              {/* Clearance Card */}
-              <TouchableOpacity style={styles.dealCard}>
-                <View style={[styles.dealBadge, { backgroundColor: '#f1c40f' }]}>
-                  <Text style={styles.dealBadgeText}>CLEARANCE</Text>
+            {/* Trending Categories Grid */}
+            <View style={[styles.sectionContainer, { marginBottom: 20 }]}>
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionTitleContainer}>
+                  <View style={[styles.sectionTitleAccent, {backgroundColor: '#FFD166'}]}></View>
+                  <Text style={styles.sectionTitle}>Trending Categories</Text>
                 </View>
-                <Image 
-                  source={{ uri: 'https://images.unsplash.com/photo-1585386959984-a4155224a1ad' }}
-                  style={styles.dealImage}
-                />
-                <View style={styles.dealInfo}>
-                  <Text style={styles.dealTitle}>End of Season</Text>
-                  <Text style={styles.dealDescription}>Up to 70% off</Text>
-                </View>
-              </TouchableOpacity>
-            </ScrollView>
-          </View>
+              </View>
+              <View style={styles.gridContainer}>
+                {/* First Row */}
+                <View style={styles.gridRow}>
+                  <TouchableOpacity 
+                    style={styles.gridItem}
+                    onPress={() => navigation.navigate('CategoriesScreen', { 
+                      categoryName: 'New Arrivals',
+                      filter: {
+                        sortBy: 'createdAt',
+                        sortOrder: 'desc',
+                        limit: 20
+                      }
+                    })}
+                  >
+                    <Image 
+                      source={{ uri: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?ixlib=rb-4.0.3' }} 
+                      style={styles.gridImage}
+                    />
+                    <View style={styles.gridOverlay}>
+                      <Text style={styles.gridTitle}>New</Text>
+                    </View>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity 
+                    style={styles.gridItem}
+                    onPress={() => navigation.navigate('CategoriesScreen', { 
+                      categoryName: 'Women',
+                      filter: {
+                        featuredType: 'women',
+                        category: 'CLOTHING_FASHION',
+                        gender: 'women'
+                      }
+                    })}
+                  >
+                    <Image 
+                      source={{ uri: 'https://images.unsplash.com/photo-1535043934128-cf0b28d52f95?ixlib=rb-4.0.3' }} 
+                      style={styles.gridImage}
+                    />
+                    <View style={styles.gridOverlay}>
+                      <Text style={styles.gridTitle}>Women</Text>
+                    </View>
+                  </TouchableOpacity>
 
-          {/* Featured Brands */}
-          <View style={[styles.sectionContainer, { marginBottom: 20 }]}>
-            <View style={styles.sectionHeader}>
-              <View style={styles.sectionTitleContainer}>
-                <View style={[styles.sectionTitleAccent, {backgroundColor: '#6c5ce7'}]}></View>
-                <Text style={styles.sectionTitle}>Featured Brands</Text>
+                  <TouchableOpacity 
+                    style={styles.gridItem}
+                    onPress={() => navigation.navigate('CategoriesScreen', { 
+                      categoryName: 'Men',
+                      filter: {
+                        featuredType: 'men',
+                        category: 'CLOTHING_FASHION',
+                        gender: 'men'
+                      }
+                    })}
+                  >
+                    <Image 
+                      source={{ uri: 'https://images.unsplash.com/photo-1550246140-29f40b909e5a?ixlib=rb-4.0.3' }} 
+                      style={styles.gridImage}
+                    />
+                    <View style={styles.gridOverlay}>
+                      <Text style={styles.gridTitle}>Men</Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={styles.gridItem}
+                    onPress={() => navigation.navigate('CategoriesScreen', { 
+                      categoryName: 'Asarion',
+                      filter: {
+                        featuredType: 'featured',
+                        isVerified: true,
+                        sortBy: 'views',
+                        sortOrder: 'desc'
+                      }
+                    })}
+                  >
+                    <Image 
+                      source={require('../assets/images/Asarion2.png')} 
+                      style={styles.gridImage}
+                    />
+                    <View style={styles.gridOverlay}>
+                      <Text style={styles.gridTitle}>Asarion</Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
+
+                {/* Second Row */}
+                <View style={styles.gridRow}>
+                  <TouchableOpacity 
+                    style={styles.gridItem}
+                    onPress={() => navigation.navigate('CategoriesScreen', { 
+                      categoryName: 'Shoes',
+                      filter: {
+                        category: 'CLOTHING_FASHION',
+                        subcategory: 'shoes',
+                        searchTerm: 'shoes',
+                        sortBy: 'views',
+                        sortOrder: 'desc'
+                      }
+                    })}
+                  >
+                    <Image 
+                      source={{ uri: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?ixlib=rb-4.0.3' }} 
+                      style={styles.gridImage}
+                    />
+                    <View style={styles.gridOverlay}>
+                      <Text style={styles.gridTitle}>Shoes</Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={styles.gridItem}
+                    onPress={() => navigation.navigate('CategoriesScreen', { 
+                      categoryName: 'Watches',
+                      filter: {
+                        category: 'ELECTRONICS',
+                        subcategory: 'watches',
+                        $or: [
+                          { name: { $regex: 'watch', $options: 'i' } },
+                          { description: { $regex: 'watch', $options: 'i' } }
+                        ],
+                        sort: { views: -1 }
+                      }
+                    })}
+                  >
+                    <Image 
+                      source={{ uri: 'https://images.unsplash.com/photo-1524592094714-0f0654e20314?ixlib=rb-4.0.3' }} 
+                      style={styles.gridImage}
+                    />
+                    <View style={styles.gridOverlay}>
+                      <Text style={styles.gridTitle}>Watches</Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={styles.gridItem}
+                    onPress={() => navigation.navigate('CategoriesScreen', { 
+                      categoryName: 'Bags',
+                      filter: {
+                        category: 'CLOTHING_FASHION',
+                        subcategory: 'bags',
+                        searchTerm: 'bag',
+                        sortBy: 'views',
+                        sortOrder: 'desc'
+                      }
+                    })}
+                  >
+                    <Image 
+                      source={{ uri: 'https://i.pinimg.com/474x/0b/8f/d9/0b8fd9d0b8f2006f2af7077c273a5375.jpg' }} 
+                      style={styles.gridImage}
+                    />
+                    <View style={styles.gridOverlay}>
+                      <Text style={styles.gridTitle}>Bags</Text>
+                    </View>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity 
+                    style={styles.gridItem}
+                    onPress={() => navigation.navigate('CategoriesScreen', { 
+                      categoryName: 'Crop Tops',
+                      filter: {
+                        category: 'CLOTHING_FASHION',
+                        subcategory: 'tops',
+                        gender: 'women',
+                        searchTerm: 'crop top',
+                        sortBy: 'views',
+                        sortOrder: 'desc'
+                      }
+                    })}
+                  >
+                    <Image 
+                      source={{ uri: 'https://images.unsplash.com/photo-1583292650898-7d22cd27ca6f?ixlib=rb-4.0.3' }} 
+                      style={styles.gridImage}
+                    />
+                    <View style={styles.gridOverlay}>
+                      <Text style={styles.gridTitle}>Crop Tops</Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
 
-            {/* Brand Logos */}
-            <View style={styles.brandContainer}>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                <TouchableOpacity style={styles.brandCircle}>
-                  <Image 
-                    source={{ uri: 'https://images.unsplash.com/photo-1515955656352-a1fa3ffcd111?ixlib=rb-4.0.3' }}
-                    style={styles.brandLogo}
-                  />
-                  <Text style={styles.brandName}>Nike</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.brandCircle}>
-                  <Image 
-                    source={{ uri: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?ixlib=rb-4.0.3' }}
-                    style={styles.brandLogo}
-                  />
-                  <Text style={styles.brandName}>Adidas</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.brandCircle}>
-                  <Image 
-                    source={{ uri: 'https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?ixlib=rb-4.0.3' }}
-                    style={styles.brandLogo}
-                  />
-                  <Text style={styles.brandName}>Puma</Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.brandCircle}>
-                  <Image 
-                    source={{ uri: 'https://images.unsplash.com/photo-1618354691373-d851c5c3a990?ixlib=rb-4.0.3' }}
-                    style={styles.brandLogo}
-                  />
-                  <Text style={styles.brandName}>Reebok</Text>
-                </TouchableOpacity>
-              </ScrollView>
+            {/* After Trending Categories Grid, add: */}
+            <View style={[styles.sectionContainer, { marginBottom: 20 }]}>
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionTitleContainer}>
+                  <View style={[styles.sectionTitleAccent, {backgroundColor: '#5D3FD3'}]}></View>
+                  <Text style={styles.sectionTitle}>Special Offers & Deals</Text>
+                </View>
+              </View>
+              
+              {renderDealsSection()}
             </View>
 
-            {/* Special Collections */}
-            <View style={styles.collectionsContainer}>
-              <TouchableOpacity style={styles.collectionCard}>
-                <Image 
-                  source={{ uri: 'https://images.unsplash.com/photo-1556906781-9a412961c28c?ixlib=rb-4.0.3' }}
-                    style={styles.collectionImage}
-                />
-                <View style={styles.collectionOverlay}>
-                  <Text style={styles.collectionTitle}>Premium Collection</Text>
-                  <Text style={styles.collectionSubtitle}>Luxury at its finest</Text>
+            {/* Featured Brands */}
+            <View style={[styles.sectionContainer, { marginBottom: 20 }]}>
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionTitleContainer}>
+                  <View style={[styles.sectionTitleAccent, {backgroundColor: '#6c5ce7'}]}></View>
+                  <Text style={styles.sectionTitle}>Featured Brands</Text>
                 </View>
-              </TouchableOpacity>
+              </View>
 
-              <TouchableOpacity style={styles.collectionCard}>
-                <Image 
-                  source={{ uri: 'https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?ixlib=rb-4.0.3' }}
-                    style={styles.collectionImage}
-                />
-                <View style={styles.collectionOverlay}>
-                  <Text style={styles.collectionTitle}>New Season</Text>
-                  <Text style={styles.collectionSubtitle}>Spring/Summer 2024</Text>
-                </View>
-              </TouchableOpacity>
+              {/* Brand Logos */}
+              <View style={styles.brandContainer}>
+                {renderBrandsSection()}
+              </View>
+
+              {/* Special Collections */}
+              <View style={styles.collectionsContainer}>
+                <TouchableOpacity style={styles.collectionCard}>
+                  <Image 
+                    source={{ uri: 'https://images.unsplash.com/photo-1556906781-9a412961c28c?ixlib=rb-4.0.3' }}
+                      style={styles.collectionImage}
+                  />
+                  <View style={styles.collectionOverlay}>
+                    <Text style={styles.collectionTitle}>Premium Collection</Text>
+                    <Text style={styles.collectionSubtitle}>Luxury at its finest</Text>
+                  </View>
+                </TouchableOpacity>
+
+                <TouchableOpacity style={styles.collectionCard}>
+                  <Image 
+                    source={{ uri: 'https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?ixlib=rb-4.0.3' }}
+                      style={styles.collectionImage}
+                  />
+                  <View style={styles.collectionOverlay}>
+                    <Text style={styles.collectionTitle}>New Season</Text>
+                    <Text style={styles.collectionSubtitle}>Spring/Summer 2024</Text>
+                  </View>
+                </TouchableOpacity>
+              </View>
             </View>
-          </View>
-        </ScrollView>
+          </ScrollView>
+        )}
 
         {/* Bottom Navigation */}
         <View style={styles.bottomNavigation}>
@@ -1224,6 +1853,81 @@ const BuyerHomeScreen = () => {
 };
 
 const styles = StyleSheet.create({
+  // Skeleton styles
+  skeletonBanner: {
+    width: 280,
+    height: 160,
+    backgroundColor: '#E1E9EE',
+    borderRadius: 15,
+    overflow: 'hidden',
+  },
+  skeletonImage: {
+    width: '100%',
+    height: 100,
+    backgroundColor: '#E1E9EE',
+    overflow: 'hidden',
+  },
+  skeletonTitle: {
+    width: '80%',
+    height: 15,
+    backgroundColor: '#E1E9EE',
+    marginVertical: 5,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  skeletonPrice: {
+    width: '40%',
+    height: 15,
+    backgroundColor: '#E1E9EE',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  skeletonDealImage: {
+    width: '100%',
+    height: 100,
+    backgroundColor: '#E1E9EE',
+    overflow: 'hidden',
+  },
+  skeletonDealTitle: {
+    width: '80%',
+    height: 15,
+    backgroundColor: '#E1E9EE',
+    marginVertical: 5,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  skeletonDealDescription: {
+    width: '40%',
+    height: 15,
+    backgroundColor: '#E1E9EE',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  skeletonBrandLogo: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  skeletonBrandName: {
+    width: 80,
+    height: 15,
+    backgroundColor: '#E1E9EE',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  skeletonCategoryName: {
+    width: 80,
+    height: 15,
+    backgroundColor: '#E1E9EE',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  shimmer: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#F8F8F8',
+    opacity: 0.5,
+  },
   safeArea: {
     flex: 1,
     backgroundColor: '#fff',
@@ -1279,15 +1983,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: '#fff',
-    borderRadius: 10,
+    borderRadius: 25,
     marginHorizontal: 16,
-    marginTop: -20, // Overlapping with the header
+    marginTop: -20,
     marginBottom: 12,
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     paddingVertical: 8,
     borderWidth: 1,
     borderColor: '#e0e0e0',
-    // Shadow for the search bar
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -1300,12 +2003,20 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    height: 36,
+    height: 40,
     fontSize: 16,
     color: '#333',
+    paddingVertical: 8,
   },
-  
-  /* Special Offers Section - Added based on image reference */
+  searchButton: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#5D3FD3',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
   specialOffersContainer: {
     marginTop: 10,
     paddingHorizontal: 16,
@@ -1870,47 +2581,124 @@ const styles = StyleSheet.create({
     marginRight: 4,
     opacity: 0.9,
   },
-  searchButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#5D3FD3',
+  searchResultsContainer: {
+    flex: 1,
+    backgroundColor: '#f5f5f5',
+    paddingTop: 8,
+  },
+  searchResultsList: {
+    paddingHorizontal: 8,
+  },
+  loadingContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: 8,
+    paddingTop: 40,
   },
-  favoriteBadge: {
-    position: 'absolute',
-    top: -2,
-    right: 10,
-    backgroundColor: '#FF4757',
+  loadingText: {
+    marginTop: 12,
+    color: '#666',
+    fontSize: 16,
+  },
+  noResultsText: {
+    textAlign: 'center',
+    color: '#666',
+    fontSize: 16,
+    marginTop: 40,
+  },
+  errorText: {
+    textAlign: 'center',
+    color: '#FF4757',
+    fontSize: 16,
+    marginTop: 40,
+    paddingHorizontal: 20,
+  },
+  skeletonImage: {
+    width: '100%',
+    height: 100,
+    backgroundColor: '#E1E9EE',
+    overflow: 'hidden',
+  },
+  skeletonTitle: {
+    width: '80%',
+    height: 15,
+    backgroundColor: '#E1E9EE',
+    marginVertical: 5,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  skeletonPrice: {
+    width: '40%',
+    height: 15,
+    backgroundColor: '#E1E9EE',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  skeletonBanner: {
+    width: 280,
+    height: 160,
+    backgroundColor: '#E1E9EE',
+    borderRadius: 15,
+    overflow: 'hidden',
+  },
+  shimmer: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#F8F8F8',
+    opacity: 0.5,
+  },
+  skeletonDealImage: {
+    width: '100%',
+    height: 100,
+    backgroundColor: '#E1E9EE',
+    overflow: 'hidden',
+  },
+  skeletonDealTitle: {
+    width: '80%',
+    height: 15,
+    backgroundColor: '#E1E9EE',
+    marginVertical: 5,
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  skeletonDealDescription: {
+    width: '40%',
+    height: 15,
+    backgroundColor: '#E1E9EE',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  skeletonBrandLogo: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  skeletonBrandName: {
+    width: 80,
+    height: 15,
+    backgroundColor: '#E1E9EE',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  skeletonCategoryName: {
+    width: 80,
+    height: 15,
+    backgroundColor: '#E1E9EE',
+    borderRadius: 4,
+    overflow: 'hidden',
+  },
+  viewsContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.05)',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
     borderRadius: 10,
-    minWidth: 16,
-    height: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#fff',
   },
-  favoriteBadgeText: {
-    color: '#fff',
-    fontSize: 9,
-    fontWeight: 'bold',
-    paddingHorizontal: 3,
-  },
-  headerNotificationBadge: {
-    position: 'absolute',
-    top: -2,
-    right: -5,
-    backgroundColor: '#FF4757',
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#fff',
-    zIndex: 10,
+  viewsText: {
+    fontSize: 10,
+    color: '#666',
+    marginLeft: 4,
   },
 });
 

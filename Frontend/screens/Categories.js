@@ -20,6 +20,9 @@ const Categories = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { categoryId, categoryName } = route.params || {};
+
+  const API_URL = 'http://172.20.10.2:5000'; // Local development URL - CHANGE BACK FOR PRODUCTION!
+
   
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -61,10 +64,22 @@ const Categories = () => {
     fetchProducts();
   }, [selectedCategory, showingProductCategories]);
   
+  useEffect(() => {
+    if (categoryId) {
+      setSelectedCategory(categoryId);
+    }
+  }, [categoryId]);
+  
   const handleCategorySelect = (category) => {
     console.log('Selected category:', category);
     setSelectedCategory(category);
-    // No need to fetch products here as the useEffect will handle it
+    setSearchQuery(''); // Clear search when changing categories
+    
+    // Reset sorting to default when changing categories
+    setSortBy('popularity');
+    
+    // Close filter modal if open
+    setFilterModalVisible(false);
   };
   
   const toggleCategoryType = () => {
@@ -80,13 +95,25 @@ const Categories = () => {
     setTimeout(() => {
       const params = new URLSearchParams();
       if (selectedCategory && selectedCategory !== 'all') {
-        params.append('category', 'all'); // We reset to 'all' above
+        const categoryDisplayName = !newValue 
+          ? categories.PRODUCTS[selectedCategory] 
+          : categories.SERVICES[selectedCategory];
+          
+        if (categoryDisplayName) {
+          // Filter by both mainCategory and category fields
+          params.append('filter', JSON.stringify({
+            $or: [
+              { mainCategory: categoryDisplayName },
+              { category: categoryDisplayName }
+            ]
+          }));
+        }
       }
       
       // Use the newValue directly instead of relying on the state
       params.append('isService', !newValue ? 'true' : 'false');
       
-      let url = `https://unimarket-ikin.onrender.com/api/products?${params.toString()}`;
+      let url = `${API_URL}/api/products?${params.toString()}`;
       
       console.log('Toggling to URL:', url); // Debug log
       
@@ -99,14 +126,27 @@ const Categories = () => {
         })
         .then(data => {
           console.log('Toggled products/services:', data);
-          setProducts(data);
+          console.log('Number of products after toggle:', Array.isArray(data) ? data.length : 0);
+          
+          // Filter products client-side as well
+          const filteredData = data.filter(product => {
+            const categoryDisplayName = !newValue 
+              ? categories.PRODUCTS[selectedCategory] 
+              : categories.SERVICES[selectedCategory];
+              
+            return selectedCategory === 'all' || 
+                   product.mainCategory === categoryDisplayName ||
+                   product.category === categoryDisplayName;
+          });
+          
+          setProducts(filteredData);
           setError(null);
           setLoading(false);
         })
         .catch(err => {
           console.error('Error fetching after toggle:', err);
           setError('Failed to load. Please try again.');
-          setProducts(MOCK_PRODUCTS);
+          setProducts([]);
           setLoading(false);
         });
     }, 0);
@@ -115,58 +155,74 @@ const Categories = () => {
   const fetchProducts = async () => {
     setLoading(true);
     try {
-      // Construct the URL with category filter if provided
-      let url = 'https://unimarket-ikin.onrender.com/api/products';
-      
+      // Base URL
+      const baseUrl = `${API_URL}/api/products`;
       const params = new URLSearchParams();
       
-      // If a specific category is selected (not 'all')
+      // Handle category filtering
       if (selectedCategory && selectedCategory !== 'all') {
-        // Convert the category key to the display name that's stored in the database
+        // Convert category key to display name
         const categoryDisplayName = showingProductCategories 
           ? categories.PRODUCTS[selectedCategory] 
           : categories.SERVICES[selectedCategory];
+          
+        console.log('Selected Category:', selectedCategory);
+        console.log('Category Display Name:', categoryDisplayName);
         
-        params.append('category', categoryDisplayName);
-      }
-      // If categoryId is provided from route params, it takes precedence
-      else if (categoryId) {
-        // If categoryId is a key, convert it to display name
-        const categoryDisplayName = showingProductCategories 
-          ? categories.PRODUCTS[categoryId] || categoryId
-          : categories.SERVICES[categoryId] || categoryId;
-        
-        params.append('category', categoryDisplayName);
-        setSelectedCategory(categoryId);
+        if (categoryDisplayName) {
+          // Filter by both mainCategory and category fields
+          params.append('filter', JSON.stringify({
+            $or: [
+              { mainCategory: categoryDisplayName },
+              { category: categoryDisplayName }
+            ]
+          }));
+        }
       }
       
-      // Fix the isService parameter
+      // Handle service/product filtering
       params.append('isService', !showingProductCategories ? 'true' : 'false');
       
-      // Append the query string to the URL if we have parameters
-      if (params.toString()) {
-        url += `?${params.toString()}`;
-      }
-      
-      console.log('Fetching from URL:', url); // Debug log
+      // Construct final URL with proper encoding
+      const url = `${baseUrl}?${params.toString()}`;
+      console.log('Fetching products from URL:', url);
       
       const response = await fetch(url);
       
       if (!response.ok) {
-        const errorData = await response.text();
-        console.error('Server response:', errorData);
-        throw new Error(`Failed to fetch products: ${response.status}`);
+        throw new Error(`HTTP error! status: ${response.status}`);
       }
       
       const data = await response.json();
       console.log('Fetched products:', data);
-      setProducts(data);
-      setError(null);
+      console.log('Number of products:', Array.isArray(data) ? data.length : 0);
+      
+      // Log both category and mainCategory of each product to verify filtering
+      if (Array.isArray(data)) {
+        data.forEach(product => {
+          console.log(`Product ${product.name} - category: ${product.category}, mainCategory: ${product.mainCategory}`);
+        });
+        
+        // Filter products client-side as well to ensure correct categorization
+        const filteredData = data.filter(product => {
+          const categoryDisplayName = showingProductCategories 
+            ? categories.PRODUCTS[selectedCategory] 
+            : categories.SERVICES[selectedCategory];
+            
+          return selectedCategory === 'all' || 
+                 product.mainCategory === categoryDisplayName ||
+                 product.category === categoryDisplayName;
+        });
+        
+        setProducts(filteredData);
+        setError(null);
+      } else {
+        throw new Error('Invalid data format received');
+      }
     } catch (err) {
       console.error('Error fetching products:', err);
-      setError('Failed to load products. Please try again later.');
-      // Use mock data as fallback
-      setProducts(MOCK_PRODUCTS);
+      setError('Failed to load products. Please try again.');
+      setProducts([]); // Clear products on error instead of using mock data
     } finally {
       setLoading(false);
     }
@@ -203,7 +259,7 @@ const Categories = () => {
     console.log('Product item:', item);
     const imageUri = item.image && (item.image.startsWith('http') 
       ? item.image 
-      : `https://unimarket-ikin.onrender.com${item.image}`);
+      : `${API_URL}${item.image}`);
       
     return (
       <TouchableOpacity 

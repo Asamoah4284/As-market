@@ -5,31 +5,8 @@ const Product = require('../models/productModel'); // Adjust path as needed
 // Get all categories
 router.get('/', async (req, res) => {
   try {
-    // Define your categories structure (same as in your frontend)
-    const categories = {
-      PRODUCTS: {
-        CLOTHING_FASHION: 'Clothing & Fashion',
-        ELECTRONICS: 'Electronics & Gadgets',
-        SCHOOL_SUPPLIES: 'School Supplies',
-        FOOD_DRINKS: 'Food & Drinks',
-        BEAUTY_SKINCARE: 'Beauty & Skincare',
-        HEALTH_FITNESS: 'Health & Fitness',
-        FURNITURE_HOME: 'Furniture & Home Items',
-        EVENT_TICKETS: 'Event Tickets & Merchandise'
-      },
-      SERVICES: {
-        HOSTEL_AGENTS: 'Hostel Agents',
-        ASSIGNMENT_HELP: 'Assignment Assistance',
-        GRAPHIC_DESIGN: 'Graphic Design',
-        PHOTO_VIDEO: 'Photography & Videography',
-        LAUNDRY: 'Laundry Services',
-        BARBER_HAIR: 'Barbering & Hairdressing',
-        MC_DJ: 'MCs & DJs for Events',
-        TUTORING: 'Tutoring & Lessons',
-        FREELANCE_WRITING: 'Freelance Writing',
-        TECH_SUPPORT: 'Tech Support'
-      }
-    };
+    // Get categories from Product model to ensure consistency
+    const categories = Product.getCategories();
     
     res.json(categories);
   } catch (error) {
@@ -38,31 +15,48 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Get products by category
+// Get products by category ID
 router.get('/:categoryId/products', async (req, res) => {
   try {
     const { categoryId } = req.params;
-    const { isService } = req.query;
     
     // Build query object
-    const query = {};
+    const query = {
+      status: 'approved' // Only return approved products
+    };
     
     // Add category filter if provided and not 'all'
     if (categoryId && categoryId !== 'all') {
-      query.category = categoryId;
-    }
-    
-    // Add service/product filter if provided
-    if (isService !== undefined) {
-      query.isService = isService === 'true';
+      query.categoryId = categoryId;
     }
     
     // Find products matching the query
-    const products = await Product.find(query).populate('seller', 'name');
+    const products = await Product.find(query)
+      .populate('seller', 'name')
+      .sort({ createdAt: -1 }); // Sort by newest first
     
     res.json(products);
   } catch (error) {
     console.error('Error fetching products by category:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Get available categories for admin use (when assigning products)
+router.get('/admin/available', async (req, res) => {
+  try {
+    const categories = Product.getCategories();
+    
+    // Return simplified format for admin dropdown/selection
+    const adminCategories = categories.map(cat => ({
+      id: cat.id,
+      name: cat.name,
+      displayName: `${cat.name} (${cat.id})`
+    }));
+    
+    res.json(adminCategories);
+  } catch (error) {
+    console.error('Error fetching admin categories:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

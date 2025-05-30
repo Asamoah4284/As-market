@@ -7,7 +7,8 @@ const {
   updateProduct, 
   deleteProduct,
   getProducts,
-  adminUpdateProduct
+  adminUpdateProduct,
+  incrementProductViews
 } = require('../controllers/productController');
 const { protect } = require('../middleware/auth');
 const Product = require('../models/productModel');
@@ -15,7 +16,7 @@ const Product = require('../models/productModel');
 // Public routes
 router.get('/', async (req, res) => {
   try {
-    const { category, isService, status } = req.query;
+    const { category, isService, status, gender, sort, subcategory } = req.query;
     
     // Build query object
     const query = {};
@@ -25,16 +26,31 @@ router.get('/', async (req, res) => {
       query.category = category;
     }
     
+    // Add subcategory filter if provided
+    if (subcategory) {
+      query.subcategory = subcategory;
+    }
+    
     // Add service/product filter if provided
     if (isService !== undefined) {
       query.isService = isService === 'true';
+    }
+    
+    // Add gender filter if provided
+    if (gender) {
+      query.gender = gender;
     }
     
     // Only show approved products on public routes
     query.status = 'approved';
     
     // Find products matching the query
-    const products = await Product.find(query).populate('seller', 'name');
+    let products = await Product.find(query).populate('seller', 'name');
+    
+    // Apply sorting if specified
+    if (sort === 'newest') {
+      products = products.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    }
     
     res.json(products);
   } catch (error) {
@@ -115,6 +131,9 @@ router.put('/approve/:id', protect, async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 });
+
+// Increment product views
+router.post('/:id/views', incrementProductViews);
 
 // Enhanced route for admin to approve/reject AND configure product features
 router.put('/admin-update/:id', protect, adminUpdateProduct);

@@ -69,7 +69,18 @@ const createProduct = asyncHandler(async (req, res) => {
     throw new Error('Not authorized, please login');
   }
 
-  const { name, description, price, category, stock, image, additionalImages, isService } = req.body;
+  const { 
+    name, 
+    description, 
+    price, 
+    category, 
+    stock, 
+    image, 
+    additionalImages, 
+    isService,
+    gender,
+    color 
+  } = req.body;
 
   // Check if user is a seller
   const user = await User.findById(req.user._id);
@@ -106,13 +117,15 @@ const createProduct = asyncHandler(async (req, res) => {
     name,
     description,
     price: finalPrice,
-    category,
+    mainCategory: category, // Store seller's category choice as mainCategory
     stock: isService ? 1 : stock, // Services always have stock of 1
     image: mainImageUrl,
     additionalImages: additionalImageUrls,
     isService,
     seller: req.user._id,
-    status: 'pending' // Always start as pending
+    status: 'pending', // Always start as pending
+    gender: isService ? undefined : gender, // Only include gender for products
+    color: isService ? undefined : color // Only include color for products
   });
 
   if (product) {
@@ -156,7 +169,18 @@ const getProductById = asyncHandler(async (req, res) => {
 // @route   PUT /api/products/:id
 // @access  Private/Seller
 const updateProduct = asyncHandler(async (req, res) => {
-  const { name, description, price, category, stock, image, additionalImages, isService } = req.body;
+  const { 
+    name, 
+    description, 
+    price, 
+    category, 
+    stock, 
+    image, 
+    additionalImages, 
+    isService,
+    gender,
+    color 
+  } = req.body;
 
   const product = await Product.findById(req.params.id);
 
@@ -192,11 +216,17 @@ const updateProduct = asyncHandler(async (req, res) => {
   product.name = name || product.name;
   product.description = description || product.description;
   product.price = price || product.price;
-  product.category = category || product.category;
+  product.mainCategory = category || product.mainCategory;
   product.stock = isService ? 1 : (stock || product.stock);
   product.image = mainImageUrl;
   product.additionalImages = additionalImageUrls;
   product.isService = isService !== undefined ? isService : product.isService;
+  
+  // Only update gender and color for products
+  if (!product.isService) {
+    product.gender = gender || product.gender;
+    product.color = color || product.color;
+  }
 
   const updatedProduct = await product.save();
   res.json(updatedProduct);
@@ -256,7 +286,10 @@ const adminUpdateProduct = asyncHandler(async (req, res) => {
     featuredType, 
     featuredRank,
     onSale,
-    discountPercentage
+    discountPercentage,
+    subcategory,
+    category,
+    categoryId
   } = req.body;
 
   // Check if user is admin
@@ -265,41 +298,84 @@ const adminUpdateProduct = asyncHandler(async (req, res) => {
     throw new Error('Not authorized as an admin');
   }
 
+  // First check if product exists
+  const existingProduct = await Product.findById(req.params.id);
+  if (!existingProduct) {
+    res.status(404);
+    throw new Error('Product not found');
+  }
+
+  // Build update object with only defined fields
+  const updateData = {};
+  
+  // Update status related fields
+  if (status !== undefined) {
+    updateData.status = status;
+    if (status === 'rejected' && rejectionReason) {
+      updateData.rejectionReason = rejectionReason;
+    }
+  }
+
+  // Update category related fields
+  if (category !== undefined && category !== null) {
+    updateData.category = category;
+  }
+
+  if (categoryId !== undefined && categoryId !== null) {
+    updateData.categoryId = categoryId;
+  }
+
+  // Update subcategory
+  if (subcategory !== undefined) {
+    updateData.subcategory = subcategory || null;
+  }
+
+  // Update featured related fields
+  if (featuredType !== undefined) {
+    updateData.featuredType = featuredType;
+  }
+
+  if (featuredRank !== undefined) {
+    updateData.featuredRank = featuredRank;
+  }
+
+  // Update sale related fields
+  if (onSale !== undefined) {
+    updateData.onSale = onSale;
+  }
+
+  if (discountPercentage !== undefined) {
+    updateData.discountPercentage = discountPercentage;
+  }
+
+  // Use findByIdAndUpdate to bypass any schema defaults
+  const updatedProduct = await Product.findByIdAndUpdate(
+    req.params.id,
+    updateData,
+    { 
+      new: true, // Return the updated document
+      runValidators: true // Run schema validators
+    }
+  );
+  
+  res.json(updatedProduct);
+});
+
+// @desc    Increment product views
+// @route   POST /api/products/:id/views
+// @access  Public
+const incrementProductViews = asyncHandler(async (req, res) => {
   const product = await Product.findById(req.params.id);
+  
   if (!product) {
     res.status(404);
     throw new Error('Product not found');
   }
 
-  // Update status related fields
-  if (status) {
-    product.status = status;
-    
-    if (status === 'rejected' && rejectionReason) {
-      product.rejectionReason = rejectionReason;
-    }
-  }
+  product.views = (product.views || 0) + 1;
+  await product.save();
 
-  // Update featured related fields
-  if (featuredType !== undefined) {
-    product.featuredType = featuredType;
-  }
-
-  if (featuredRank !== undefined) {
-    product.featuredRank = featuredRank;
-  }
-
-  // Update sale related fields
-  if (onSale !== undefined) {
-    product.onSale = onSale;
-  }
-
-  if (discountPercentage !== undefined) {
-    product.discountPercentage = discountPercentage;
-  }
-
-  const updatedProduct = await product.save();
-  res.json(updatedProduct);
+  res.json({ views: product.views });
 });
 
 module.exports = {
@@ -309,5 +385,6 @@ module.exports = {
   updateProduct,
   deleteProduct,
   getProducts,
-  adminUpdateProduct
+  adminUpdateProduct,
+  incrementProductViews
 }; 

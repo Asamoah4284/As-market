@@ -14,8 +14,93 @@ import {
 } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { API_BASE_URL } from '../config/api';
 
-const API_URL = 'https://unimarket-ikin.onrender.com'; // Replace with your API URL
+// Add categories array
+const CATEGORIES = [
+  { id: '1', name: 'Electronic', icon: 'devices', color: '#FF6B6B' },
+  { id: '2', name: 'Fashion', icon: 'checkroom', color: '#4ECDC4' },
+  { id: '3', name: 'Home', icon: 'home', color: '#FFD166' },
+  { id: '4', name: 'Beauty', icon: 'spa', color: '#FF9F9F' },
+  { id: '5', name: 'Sneakers', icon: 'sports-basketball', color: '#6A0572' },
+  { id: '6', name: 'Books', icon: 'menu-book', color: '#1A535C' },
+];
+
+// Add subcategories for each main category
+const SUBCATEGORIES = {
+  '1': [ // Electronic
+    'Smartphones',
+    'Laptops',
+    'Tablets',
+    'Headphones',
+    'Gaming',
+    'Cameras',
+    'Smart Watches',
+    'Accessories',
+    'Audio Equipment',
+    'Computer Parts'
+  ],
+  '2': [ // Fashion
+    'T-Shirts',
+    'Shirts',
+    'Dresses',
+    'Pants/Jeans',
+    'Shoes',
+    'Bags',
+    'Watches',
+    'Jewelry',
+    'Hats/Caps',
+    'Underwear'
+  ],
+  '3': [ // Home
+    'Furniture',
+    'Kitchen Appliances',
+    'Bedding',
+    'Decor',
+    'Lighting',
+    'Storage',
+    'Cleaning Supplies',
+    'Garden',
+    'Tools',
+    'Bathroom'
+  ],
+  '4': [ // Beauty
+    'Skincare',
+    'Makeup',
+    'Hair Care',
+    'Fragrances',
+    'Body Care',
+    'Nail Care',
+    'Beauty Tools',
+    'Men\'s Grooming',
+    'Supplements',
+    'Organic/Natural'
+  ],
+  '5': [ // Sneakers
+    'Running Shoes',
+    'Basketball Shoes',
+    'Casual Sneakers',
+    'Formal Shoes',
+    'Boots',
+    'Sandals',
+    'Sports Shoes',
+    'Designer Sneakers',
+    'Vintage/Retro',
+    'Limited Edition'
+  ],
+  '6': [ // Books
+    'Textbooks',
+    'Fiction',
+    'Non-Fiction',
+    'Academic',
+    'Reference',
+    'Comics/Manga',
+    'Self-Help',
+    'Biographies',
+    'Children\'s Books',
+    'Educational'
+  ]
+};
 
 const PendingProducts = () => {
   const [pendingProducts, setPendingProducts] = useState([]);
@@ -29,6 +114,10 @@ const PendingProducts = () => {
   const [onSale, setOnSale] = useState(false);
   const [discountPercentage, setDiscountPercentage] = useState('0');
   const [refreshing, setRefreshing] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState(null);
+  const [categoryDropdownVisible, setCategoryDropdownVisible] = useState(false);
+  const [subcategory, setSubcategory] = useState('');
+  const [subcategoryDropdownVisible, setSubcategoryDropdownVisible] = useState(false);
   
   // For custom dropdown
   const [dropdownVisible, setDropdownVisible] = useState(false);
@@ -65,7 +154,7 @@ const PendingProducts = () => {
         return;
       }
       
-      const response = await fetch(`${API_URL}/api/products/pending`, {
+      const response = await fetch(`${API_BASE_URL}/api/products/pending`, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Accept': 'application/json'
@@ -103,6 +192,16 @@ const PendingProducts = () => {
     setFeaturedRank(product.featuredRank.toString());
     setOnSale(product.onSale);
     setDiscountPercentage(product.discountPercentage.toString());
+    setSubcategory(product.subcategory || '');
+    
+    // Initialize category selection based on existing categoryId
+    if (product.categoryId) {
+      const existingCategory = CATEGORIES.find(cat => cat.id === product.categoryId);
+      if (existingCategory) {
+        setSelectedCategory(existingCategory);
+      }
+    }
+    
     setModalVisible(true);
   };
   
@@ -110,6 +209,18 @@ const PendingProducts = () => {
     setFeaturedType(option.value);
     setSelectedFeaturedLabel(option.label);
     setDropdownVisible(false);
+  };
+
+  const handleSelectCategory = (category) => {
+    setSelectedCategory(category);
+    setCategoryDropdownVisible(false);
+    // Reset subcategory when category changes
+    setSubcategory('');
+  };
+
+  const handleSelectSubcategory = (subcategoryValue) => {
+    setSubcategory(subcategoryValue);
+    setSubcategoryDropdownVisible(false);
   };
 
   const handleApproveProduct = async (status) => {
@@ -120,6 +231,13 @@ const PendingProducts = () => {
       if (!token) {
         throw new Error('Authentication required');
       }
+
+      // Validate category selection for approval
+      if (status === 'approved' && !selectedCategory) {
+        Alert.alert('Error', 'Please select a category before approving the product');
+        setLoading(false);
+        return;
+      }
       
       // Build update data based on form state
       const updateData = {
@@ -127,7 +245,12 @@ const PendingProducts = () => {
         featuredType: featuredType === '' ? null : featuredType,
         featuredRank: parseInt(featuredRank),
         onSale,
-        discountPercentage: parseInt(discountPercentage)
+        discountPercentage: parseInt(discountPercentage),
+        subcategory: subcategory.trim() || null,
+        category: selectedCategory ? selectedCategory.name : null,
+        categoryId: selectedCategory ? selectedCategory.id : null,
+        categoryColor: selectedCategory ? selectedCategory.color : null,
+        categoryIcon: selectedCategory ? selectedCategory.icon : null
       };
       
       // Add rejection reason if rejecting
@@ -140,7 +263,7 @@ const PendingProducts = () => {
         updateData.rejectionReason = rejectionReason;
       }
       
-      const response = await fetch(`${API_URL}/api/products/admin-update/${selectedProduct._id}`, {
+      const response = await fetch(`${API_BASE_URL}/api/products/admin-update/${selectedProduct._id}`, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -150,9 +273,10 @@ const PendingProducts = () => {
         body: JSON.stringify(updateData)
       });
       
+      const responseData = await response.json();
+      
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `Failed to ${status} product`);
+        throw new Error(responseData.message || `Failed to ${status} product`);
       }
       
       // Update local state by removing the product from the list
@@ -167,6 +291,8 @@ const PendingProducts = () => {
       // Reset form
       setRejectionReason('');
       setSelectedProduct(null);
+      setSelectedCategory(null);
+      setSubcategory('');
       
     } catch (error) {
       console.error(`Error ${status === 'approved' ? 'approving' : 'rejecting'} product:`, error);
@@ -184,7 +310,7 @@ const PendingProducts = () => {
       <Image source={{ uri: item.image }} style={styles.productImage} />
       <View style={styles.productInfo}>
         <Text style={styles.productName}>{item.name}</Text>
-        <Text style={styles.productCategory}>{item.category}</Text>
+        <Text style={styles.productCategory}>{item.mainCategory || item.category}</Text>
         <View style={styles.productMeta}>
           <Text style={styles.productPrice}>GH₵{item.price.toFixed(2)}</Text>
           <Text style={styles.productSeller}>
@@ -284,8 +410,22 @@ const PendingProducts = () => {
                       <Text style={styles.detailLabel}>Price:</Text>
                       <Text style={styles.detailValue}>GH₵{selectedProduct.price.toFixed(2)}</Text>
                       
-                      <Text style={styles.detailLabel}>Category:</Text>
-                      <Text style={styles.detailValue}>{selectedProduct.category}</Text>
+                      <Text style={styles.detailLabel}>Seller's Category:</Text>
+                      <Text style={styles.detailValue}>{selectedProduct.mainCategory || selectedProduct.category || 'Not specified'}</Text>
+                      
+                      {selectedProduct.category && selectedProduct.category !== selectedProduct.mainCategory && (
+                        <>
+                          <Text style={styles.detailLabel}>Admin Assigned Category:</Text>
+                          <Text style={styles.detailValue}>{selectedProduct.category}</Text>
+                        </>
+                      )}
+                      
+                      {selectedProduct.subcategory && (
+                        <>
+                          <Text style={styles.detailLabel}>Subcategory:</Text>
+                          <Text style={styles.detailValue}>{selectedProduct.subcategory}</Text>
+                        </>
+                      )}
                       
                       <Text style={styles.detailLabel}>Stock:</Text>
                       <Text style={styles.detailValue}>{selectedProduct.stock}</Text>
@@ -313,6 +453,150 @@ const PendingProducts = () => {
                       </ScrollView>
                     </View>
                   )}
+                  
+                  {/* Category Selection */}
+                  <View style={styles.configSection}>
+                    <Text style={styles.sectionTitle}>Category Assignment</Text>
+                    <View style={styles.formGroup}>
+                      <Text style={styles.formLabel}>Select Category:</Text>
+                      <TouchableOpacity 
+                        style={styles.dropdownButton}
+                        onPress={() => setCategoryDropdownVisible(true)}
+                      >
+                        <Text style={styles.dropdownButtonText}>
+                          {selectedCategory ? selectedCategory.name : 'Select Category'}
+                        </Text>
+                        <MaterialIcons name="arrow-drop-down" size={24} color="#666" />
+                      </TouchableOpacity>
+                    </View>
+                    
+                    <View style={styles.formGroup}>
+                      <Text style={styles.formLabel}>Subcategory (Optional):</Text>
+                      {selectedCategory ? (
+                        <TouchableOpacity 
+                          style={styles.dropdownButton}
+                          onPress={() => setSubcategoryDropdownVisible(true)}
+                        >
+                          <Text style={styles.dropdownButtonText}>
+                            {subcategory || 'Select Subcategory'}
+                          </Text>
+                          <MaterialIcons name="arrow-drop-down" size={24} color="#666" />
+                        </TouchableOpacity>
+                      ) : (
+                        <View style={[styles.dropdownButton, {backgroundColor: '#f5f5f5'}]}>
+                          <Text style={[styles.dropdownButtonText, {color: '#999'}]}>
+                            Select category first
+                          </Text>
+                        </View>
+                      )}
+                    </View>
+                  </View>
+
+                  {/* Category Dropdown Modal */}
+                  <Modal
+                    transparent={true}
+                    visible={categoryDropdownVisible}
+                    animationType="fade"
+                    onRequestClose={() => setCategoryDropdownVisible(false)}
+                  >
+                    <TouchableOpacity 
+                      style={styles.dropdownOverlay}
+                      activeOpacity={1}
+                      onPress={() => setCategoryDropdownVisible(false)}
+                    >
+                      <View style={styles.dropdownContainer}>
+                        <ScrollView>
+                          {CATEGORIES.map((category) => (
+                            <TouchableOpacity
+                              key={category.id}
+                              style={[
+                                styles.dropdownItem,
+                                selectedCategory?.id === category.id && styles.dropdownItemSelected
+                              ]}
+                              onPress={() => handleSelectCategory(category)}
+                            >
+                              <View style={styles.categoryDropdownItem}>
+                                <MaterialIcons 
+                                  name={category.icon} 
+                                  size={24} 
+                                  color={category.color} 
+                                  style={styles.categoryIcon}
+                                />
+                                <Text style={[
+                                  styles.dropdownItemText,
+                                  selectedCategory?.id === category.id && styles.dropdownItemTextSelected
+                                ]}>
+                                  {category.name}
+                                </Text>
+                              </View>
+                              {selectedCategory?.id === category.id && (
+                                <MaterialIcons name="check" size={20} color="#0066cc" />
+                              )}
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      </View>
+                    </TouchableOpacity>
+                  </Modal>
+                  
+                  {/* Subcategory Dropdown Modal */}
+                  <Modal
+                    transparent={true}
+                    visible={subcategoryDropdownVisible}
+                    animationType="fade"
+                    onRequestClose={() => setSubcategoryDropdownVisible(false)}
+                  >
+                    <TouchableOpacity 
+                      style={styles.dropdownOverlay}
+                      activeOpacity={1}
+                      onPress={() => setSubcategoryDropdownVisible(false)}
+                    >
+                      <View style={styles.dropdownContainer}>
+                        <ScrollView>
+                          {/* None/Clear option */}
+                          <TouchableOpacity
+                            style={[
+                              styles.dropdownItem,
+                              !subcategory && styles.dropdownItemSelected
+                            ]}
+                            onPress={() => handleSelectSubcategory('')}
+                          >
+                            <Text style={[
+                              styles.dropdownItemText,
+                              !subcategory && styles.dropdownItemTextSelected
+                            ]}>
+                              None (Clear Selection)
+                            </Text>
+                            {!subcategory && (
+                              <MaterialIcons name="check" size={20} color="#0066cc" />
+                            )}
+                          </TouchableOpacity>
+                          
+                          {/* Subcategory options based on selected category */}
+                          {selectedCategory && SUBCATEGORIES[selectedCategory.id]?.map((subcat) => (
+                            <TouchableOpacity
+                              key={subcat}
+                              style={[
+                                styles.dropdownItem,
+                                subcategory === subcat && styles.dropdownItemSelected
+                              ]}
+                              onPress={() => handleSelectSubcategory(subcat)}
+                            >
+                              <Text style={[
+                                styles.dropdownItemText,
+                                subcategory === subcat && styles.dropdownItemTextSelected
+                              ]}>
+                                {subcat}
+                              </Text>
+                              {subcategory === subcat && (
+                                <MaterialIcons name="check" size={20} color="#0066cc" />
+                              )}
+                            </TouchableOpacity>
+                          ))}
+                        </ScrollView>
+                      </View>
+                    </TouchableOpacity>
+                  </Modal>
                   
                   {/* Featured Section Configuration */}
                   <View style={styles.configSection}>
@@ -803,6 +1087,13 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: 'bold',
     marginLeft: 8,
+  },
+  categoryDropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  categoryIcon: {
+    marginRight: 12,
   },
 });
 

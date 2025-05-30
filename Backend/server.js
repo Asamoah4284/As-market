@@ -13,6 +13,7 @@ const orderRoutes = require('./routes/orderRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
 const promotionRoutes = require('./routes/promotionRoutes');
 const bannerRoutes = require('./routes/bannerRoutes');
+const assistantRoutes = require('./routes/assistantRoutes');
 const mongoose = require('mongoose');
 
 dotenv.config();
@@ -44,6 +45,7 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/notifications', notificationRoutes);
 app.use('/api/store-promotions', promotionRoutes);
 app.use('/api/banners', bannerRoutes);
+app.use('/api/assistant', assistantRoutes);
 
 app.get('/api/test', async (req, res) => {
   try {

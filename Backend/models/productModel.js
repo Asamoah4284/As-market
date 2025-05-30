@@ -17,9 +17,46 @@ const productSchema = new mongoose.Schema(
       required: [true, 'Product price is required'],
       min: [0, 'Price cannot be negative']
     },
+    color: {
+      type: String,
+      required: [true, 'Product color is required'],
+      trim: true
+    },
+    gender: {
+      type: String,
+      enum: ['men', 'women', 'unisex'],
+      required: [true, 'Product gender is required']
+    },
     category: {
       type: String,
-      required: [true, 'Product category is required']
+      required: [false, 'Product category is required']
+    },
+    mainCategory: {
+      type: String,
+      required: true // This will be set by sellers, not required initially for backward compatibility
+    },
+    categoryId: {
+      type: String,
+      required: false,
+      enum: ['1', '2', '3', '4', '5', '6'], // Electronic, Fashion, Home, Beauty, Sneakers, Books
+      default: function() {
+        if (this.category) {
+          const categoryMap = {
+            'Electronic': '1',
+            'Fashion': '2', 
+            'Home': '3',
+            'Beauty': '4',
+            'Sneakers': '5',
+            'Books': '6'
+          };
+          return categoryMap[this.category] || '1';
+        }
+        return '1';
+      }
+    },
+    subcategory: {
+      type: String,
+      default: null
     },
     stock: {
       type: Number,
@@ -109,6 +146,10 @@ const productSchema = new mongoose.Schema(
     rejectionReason: {
       type: String,
       default: null
+    },
+    views: {
+      type: Number,
+      default: 0
     }
   },
   {
@@ -124,6 +165,31 @@ productSchema.virtual('comments', {
   localField: '_id',
   foreignField: 'product'
 });
+
+// Virtual for category name based on categoryId
+productSchema.virtual('categoryName').get(function() {
+  const categories = {
+    '1': 'Electronic',
+    '2': 'Fashion', 
+    '3': 'Home',
+    '4': 'Beauty',
+    '5': 'Sneakers',
+    '6': 'Books'
+  };
+  return categories[this.categoryId] || 'Unknown';
+});
+
+// Static method to get all valid categories
+productSchema.statics.getCategories = function() {
+  return [
+    { id: '1', name: 'Electronic', icon: 'devices', color: '#FF6B6B' },
+    { id: '2', name: 'Fashion', icon: 'checkroom', color: '#4ECDC4' },
+    { id: '3', name: 'Home', icon: 'home', color: '#FFD166' },
+    { id: '4', name: 'Beauty', icon: 'spa', color: '#FF9F9F' },
+    { id: '5', name: 'Sneakers', icon: 'sports-basketball', color: '#6A0572' },
+    { id: '6', name: 'Books', icon: 'menu-book', color: '#1A535C' },
+  ];
+};
 
 const Product = mongoose.model('Product', productSchema);
 

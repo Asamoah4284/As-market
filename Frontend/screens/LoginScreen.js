@@ -64,19 +64,22 @@ function LoginScreen({ navigation, route }) {
         if (data.token) {
           await AsyncStorage.setItem('userToken', data.token);
           
-          console.log('User token:', data.token);
+          // Add more detailed logging for debugging
+          console.log('Login response data:', JSON.stringify(data, null, 2));
           
           const userData = {
             id: data.user?._id || data._id,
             name: data.user?.name || data.name,
             email: data.user?.email || data.email,
-            role: data.user?.role || data.role,
+            role: (data.user?.role || data.role || '').toLowerCase(), // Normalize role to lowercase
             phone: data.user?.phone || data.phone
           };
 
-          if (data.user?.role === 'admin' || data.role === 'admin') {
-            console.log('Admin logged in with token:', data.token);
-          }
+          console.log('Processed user data:', JSON.stringify(userData, null, 2));
+
+          // Check admin role more explicitly
+          const isAdmin = userData.role === 'admin';
+          console.log('Is admin user:', isAdmin);
           
           dispatch(setCredentials({
             token: data.token,
@@ -119,6 +122,7 @@ function LoginScreen({ navigation, route }) {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}` // Add token to headers
               },
               body: JSON.stringify({
                 pushToken,
@@ -136,38 +140,36 @@ function LoginScreen({ navigation, route }) {
       
       // Check if we need to redirect somewhere specific
       const redirectTo = route.params?.redirectTo;
-
-      // Navigate based on user role
-      if (userData.role === 'seller') {
+      
+      // Navigate based on user role with more explicit checks
+      console.log('Navigating based on role:', userData.role);
+      
+      if (userData.role === 'admin') {
+        console.log('Navigating to Admin screen');
+        // Clear the navigation stack and set Admin as the only screen
+        navigation.reset({
+          index: 0,
+          routes: [{ 
+            name: 'Admin',
+            params: { initialSection: 'dashboard' }
+          }],
+        });
+      } else if (userData.role === 'seller') {
+        console.log('Navigating to SellerDashboard');
         navigation.reset({
           index: 0,
           routes: [{ name: 'SellerDashboard' }],
         });
-      } else if (userData.role === 'admin') {
+      } else {
+        console.log('Navigating to BuyerHome'); 
         navigation.reset({
           index: 0,
-          routes: [{ name: 'Admin' }],
+          routes: [{ name: 'BuyerHome' }],
         });
-      } else {
-        // For buyers or if role is not specified
-        if (redirectTo) {
-          navigation.reset({
-            index: 1,
-            routes: [
-              { name: 'BuyerHome' },
-              { name: redirectTo }
-            ],
-          });
-        } else {
-          navigation.reset({
-            index: 0,
-            routes: [{ name: 'BuyerHome' }],
-          });
-        }
       }
     } catch (error) {
-      console.error('Error saving auth data:', error);
-      Alert.alert('Error', 'Failed to save login information');
+      console.error('Error in handleLoginSuccess:', error);
+      setError('Failed to complete login process');
     }
   };
 

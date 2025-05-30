@@ -15,6 +15,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import WelcomeScreen from './screens/WelcomeScreen';
 import SignUpScreen from './screens/SignUpScreen';
 import LoginScreen from './screens/LoginScreen';
+import AIProductSearch from './screens/AIProductSearch';
 import BuyerHomeScreen from './screens/BuyerHomeScreen';
 import BuyerProfileScreen from './screens/BuyerprofileScreen';
 import CartScreen from './screens/CartScreen';
@@ -299,7 +300,17 @@ function AppContent() {
           <Stack.Screen name="Cart" component={CartScreen} />
           <Stack.Screen name="Login" component={LoginScreen} />
           <Stack.Screen name="BuyerHome" component={BuyerHomeScreen} />
-          <Stack.Screen name="Admin" component={Admin} />
+          <Stack.Screen 
+            name="Admin" 
+            component={Admin}
+            options={{
+              headerShown: false,
+              gestureEnabled: false,
+              animationEnabled: true,
+              animation: 'fade',
+              freezeOnBlur: true
+            }}
+          />
           <Stack.Screen 
             name="Checkout" 
             component={CheckoutForm}
@@ -322,6 +333,7 @@ function AppContent() {
             component={ProductDetailsScreen} 
             options={{ headerShown: false }}
           />
+          <Stack.Screen name="AIProductSearch" component={AIProductSearch} />
           <Stack.Screen name="Categories" component={Categories} />
           <Stack.Screen name="CategoriesScreen" component={CategoryScreen} />
 

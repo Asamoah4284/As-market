@@ -22,79 +22,101 @@ const CategoryScreen = ({ route, navigation }) => {
     categoryId = '1', 
     categoryName = 'Products', 
     featuredOnly = false, 
-    newArrivals = false,
-    services = false
+    services = false,
+    filter = {}
   } = route?.params || {};
   
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  // Memoize the filter parameters to prevent unnecessary re-renders
+  const filterParams = React.useMemo(() => ({
+    categoryId,
+    categoryName,
+    featuredOnly,
+    services,
+    filter
+  }), [categoryId, categoryName, featuredOnly, services, JSON.stringify(filter)]);
 
   useEffect(() => {
+    let isMounted = true;
+    
     const fetchProducts = async () => {
+      if (!isMounted) return;
+      
       try {
-        let endpoint = `${API_BASE_URL}/api/products`;
+        setLoading(true);
+        setError(null);
         
+        // Base endpoint for products
+        let endpoint = `${API_BASE_URL}/api/products`;
+        let params = new URLSearchParams();
+        
+        // Handle different endpoint scenarios
         if (featuredOnly) {
-          // Featured products endpoint
           endpoint = `${API_BASE_URL}/api/products/featured`;
-        } else if (categoryId !== '1' && !isNaN(parseInt(categoryId))) {
-          // If categoryId is a valid numeric ID, use category specific endpoint
-          endpoint = `${API_BASE_URL}/api/products/category/${categoryId}`;
+        }
+
+        // Add category filtering - check both categoryId and category name
+        if (filter.categoryId) {
+          params.append('categoryId', filter.categoryId);
+        }
+        if (filter.category) {
+          params.append('category', filter.category);
+        }
+
+        // Add service/product filter
+        params.append('isService', services ? 'true' : 'false');
+        
+        // Add any additional filters from the filter prop
+        if (filter && Object.keys(filter).length > 0) {
+          Object.entries(filter).forEach(([key, value]) => {
+            if (value && key !== 'categoryId' && key !== 'category') { // Skip already handled filters
+              params.append(key, value);
+            }
+          });
+        }
+
+        // Construct final URL
+        const finalEndpoint = `${endpoint}${params.toString() ? '?' + params.toString() : ''}`;
+        console.log('Fetching products from:', finalEndpoint); // Debug log
+        
+        const response = await fetch(finalEndpoint);
+        
+        if (!response.ok) {
+          throw new Error(`Failed to fetch products. Status: ${response.status}`);
         }
         
-        console.log('Fetching products from:', endpoint);
+        const fetchedData = await response.json();
+        console.log('Fetched products:', fetchedData); // Debug log
         
-        const response = await fetch(endpoint);
-        
-        if (response.ok) {
-          let data = await response.json();
-          console.log('Fetched products:', data);
-          
-          // Filter based on the section type
-          if (services) {
-            data = data.filter(product => 
-              product.isService === true || product.featuredType === 'featured-service'
-            );
-          } else if (newArrivals) {
-            // Sort by date, assuming there's a createdAt field, to get newest products
-            data = data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).slice(0, 10);
-          } else if (!featuredOnly && !services && categoryId === '1') {
-            // Filter out services from regular product lists
-            data = data.filter(product => product.isService !== true);
-          } else if (categoryId !== '1' && isNaN(parseInt(categoryId))) {
-            // Filter by name for trend categories (when categoryId is not a number)
-            // This handles trending categories like 'men', 'women', 'kids', etc.
-            const categoryNameLower = categoryName.toLowerCase();
-            data = data.filter(product => {
-              // Check if product name or description contains the category name
-              const nameMatches = product.name && 
-                product.name.toLowerCase().includes(categoryNameLower);
-              const descMatches = product.description && 
-                product.description.toLowerCase().includes(categoryNameLower);
-              const categoryMatches = product.category && 
-                product.category.toLowerCase().includes(categoryNameLower);
-              const tagsMatch = product.tags && 
-                product.tags.some(tag => tag.toLowerCase().includes(categoryNameLower));
-              
-              return nameMatches || descMatches || categoryMatches || tagsMatch;
-            });
+        if (isMounted) {
+          setProducts(fetchedData);
+          if (fetchedData.length === 0) {
+            setError(`No products found in ${categoryName || 'this category'}`);
           }
-          
-          setProducts(data);
-        } else {
-          console.error('Error response:', response.status);
+        }
+        
+      } catch (error) {
+        console.error('Error fetching products:', error); // Debug log
+        if (isMounted) {
+          setError(error.message);
           setProducts([]);
         }
-      } catch (error) {
-        console.error('Error fetching products:', error);
-        setProducts([]);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
     
     fetchProducts();
-  }, [categoryId, categoryName, featuredOnly, services, newArrivals]);
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [filterParams]); // Only depend on the memoized filterParams
 
   const renderProductItem = ({ item }) => {
     // Handle proper image path
@@ -184,11 +206,26 @@ const CategoryScreen = ({ route, navigation }) => {
     );
   }
 
-  // Determine the correct title based on parameters
+  if (error) {
+    return (
+      <View style={styles.emptyState}>
+        <Ionicons name="alert-circle-outline" size={70} color="#e74c3c" />
+        <Text style={styles.emptyStateTitle}>Error Loading Products</Text>
+        <Text style={styles.emptyStateText}>{error}</Text>
+        <TouchableOpacity 
+          style={styles.browseButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Text style={styles.browseButtonText}>Go Back</Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  // Update getScreenTitle to remove newArrivals
   const getScreenTitle = () => {
     if (featuredOnly) return "Featured Products";
     if (services) return "Services";
-    if (newArrivals) return "New Arrivals";
     return categoryName || "Products";
   };
 
@@ -208,7 +245,23 @@ const CategoryScreen = ({ route, navigation }) => {
         </TouchableOpacity>
       </View>
 
-      {products.length === 0 ? (
+      {loading ? (
+        <View style={styles.centered}>
+          <ActivityIndicator size="large" color="#3498db" />
+        </View>
+      ) : error ? (
+        <View style={styles.emptyState}>
+          <Ionicons name="alert-circle-outline" size={70} color="#e74c3c" />
+          <Text style={styles.emptyStateTitle}>Error Loading Products</Text>
+          <Text style={styles.emptyStateText}>{error}</Text>
+          <TouchableOpacity 
+            style={styles.browseButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Text style={styles.browseButtonText}>Go Back</Text>
+          </TouchableOpacity>
+        </View>
+      ) : products.length === 0 ? (
         <View style={styles.emptyState}>
           <Ionicons name="search-outline" size={70} color="#ddd" />
           <Text style={styles.emptyStateTitle}>No Products Found</Text>
@@ -217,14 +270,14 @@ const CategoryScreen = ({ route, navigation }) => {
           </Text>
           <TouchableOpacity 
             style={styles.browseButton}
-            onPress={() => navigation.navigate('CategoriesScreen')}
+            onPress={() => navigation.goBack()}
           >
-            <Text style={styles.browseButtonText}>Browse All Products</Text>
+            <Text style={styles.browseButtonText}>Go Back</Text>
           </TouchableOpacity>
         </View>
       ) : (
         <FlatList
-          key="two-column-grid"
+          key="product-list"
           data={products}
           keyExtractor={(item) => item._id ? item._id.toString() : Math.random().toString()}
           renderItem={renderProductItem}
