@@ -1730,31 +1730,113 @@ const BuyerHomeScreen = () => {
               <View style={styles.brandContainer}>
                 {renderBrandsSection()}
               </View>
+            </View>
 
-              {/* Special Collections */}
-              <View style={styles.collectionsContainer}>
-                <TouchableOpacity style={styles.collectionCard}>
-                  <Image 
-                    source={{ uri: 'https://images.unsplash.com/photo-1556906781-9a412961c28c?ixlib=rb-4.0.3' }}
-                      style={styles.collectionImage}
-                  />
-                  <View style={styles.collectionOverlay}>
-                    <Text style={styles.collectionTitle}>Premium Collection</Text>
-                    <Text style={styles.collectionSubtitle}>Luxury at its finest</Text>
-                  </View>
-                </TouchableOpacity>
-
-                <TouchableOpacity style={styles.collectionCard}>
-                  <Image 
-                    source={{ uri: 'https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?ixlib=rb-4.0.3' }}
-                      style={styles.collectionImage}
-                  />
-                  <View style={styles.collectionOverlay}>
-                    <Text style={styles.collectionTitle}>New Season</Text>
-                    <Text style={styles.collectionSubtitle}>Spring/Summer 2024</Text>
-                  </View>
+            {/* Recommended for You Section */}
+            <View style={[styles.sectionContainer, { marginBottom: 20 }]}>
+              <View style={styles.sectionHeader}>
+                <View style={styles.sectionTitleContainer}>
+                  <View style={[styles.sectionTitleAccent, {backgroundColor: '#FF6B6B'}]}></View>
+                  <Text style={styles.sectionTitle}>Recommended for You</Text>
+                </View>
+                <TouchableOpacity 
+                  style={styles.seeAllButton} 
+                  onPress={() => navigation.navigate('CategoriesScreen', { recommended: true })}
+                >
+                  <Text style={styles.seeAllText}>See All</Text>
+                  <Ionicons name="chevron-forward" size={16} color="#5D3FD3" />
                 </TouchableOpacity>
               </View>
+
+              {isLoadingProducts ? (
+                <View style={styles.recommendedGridContainer}>
+                  <View style={styles.recommendedRow}>
+                    {[1, 2].map((item) => (
+                      <View key={item} style={styles.recommendedGridItem}>
+                        <ProductSkeleton />
+                      </View>
+                    ))}
+                  </View>
+                  <View style={styles.recommendedRow}>
+                    {[3, 4].map((item) => (
+                      <View key={item} style={styles.recommendedGridItem}>
+                        <ProductSkeleton />
+                      </View>
+                    ))}
+                  </View>
+                </View>
+              ) : (
+                <View style={styles.recommendedGridContainer}>
+                  {Array.from({ length: Math.ceil(featuredProducts.length / 2) }).map((_, rowIndex) => (
+                    <View key={rowIndex} style={styles.recommendedRow}>
+                      {featuredProducts.slice(rowIndex * 2, rowIndex * 2 + 2).map((item) => (
+                        <TouchableOpacity 
+                          key={item._id}
+                          style={styles.recommendedGridItem}
+                          onPress={() => navigation.navigate('ProductDetails', { productId: item._id })}
+                        >
+                          <View style={styles.productCard}>
+                            <View style={styles.productImageContainer}>
+                              <Image 
+                                source={{ uri: item.image }} 
+                                style={styles.productImage}
+                              />
+                              {item.isNew && (
+                                <View style={[styles.productBadge, { backgroundColor: '#FF6B6B' }]}>
+                                  <Text style={styles.productBadgeText}>New</Text>
+                                </View>
+                              )}
+                              <TouchableOpacity 
+                                style={styles.favoriteButton}
+                                onPress={(e) => {
+                                  e.stopPropagation();
+                                  toggleFavorite(item._id);
+                                }}
+                              >
+                                <Ionicons 
+                                  name={favorites.includes(item._id) ? "heart" : "heart-outline"} 
+                                  size={20} 
+                                  color={favorites.includes(item._id) ? "#FFD700" : "#fff"} 
+                                />
+                              </TouchableOpacity>
+                            </View>
+                            <View style={styles.productInfo}>
+                              <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
+                              <View style={styles.productDetails}>
+                                <View style={styles.priceContainer}>
+                                  <Text style={styles.productPrice}>GH¢{item.price.toFixed(2)}</Text>
+                                  {item.originalPrice && (
+                                    <Text style={styles.originalPrice}>GH¢{item.originalPrice.toFixed(2)}</Text>
+                                  )}
+                                </View>
+                                <View style={styles.viewsContainer}>
+                                  <Ionicons name="eye-outline" size={12} color="#666" />
+                                  <Text style={styles.viewsText}>{item.views || 0}</Text>
+                                </View>
+                              </View>
+                              <View style={styles.productFooter}>
+                                <View style={styles.sellerInfo}>
+                                  <Ionicons name="car-outline" size={12} color="#666" />
+                                  <Text style={styles.sellerText}>15% off delivery</Text>
+                                </View>
+                                <TouchableOpacity 
+                                  style={styles.addToCartButton}
+                                  onPress={(e) => {
+                                    e.stopPropagation();
+                                    handleAddToCart(item);
+                                  }}
+                                >
+                                  <Ionicons name="cart-outline" size={20} color="#5D3FD3" />
+                                </TouchableOpacity>
+                              </View>
+                            </View>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  ))}
+                </View>
+              )}
             </View>
           </ScrollView>
         )}
@@ -2699,6 +2781,23 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: '#666',
     marginLeft: 4,
+  },
+  recommendedGridContainer: {
+    paddingHorizontal: 8,
+    // paddingBottom: 8,
+    marginRight:8,
+  },
+  recommendedRow: {
+    flexDirection: 'row',
+    gap: 10,
+    justifyContent: 'space-between',
+    marginBottom: 8,
+
+  },
+  recommendedGridItem: {
+    width: (Dimensions.get('window').width - 32) / 2, // Screen width minus padding and gap
+    marginHorizontal: 4,
+    
   },
 });
 
