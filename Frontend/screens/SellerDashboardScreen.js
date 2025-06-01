@@ -13,6 +13,8 @@ import {
   ScrollView,
   Switch,
   Alert,
+  Animated,
+  Easing,
 } from 'react-native';
 import { MaterialIcons, FontAwesome, Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -116,6 +118,10 @@ const SellerDashboardScreen = () => {
   const [orderPage, setOrderPage] = useState(1);
   const [hasMoreOrders, setHasMoreOrders] = useState(true);
   const ORDERS_PER_PAGE = 10;
+  const [hasNewOrders, setHasNewOrders] = useState(false);
+  const promoteIconScale = new Animated.Value(1);
+  const promoteIconRotate = new Animated.Value(0);
+  const ordersIconScale = new Animated.Value(1);
 
   const isTokenExpired = (token) => {
     try {
@@ -646,51 +652,122 @@ const SellerDashboardScreen = () => {
 
   const handleUpdateOrderStatus = async (orderId, newStatus) => {
     try {
+      setLoading(true);
       const token = await AsyncStorage.getItem('userToken');
       if (!token) {
-        Alert.alert('Error', 'Authentication required');
+        Alert.alert('Error', 'Authentication required. Please login again.');
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Login' }],
+        });
         return;
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/orders/${orderId}/status`, {
+      // Verify API URL
+      if (!API_BASE_URL) {
+        throw new Error('API URL is not configured');
+      }
+
+      // Use the correct endpoint
+      const apiUrl = `${API_BASE_URL}/api/orders/${orderId}`;
+      console.log('Making request to:', apiUrl);
+
+      // Make the update request
+      const response = await fetch(apiUrl, {
         method: 'PUT',
         headers: {
           'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
         },
-        body: JSON.stringify({ status: newStatus })
+        body: JSON.stringify({ 
+          status: newStatus
+        })
       });
 
+      // Log response details for debugging
+      console.log('Response status:', response.status);
+      console.log('Response headers:', response.headers);
+
+      const responseText = await response.text();
+      console.log('Raw response:', responseText);
+
+      // Try to parse the response as JSON
+      let data;
+      try {
+        data = responseText ? JSON.parse(responseText) : null;
+      } catch (e) {
+        console.error('Failed to parse response:', e);
+        console.error('Response text:', responseText);
+        throw new Error('Server returned invalid response format');
+      }
+
       if (!response.ok) {
-        throw new Error('Failed to update order status');
+        throw new Error(data?.message || `Server error: ${response.status}`);
       }
 
-      // If the order is being marked as completed, update the product sales count
-      if (newStatus === 'completed') {
-        const order = orders.find(o => o._id === orderId);
-        if (order) {
-          // Update the products state with new sales count
-          setProducts(prevProducts => {
-            return prevProducts.map(product => {
-              const orderItem = order.items.find(item => item.product._id === product._id);
-              if (orderItem) {
-                return {
-                  ...product,
-                  sales: (product.sales || 0) + orderItem.quantity
-                };
-              }
-              return product;
-            });
-          });
-        }
-      }
+      // If successful, update the UI
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          order._id === orderId 
+            ? { ...order, orderStatus: newStatus }
+            : order
+        )
+      );
 
-      // Refresh orders after successful update
-      await fetchOrders();
-      Alert.alert('Success', 'Order status updated successfully');
+      // Show success message
+      Alert.alert(
+        'Success', 
+        `Order status updated to ${newStatus === 'processing' ? 'Processing' : 'Completed'}`,
+        [{ text: 'OK' }]
+      );
+
+      // Refresh orders to ensure we have the latest data
+      await fetchOrders(1, true);
+
     } catch (error) {
       console.error('Error updating order status:', error);
-      Alert.alert('Error', 'Failed to update order status. Please try again later.');
+      console.error('Error details:', {
+        message: error.message,
+        stack: error.stack,
+        apiUrl: API_BASE_URL
+      });
+      
+      // Revert any optimistic updates
+      setOrders(prevOrders => 
+        prevOrders.map(order => 
+          order._id === orderId 
+            ? { ...order, orderStatus: order.orderStatus }
+            : order
+        )
+      );
+
+      // Show appropriate error message
+      let errorMessage = 'Failed to update order status. ';
+      if (error.message.includes('Cannot connect to the server')) {
+        errorMessage += 'Please check your internet connection and try again.';
+      } else if (error.message.includes('invalid response format')) {
+        errorMessage += 'Server returned an invalid response. Please try again later.';
+      } else {
+        errorMessage += 'Please try again.';
+      }
+
+      Alert.alert(
+        'Error', 
+        errorMessage,
+        [
+          {
+            text: 'Retry',
+            onPress: () => handleUpdateOrderStatus(orderId, newStatus)
+          },
+          {
+            text: 'OK',
+            style: 'cancel'
+          }
+        ]
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -797,6 +874,53 @@ const SellerDashboardScreen = () => {
     );
   };
 
+  const getOrderStatusInfo = (status) => {
+    switch (status.toLowerCase()) {
+      case 'pending':
+        return {
+          icon: 'schedule',
+          color: '#FF9F1C',
+          bg: '#FFF3CD',
+          text: 'Awaiting Confirmation'
+        };
+      case 'processing':
+        return {
+          icon: 'local-shipping',
+          color: '#4361EE',
+          bg: '#E8F0FE',
+          text: 'Processing Order'
+        };
+      case 'completed':
+        return {
+          icon: 'check-circle',
+          color: '#2EC4B6',
+          bg: '#E8F5E9',
+          text: 'Order Completed'
+        };
+      case 'delivered':
+        return {
+          icon: 'local-shipping',
+          color: '#2EC4B6',
+          bg: '#E8F5E9',
+          text: 'Delivered Successfully'
+        };
+      case 'cancelled':
+        return {
+          icon: 'cancel',
+          color: '#E63946',
+          bg: '#FFEBEE',
+          text: 'Order Cancelled'
+        };
+      default:
+        return {
+          icon: 'info',
+          color: '#6c757d',
+          bg: '#F8F9FA',
+          text: status
+        };
+    }
+  };
+
   const renderOrderItem = ({ item }) => {
     if (!item) return null;
 
@@ -809,89 +933,129 @@ const SellerDashboardScreen = () => {
       minute: '2-digit'
     });
 
+    const statusInfo = getOrderStatusInfo(item.orderStatus || 'pending');
+
     return (
       <View style={[styles.orderCard, { backgroundColor: theme.cardBackground }]}>
-        <View style={styles.orderHeader}>
-          <View>
-            <Text style={[styles.orderId, { color: theme.text }]}>
-              Order #{item._id?.slice(-6) || 'N/A'}
-            </Text>
-            <Text style={[styles.orderDate, { color: theme.textSecondary }]}>
-              {formattedDate}
-            </Text>
+        {/* Order Header with Enhanced Gradient */}
+        <LinearGradient
+          colors={['rgba(93, 63, 211, 0.08)', 'rgba(93, 63, 211, 0.02)']}
+          style={styles.orderHeaderGradient}
+        >
+          <View style={styles.orderHeader}>
+            <View style={styles.orderHeaderLeft}>
+              <View style={styles.orderIdContainer}>
+                <View style={[styles.orderIconContainer, { backgroundColor: theme.primary + '15' }]}>
+                  <MaterialIcons name="receipt" size={18} color={theme.primary} />
+                </View>
+                <View>
+                  <Text style={[styles.orderId, { color: theme.text }]}>
+                    Order #{item._id?.slice(-6) || 'N/A'}
+                  </Text>
+                  <Text style={[styles.orderDate, { color: theme.textSecondary }]}>
+                    {formattedDate}
+                  </Text>
+                </View>
+              </View>
+            </View>
+            <View style={[styles.statusContainer, { backgroundColor: statusInfo.bg }]}>
+              <MaterialIcons 
+                name={statusInfo.icon} 
+                size={18} 
+                color={statusInfo.color} 
+              />
+              <Text style={[styles.statusText, { color: statusInfo.color }]}>
+                {statusInfo.text}
+              </Text>
+            </View>
           </View>
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.orderStatus || 'pending').bg }]}>
-            <Text style={[styles.statusText, { color: getStatusColor(item.orderStatus || 'pending').text }]}>
-              {item.orderStatus || 'Pending'}
-            </Text>
+        </LinearGradient>
+
+        {/* Order Summary Section */}
+        <View style={styles.orderSummarySection}>
+          <View style={styles.orderSummaryRow}>
+            <View style={styles.summaryItem}>
+              <MaterialIcons name="shopping-bag" size={20} color={theme.textSecondary} />
+              <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>Items</Text>
+              <Text style={[styles.summaryValue, { color: theme.text }]}>
+                {item.items?.length || 0}
+              </Text>
+            </View>
+            <View style={styles.summaryDivider} />
+            <View style={styles.summaryItem}>
+              <MaterialIcons name="payments" size={20} color={theme.textSecondary} />
+              <Text style={[styles.summaryLabel, { color: theme.textSecondary }]}>Total</Text>
+              <Text style={[styles.summaryValue, { color: theme.primary, fontWeight: '700' }]}>
+                GH₵{item.totalAmount?.toFixed(2) || '0.00'}
+              </Text>
+            </View>
           </View>
-        </View>
-        
-        <View style={styles.orderDetails}>
-          <View style={styles.customerInfo}>
-            <MaterialIcons name="person" size={16} color={theme.textSecondary} />
-            <Text style={[styles.customerName, { color: theme.text }]}>
-              {item.user?.name || 'Unknown Customer'}
-            </Text>
-          </View>
-          <Text style={[styles.orderTotal, { color: theme.primary }]}>
-            Total: GH₵{item.totalAmount?.toFixed(2) || '0.00'}
-          </Text>
         </View>
 
-        <View style={styles.orderItems}>
+        {/* Order Items Section */}
+        <View style={styles.orderItemsContainer}>
+          <View style={styles.orderItemsHeader}>
+            <MaterialIcons name="inventory" size={20} color={theme.text} />
+            <Text style={[styles.orderItemsTitle, { color: theme.text }]}>Order Items</Text>
+          </View>
           {(item.items || []).map((orderItem, index) => (
             <View key={index} style={styles.orderItem}>
               <Image 
-                source={{ uri: orderItem.product?.image || 'https://via.placeholder.com/50' }} 
-                style={styles.orderItemImage} 
+                source={{ 
+                  uri: orderItem.image || 'https://via.placeholder.com/50',
+                  cache: 'reload'
+                }} 
+                style={styles.orderItemImage}
               />
               <View style={styles.orderItemDetails}>
                 <Text style={[styles.orderItemName, { color: theme.text }]}>
-                  {orderItem.product?.name || 'Unknown Product'}
+                  {orderItem.name || 'Unknown Product'}
                 </Text>
                 <View style={styles.orderItemMeta}>
-                  <Text style={[styles.orderItemPrice, { color: theme.textSecondary }]}>
-                    GH₵{orderItem.price?.toFixed(2) || '0.00'} × {orderItem.quantity || 1}
-                  </Text>
-                  <Text style={[styles.orderItemSubtotal, { color: theme.text }]}>
-                    GH₵{(orderItem.price * orderItem.quantity)?.toFixed(2) || '0.00'}
-                  </Text>
+                  <View style={styles.orderItemQuantity}>
+                    <MaterialIcons name="shopping-cart" size={14} color={theme.textSecondary} />
+                    <Text style={[styles.orderItemQuantityText, { color: theme.textSecondary }]}>
+                      {orderItem.quantity || 1} × GH₵{orderItem.price?.toFixed(2) || '0.00'}
+                    </Text>
+                  </View>
+                  <View style={[styles.orderItemSubtotalContainer, { backgroundColor: theme.primary + '10' }]}>
+                    <Text style={[styles.orderItemSubtotal, { color: theme.primary }]}>
+                      GH₵{((orderItem.price || 0) * (orderItem.quantity || 1)).toFixed(2)}
+                    </Text>
+                  </View>
                 </View>
               </View>
             </View>
           ))}
         </View>
 
-        <View style={styles.orderActions}>
-          <TouchableOpacity 
-            style={[styles.actionButton, styles.viewButton]}
-            onPress={() => navigation.navigate('OrderDetails', { orderId: item._id })}
-          >
-            <MaterialIcons name="visibility" size={18} color={theme.primary} />
-            <Text style={[styles.actionButtonText, { color: theme.primary }]}>View Details</Text>
-          </TouchableOpacity>
-          
-          {(item.orderStatus === 'pending' || !item.orderStatus) && (
+        {/* Order Actions */}
+        {item.orderStatus === 'pending' && (
+          <View style={styles.orderActions}>
             <TouchableOpacity 
-              style={[styles.actionButton, styles.acceptButton]}
-              onPress={() => handleUpdateOrderStatus(item._id, 'processing')}
+              style={[styles.actionButton, styles.acceptButton, { backgroundColor: theme.success }]}
+              onPress={() => {
+                Alert.alert(
+                  'Accept Order',
+                  'Are you sure you want to accept this order? This will change the status to Processing.',
+                  [
+                    {
+                      text: 'Cancel',
+                      style: 'cancel'
+                    },
+                    {
+                      text: 'Accept',
+                      onPress: () => handleUpdateOrderStatus(item._id, 'processing')
+                    }
+                  ]
+                );
+              }}
             >
-              <MaterialIcons name="check-circle" size={18} color="white" />
+              <MaterialIcons name="check-circle" size={20} color="white" />
               <Text style={[styles.actionButtonText, { color: 'white' }]}>Accept Order</Text>
             </TouchableOpacity>
-          )}
-          
-          {item.orderStatus === 'processing' && (
-            <TouchableOpacity 
-              style={[styles.actionButton, styles.completeButton]}
-              onPress={() => handleUpdateOrderStatus(item._id, 'completed')}
-            >
-              <MaterialIcons name="done-all" size={18} color="white" />
-              <Text style={[styles.actionButtonText, { color: 'white' }]}>Mark as Completed</Text>
-            </TouchableOpacity>
-          )}
-        </View>
+          </View>
+        )}
       </View>
     );
   };
@@ -929,19 +1093,6 @@ const SellerDashboardScreen = () => {
       />
     </TouchableOpacity>
   );
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'Pending':
-        return { bg: '#FFF3CD', text: '#856404' };
-      case 'Shipped':
-        return { bg: '#D1ECF1', text: '#0C5460' };
-      case 'Delivered':
-        return { bg: '#D4EDDA', text: '#155724' };
-      default:
-        return { bg: '#F8F9FA', text: '#212529' };
-    }
-  };
 
   const renderTabContent = () => {
     switch (activeTab) {
@@ -1468,22 +1619,160 @@ const SellerDashboardScreen = () => {
     }
   };
 
+  // Enhanced animation for promote store icon
+  useEffect(() => {
+    const startAnimation = () => {
+      // Reset values
+      promoteIconScale.setValue(1);
+      promoteIconRotate.setValue(0);
+
+      // Create parallel animations
+      Animated.parallel([
+        // Scale animation
+        Animated.sequence([
+          Animated.timing(promoteIconScale, {
+            toValue: 1.3,
+            duration: 1000,
+            easing: Easing.bezier(0.4, 0, 0.2, 1),
+            useNativeDriver: true,
+          }),
+          Animated.timing(promoteIconScale, {
+            toValue: 1,
+            duration: 1000,
+            easing: Easing.bezier(0.4, 0, 0.2, 1),
+            useNativeDriver: true,
+          }),
+        ]),
+        // Rotation animation
+        Animated.sequence([
+          Animated.timing(promoteIconRotate, {
+            toValue: 1,
+            duration: 1000,
+            easing: Easing.bezier(0.4, 0, 0.2, 1),
+            useNativeDriver: true,
+          }),
+          Animated.timing(promoteIconRotate, {
+            toValue: 0,
+            duration: 1000,
+            easing: Easing.bezier(0.4, 0, 0.2, 1),
+            useNativeDriver: true,
+          }),
+        ]),
+      ]).start(() => {
+        // Add a small delay before starting the next animation cycle
+        setTimeout(startAnimation, 500);
+      });
+    };
+
+    startAnimation();
+
+    // Cleanup animation on component unmount
+    return () => {
+      promoteIconScale.stopAnimation();
+      promoteIconRotate.stopAnimation();
+    };
+  }, []);
+
+  // Add animation for orders icon when there are new orders
+  useEffect(() => {
+    if (hasNewOrders) {
+      const pulseAnimation = Animated.sequence([
+        Animated.timing(ordersIconScale, {
+          toValue: 1.2,
+          duration: 500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(ordersIconScale, {
+          toValue: 1,
+          duration: 500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ]);
+
+      Animated.loop(pulseAnimation, { iterations: 3 }).start();
+    }
+  }, [hasNewOrders]);
+
+  // Add this function to check for new orders
+  const checkNewOrders = async () => {
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      const response = await fetch(`${API_BASE_URL}/api/orders/seller/new`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setHasNewOrders(data.hasNewOrders);
+      }
+    } catch (error) {
+      console.error('Error checking new orders:', error);
+    }
+  };
+
+  // Add this to your existing useEffect that fetches orders
+  useEffect(() => {
+    checkNewOrders();
+    // Set up interval to check for new orders every minute
+    const interval = setInterval(checkNewOrders, 60000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: theme.background }]}>
-      <View style={[styles.header, { backgroundColor: theme.primary }]}>
-        <Text style={styles.headerTitle}>Dashboard</Text>
-        <View style={styles.headerIcons}>
-          <TouchableOpacity 
-            style={styles.headerButton}
-            onPress={() => navigation.navigate('PromoteStore')} // Navigate to PromoteStore screen
-          >
-            <MaterialIcons name="campaign" size={24} color="white" />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.headerButton}>
-            <MaterialIcons name="notifications" size={24} color="white" />
-          </TouchableOpacity>
+    <SafeAreaView style={[styles.container, { backgroundColor: '#F8FAFC' }]}>
+      <LinearGradient
+        colors={['#5D3FD3', '#3730A3']}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={styles.headerGradient}
+      >
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>Dashboard</Text>
+          <View style={styles.headerIcons}>
+            <TouchableOpacity 
+              style={styles.headerButton}
+              onPress={() => navigation.navigate('PromoteStore')}
+            >
+              <Animated.View 
+                style={{ 
+                  transform: [
+                    { scale: promoteIconScale },
+                    { 
+                      rotate: promoteIconRotate.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: ['0deg', '20deg']
+                      })
+                    }
+                  ]
+                }}
+              >
+                <MaterialIcons name="campaign" size={24} color="white" />
+                <View style={styles.promoteGlow} />
+              </Animated.View>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.headerButton}
+              onPress={() => {
+                setHasNewOrders(false);
+                setActiveTab('orders');
+              }}
+            >
+              <Animated.View style={{ transform: [{ scale: ordersIconScale }] }}>
+                <MaterialIcons name="shopping-bag" size={24} color="white" />
+                {hasNewOrders && (
+                  <View style={styles.ordersBadge}>
+                    <Text style={styles.ordersBadgeText}>New</Text>
+                  </View>
+                )}
+              </Animated.View>
+            </TouchableOpacity>
+          </View>
         </View>
-      </View>
+      </LinearGradient>
       
       <View style={styles.content}>
         {renderTabContent()}
@@ -1813,29 +2102,71 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  headerGradient: {
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+  },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12, // Adjusted padding
-    elevation: 4,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    paddingVertical: 12,
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: 24,
     fontWeight: 'bold',
     color: 'white',
+    textShadowColor: 'rgba(0, 0, 0, 0.2)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
   },
-  headerIcons: { // Added style for icon container
+  headerIcons: {
     flexDirection: 'row',
+    alignItems: 'center',
   },
   headerButton: {
-    padding: 8, // Adjusted padding for touchable area
-    marginLeft: 8, // Add some space between icons
+    padding: 8,
+    marginLeft: 8,
+    position: 'relative',
+    overflow: 'visible',
+  },
+  promoteTooltip: {
+    position: 'absolute',
+    bottom: -30,
+    left: -20,
+    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+    opacity: 0,
+    transform: [{ translateY: 10 }],
+  },
+  promoteTooltipText: {
+    color: 'white',
+    fontSize: 12,
+    whiteSpace: 'nowrap',
+  },
+  ordersBadge: {
+    position: 'absolute',
+    top: -2,
+    right: -2,
+    backgroundColor: '#E63946',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#5D3FD3',
+  },
+  ordersBadgeText: {
+    color: 'white',
+    fontSize: 10,
+    fontWeight: 'bold',
   },
   content: {
     flex: 1,
@@ -2006,101 +2337,161 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginLeft: 6,
   },
+  orderHeaderGradient: {
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
   orderHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
   },
-  orderCustomerInfo: {
+  orderHeaderLeft: {
+    flex: 1,
+  },
+  orderIdContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
   },
-  orderAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#4361EE',
-    alignItems: 'center',
+  orderIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
     justifyContent: 'center',
-    marginRight: 12,
+    alignItems: 'center',
   },
-  orderAvatarText: {
-    color: 'white',
+  orderId: {
     fontSize: 16,
-    fontWeight: 'bold',
-  },
-  orderCustomer: {
-    fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '700',
+    marginBottom: 2,
   },
   orderDate: {
-    fontSize: 14,
+    fontSize: 13,
   },
-  orderStatus: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
+  statusContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 20,
+    gap: 8,
   },
-  orderStatusText: {
-    fontSize: 12,
+  statusText: {
+    fontSize: 13,
     fontWeight: '600',
   },
-  orderDivider: {
-    height: 1,
-    backgroundColor: '#E2E8F0',
-    marginHorizontal: 16,
-  },
-  orderDetails: {
+  orderCustomerSection: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
   },
-  orderItemCount: {
+  customerInfo: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: 12,
   },
-  orderItemCountText: {
-    marginLeft: 6,
+  customerAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  customerDetails: {
+    gap: 2,
+  },
+  customerName: {
+    fontSize: 15,
+    fontWeight: '600',
+  },
+  customerPhone: {
+    fontSize: 13,
+  },
+  orderTotalContainer: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  orderTotalLabel: {
+    fontSize: 12,
+    marginBottom: 2,
   },
   orderTotal: {
-    fontSize: 18,
-    fontWeight: 'bold',
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  orderItemsContainer: {
+    padding: 16,
+  },
+  orderItemsTitle: {
+    fontSize: 15,
+    fontWeight: '600',
+    marginBottom: 12,
+  },
+  orderItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 12,
+    backgroundColor: 'rgba(0,0,0,0.02)',
+    borderRadius: 12,
+    padding: 8,
+  },
+  orderItemImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+    backgroundColor: '#f0f0f0',
+  },
+  orderItemDetails: {
+    flex: 1,
+    marginLeft: 12,
+    gap: 4,
+  },
+  orderItemName: {
+    fontSize: 15,
+    fontWeight: '500',
+  },
+  orderItemMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  orderItemQuantity: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  orderItemQuantityText: {
+    fontSize: 13,
+  },
+  orderItemSubtotal: {
+    fontSize: 14,
+    fontWeight: '600',
   },
   orderActions: {
     flexDirection: 'row',
     padding: 16,
+    gap: 12,
     borderTopWidth: 1,
-    borderTopColor: '#E2E8F0',
-    justifyContent: 'flex-end',
-    gap: 10,
-  },
-  statusButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
-    elevation: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 1,
-  },
-  statusButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-    marginLeft: 6,
+    borderTopColor: 'rgba(0,0,0,0.05)',
   },
   viewButton: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 8,
     borderWidth: 1,
+    backgroundColor: 'transparent',
   },
-  viewButtonText: {
+  acceptButton: {
+    backgroundColor: '#2EC4B6',
+  },
+  completeButton: {
+    backgroundColor: '#2EC4B6',
+  },
+  actionButtonText: {
     fontSize: 14,
     fontWeight: '600',
   },
@@ -2790,58 +3181,14 @@ const styles = StyleSheet.create({
     fontSize: 14,
   },
   orderCard: {
-    borderRadius: 12,
+    borderRadius: 16,
     marginBottom: 16,
     overflow: 'hidden',
-    elevation: 3,
+    elevation: 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 4,
-  },
-  orderId: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    marginBottom: 4,
-  },
-  statusBadge: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 16,
-  },
-  orderItems: {
-    marginBottom: 16,
-  },
-  orderItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  orderItemImage: {
-    width: 50,
-    height: 50,
-    borderRadius: 8,
-    marginRight: 12,
-  },
-  orderItemDetails: {
-    flex: 1,
-  },
-  orderItemName: {
-    fontSize: 16,
-    fontWeight: 'bold',
-  },
-  orderItemPrice: {
-    fontSize: 14,
-    color: '#6c757d',
-  },
-  acceptButton: {
-    backgroundColor: '#2EC4B6',
-  },
-  completeButton: {
-    backgroundColor: '#1B5E20',
-  },
-  tabContent: {
-    flex: 1,
+    shadowRadius: 8,
   },
   listContent: {
     paddingBottom: 16,
@@ -2868,6 +3215,55 @@ const styles = StyleSheet.create({
   },
   loadingMoreText: {
     fontSize: 14,
+  },
+  orderTotalSection: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  orderSummarySection: {
+    padding: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(0,0,0,0.05)',
+  },
+  orderSummaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    alignItems: 'center',
+  },
+  summaryItem: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 4,
+  },
+  summaryDivider: {
+    width: 1,
+    height: 40,
+    backgroundColor: 'rgba(0,0,0,0.05)',
+  },
+  summaryLabel: {
+    fontSize: 13,
+    marginTop: 4,
+  },
+  summaryValue: {
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  orderItemsHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 16,
+  },
+  promoteGlow: {
+    position: 'absolute',
+    top: -8,
+    left: -8,
+    right: -8,
+    bottom: -8,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    borderRadius: 16,
+    opacity: 0.5,
   },
 });
 

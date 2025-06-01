@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { protect, admin } = require('../middleware/auth');
+const { protect, admin, adminOrSeller } = require('../middleware/auth');
 const {
   createOrder,
   getOrderById,
@@ -40,6 +40,6 @@ router.route('/seller/:sellerId')
 
 router.route('/:id')
   .get(protect, getOrderById)
-  .put(protect, admin, updateOrderStatus);
+  .put(protect, adminOrSeller, updateOrderStatus);
 
 module.exports = router; 
