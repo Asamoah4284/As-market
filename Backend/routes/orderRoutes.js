@@ -25,8 +25,18 @@ router.route('/myorders')
   .get(protect, getMyOrders);
 
 // This route must come before /:id to avoid conflicts
+router.route('/seller/me')
+  .get(protect, async (req, res, next) => {
+    // Add seller role check
+    if (req.user.role !== 'seller') {
+      return res.status(403).json({ message: 'Access denied. Seller role required.' });
+    }
+    req.params.sellerId = req.user._id;
+    next();
+  }, getOrdersBySellerId);
+
 router.route('/seller/:sellerId')
-  .get(protect, getOrdersBySellerId);
+  .get(protect, admin, getOrdersBySellerId); // Only admin can view other sellers' orders
 
 router.route('/:id')
   .get(protect, getOrderById)

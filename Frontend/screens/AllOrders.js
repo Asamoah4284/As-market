@@ -169,14 +169,144 @@ const AllOrders = () => {
 
   const handleUpdateStatus = async (orderId) => {
     try {
-      // TODO: Implement status update modal or screen
-      console.log('Updating status for order:', orderId);
+      const token = await getAuthToken();
+      if (!token) {
+        Alert.alert('Error', 'Authentication required');
+        return;
+      }
+
+      // Show status options in an alert
+      Alert.alert(
+        'Update Order Status',
+        'Select new status for this order',
+        [
+          {
+            text: 'Cancel',
+            style: 'cancel'
+          },
+          {
+            text: 'Processing',
+            onPress: async () => {
+              try {
+                const response = await axios.put(
+                  `${API_BASE_URL}/api/orders/${orderId}`,
+                  { status: 'processing' },
+                  {
+                    headers: {
+                      'Authorization': `Bearer ${token}`,
+                      'Content-Type': 'application/json'
+                    }
+                  }
+                );
+
+                if (response.data) {
+                  Alert.alert('Success', 'Order status updated successfully');
+                  // Refresh the orders list
+                  fetchOrders();
+                }
+              } catch (error) {
+                console.error('Error updating order status:', error);
+                Alert.alert(
+                  'Error',
+                  error.response?.data?.message || 'Failed to update order status'
+                );
+              }
+            }
+          },
+          {
+            text: 'Shipped',
+            onPress: async () => {
+              try {
+                const response = await axios.put(
+                  `${API_BASE_URL}/api/orders/${orderId}`,
+                  { status: 'shipped' },
+                  {
+                    headers: {
+                      'Authorization': `Bearer ${token}`,
+                      'Content-Type': 'application/json'
+                    }
+                  }
+                );
+
+                if (response.data) {
+                  Alert.alert('Success', 'Order status updated successfully');
+                  // Refresh the orders list
+                  fetchOrders();
+                }
+              } catch (error) {
+                console.error('Error updating order status:', error);
+                Alert.alert(
+                  'Error',
+                  error.response?.data?.message || 'Failed to update order status'
+                );
+              }
+            }
+          },
+          {
+            text: 'Delivered',
+            onPress: async () => {
+              try {
+                const response = await axios.put(
+                  `${API_BASE_URL}/api/orders/${orderId}`,
+                  { status: 'delivered' },
+                  {
+                    headers: {
+                      'Authorization': `Bearer ${token}`,
+                      'Content-Type': 'application/json'
+                    }
+                  }
+                );
+
+                if (response.data) {
+                  Alert.alert('Success', 'Order status updated successfully');
+                  // Refresh the orders list
+                  fetchOrders();
+                }
+              } catch (error) {
+                console.error('Error updating order status:', error);
+                Alert.alert(
+                  'Error',
+                  error.response?.data?.message || 'Failed to update order status'
+                );
+              }
+            }
+          },
+          {
+            text: 'Cancelled',
+            onPress: async () => {
+              try {
+                const response = await axios.put(
+                  `${API_BASE_URL}/api/orders/${orderId}`,
+                  { status: 'cancelled' },
+                  {
+                    headers: {
+                      'Authorization': `Bearer ${token}`,
+                      'Content-Type': 'application/json'
+                    }
+                  }
+                );
+
+                if (response.data) {
+                  Alert.alert('Success', 'Order status updated successfully');
+                  // Refresh the orders list
+                  fetchOrders();
+                }
+              } catch (error) {
+                console.error('Error updating order status:', error);
+                Alert.alert(
+                  'Error',
+                  error.response?.data?.message || 'Failed to update order status'
+                );
+              }
+            }
+          }
+        ]
+      );
     } catch (error) {
-      console.error('Error updating order status:', error);
+      console.error('Error in handleUpdateStatus:', error);
       Alert.alert(
         'Error',
-        'Failed to update order status. Please try again later.',
-        [{ text: 'OK' }]
+        'Failed to update order status. Please try again later.'
       );
     }
   };
@@ -189,10 +319,10 @@ const AllOrders = () => {
         return '#FFA500';
       case 'processing':
         return '#0066cc';
+      case 'shipped':
+        return '#2196F3';
       case 'delivered':
         return '#4CAF50';
-      case 'completed':
-        return '#2196F3';
       case 'cancelled':
         return '#F44336';
       default:
@@ -253,7 +383,7 @@ const AllOrders = () => {
           onPress={() => handleUpdateStatus(item._id)}
         >
           <MaterialIcons name="edit" size={20} color="#0066cc" />
-          <Text style={styles.actionText}>Update Status</Text>s
+          <Text style={styles.actionText}>Update Status</Text>
         </TouchableOpacity>
       </View>
     </TouchableOpacity>

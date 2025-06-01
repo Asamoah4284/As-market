@@ -480,59 +480,44 @@ const getAllOrders = asyncHandler(async (req, res) => {
 // @desc    Get orders by seller ID
 // @route   GET /api/orders/:sellerId
 // @access  Private
+// @desc    Get orders by seller ID
+// @route   GET /api/orders/seller/:sellerId
+// @access  Private
 const getOrdersBySellerId = asyncHandler(async (req, res) => {
   try {
     const sellerId = req.params.sellerId;
-    console.log('Fetching orders for seller:', sellerId);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const skip = (page - 1) * limit;
 
-    // First, find all products belonging to the seller
-    const sellerProducts = await Product.find({ seller: sellerId });
-    console.log('Found seller products:', sellerProducts.length);
+    // Find orders where any item has sellerId matching the seller
+    const totalOrders = await Order.countDocuments({
+      'items.sellerId': sellerId
+    });
 
-    if (!sellerProducts.length) {
-      console.log('No products found for seller');
-      return res.json([]);
-    }
-
-    const productIds = sellerProducts.map(product => product._id);
-    console.log('Product IDs to search for:', productIds);
-
-    // Find orders containing any of the seller's products
     const orders = await Order.find({
-      'items': {
-        $elemMatch: {
-          'product': { $in: productIds }
-        }
-      }
+      'items.sellerId': sellerId
     })
-    .populate({
-      path: 'user',
-      select: 'name email phone'
-    })
-    .populate({
-      path: 'items.product',
-      select: 'name price seller'
-    })
-    .sort('-createdAt');
+      .populate({
+        path: 'user',
+        select: 'name email phone'
+      })
+      .populate({
+        path: 'items.product',
+        select: 'name price seller image status'
+      })
+      .sort('-createdAt')
+      .skip(skip)
+      .limit(limit);
 
-    console.log('Found orders:', orders.length);
-
-    // Transform orders to include only the seller's products
+    // Transform orders to include only the seller's items
     const transformedOrders = orders.map(order => {
-      // Filter items to only include products from this seller
-      const sellerItems = order.items.filter(item => 
-        item.product && 
-        item.product.seller && 
-        item.product.seller.toString() === sellerId.toString()
+      // Only include items for this seller
+      const sellerItems = order.items.filter(item =>
+        item.sellerId && item.sellerId.toString() === sellerId.toString()
       );
-
       if (sellerItems.length === 0) return null;
-
-      // Calculate total amount for seller's items
-      const totalAmount = sellerItems.reduce((sum, item) => 
-        sum + (item.price * item.quantity), 0
-      );
-
+      const totalAmount = sellerItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
       return {
         _id: order._id,
         user: order.user,
@@ -540,19 +525,26 @@ const getOrdersBySellerId = asyncHandler(async (req, res) => {
         totalAmount,
         orderStatus: order.orderStatus,
         createdAt: order.createdAt,
-        shippingAddress: order.shippingAddress
+        shippingAddress: order.shippingAddress,
+        paymentInfo: order.paymentInfo
       };
-    }).filter(Boolean); // Remove any null orders
+    }).filter(Boolean);
 
-    console.log('Transformed orders:', transformedOrders.length);
-    res.json(transformedOrders);
+    res.json({
+      orders: transformedOrders,
+      page,
+      limit,
+      totalPages: Math.ceil(totalOrders / limit),
+      totalOrders
+    });
   } catch (error) {
-    console.error('Error in getOrdersBySellerId:', error);
-    res.status(500);
-    throw new Error('Failed to fetch seller orders: ' + error.message);
+    res.status(500).json({
+      message: 'Failed to fetch seller orders',
+      error: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+    });
   }
 });
-
 module.exports = {
   createOrder,
   getOrderById,

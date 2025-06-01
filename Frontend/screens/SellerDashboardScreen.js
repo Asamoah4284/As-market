@@ -112,6 +112,10 @@ const SellerDashboardScreen = () => {
     location: '',
     avatar: null
   });
+  const [refreshing, setRefreshing] = useState(false);
+  const [orderPage, setOrderPage] = useState(1);
+  const [hasMoreOrders, setHasMoreOrders] = useState(true);
+  const ORDERS_PER_PAGE = 10;
 
   const isTokenExpired = (token) => {
     try {
@@ -184,22 +188,104 @@ const SellerDashboardScreen = () => {
   // Add useEffect for orders
   useEffect(() => {
     if (activeTab === 'orders') {
-      fetchOrders();
+      console.log('Orders tab activated, fetching orders...');
+      fetchOrders(1, true);
     }
   }, [activeTab]);
 
-  const fetchOrders = async () => {
+  const fetchOrders = async (page = 1, shouldRefresh = false) => {
     try {
+      if (shouldRefresh) {
+        setRefreshing(true);
+        setOrderPage(1);
+        setHasMoreOrders(true);
+      }
+      
+      if (!hasMoreOrders && !shouldRefresh) return;
+      
       setLoading(true);
-      const fetchedOrders = await mockFetchOrders();
-      console.log('Fetched orders:', fetchedOrders);
-      setOrders(fetchedOrders);
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        console.log('No token found');
+        return;
+      }
+
+      console.log('Fetching orders for seller...');
+      const url = `${API_BASE_URL}/api/orders/seller/me?page=${page}&limit=${ORDERS_PER_PAGE}`;
+      console.log('Request URL:', url);
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        }
+      });
+
+      console.log('Response status:', response.status);
+      const responseText = await response.text();
+      console.log('Raw response:', responseText);
+
+      let data;
+      try {
+        data = JSON.parse(responseText);
+        console.log('Parsed response data:', data);
+      } catch (e) {
+        console.error('Error parsing response:', e);
+        throw new Error('Invalid response from server');
+      }
+
+      if (!response.ok) {
+        throw new Error(data.message || `HTTP error! status: ${response.status}`);
+      }
+
+      // Check if we have more orders to load
+      const orders = data.orders || [];
+      console.log('Number of orders received:', orders.length);
+      
+      setHasMoreOrders(orders.length === ORDERS_PER_PAGE);
+      
+      // Update orders state based on whether we're refreshing or loading more
+      if (shouldRefresh || page === 1) {
+        console.log('Setting initial orders:', orders);
+        setOrders(orders);
+      } else {
+        console.log('Appending orders to existing list');
+        setOrders(prevOrders => [...prevOrders, ...orders]);
+      }
+      
+      setOrderPage(page);
     } catch (error) {
       console.error('Error fetching orders:', error);
-      Alert.alert('Error', 'Failed to fetch orders');
+      Alert.alert(
+        'Error',
+        'Unable to load orders. Please check your connection and try again.',
+        [
+          {
+            text: 'Retry',
+            onPress: () => fetchOrders(1, true)
+          },
+          {
+            text: 'OK',
+            style: 'cancel'
+          }
+        ]
+      );
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
+  };
+
+  const handleLoadMoreOrders = () => {
+    if (!loading && hasMoreOrders) {
+      fetchOrders(orderPage + 1);
+    }
+  };
+
+  const handleRefreshOrders = () => {
+    fetchOrders(1, true);
   };
 
   const fetchData = async () => {
@@ -714,19 +800,43 @@ const SellerDashboardScreen = () => {
   const renderOrderItem = ({ item }) => {
     if (!item) return null;
 
+    const orderDate = new Date(item.createdAt);
+    const formattedDate = orderDate.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
     return (
-      <View style={styles.orderCard}>
+      <View style={[styles.orderCard, { backgroundColor: theme.cardBackground }]}>
         <View style={styles.orderHeader}>
-          <Text style={styles.orderId}>Order #{item._id?.slice(-6) || 'N/A'}</Text>
-          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.orderStatus || 'pending') }]}>
-            <Text style={styles.statusText}>{item.orderStatus || 'Pending'}</Text>
+          <View>
+            <Text style={[styles.orderId, { color: theme.text }]}>
+              Order #{item._id?.slice(-6) || 'N/A'}
+            </Text>
+            <Text style={[styles.orderDate, { color: theme.textSecondary }]}>
+              {formattedDate}
+            </Text>
+          </View>
+          <View style={[styles.statusBadge, { backgroundColor: getStatusColor(item.orderStatus || 'pending').bg }]}>
+            <Text style={[styles.statusText, { color: getStatusColor(item.orderStatus || 'pending').text }]}>
+              {item.orderStatus || 'Pending'}
+            </Text>
           </View>
         </View>
         
         <View style={styles.orderDetails}>
-          <Text style={styles.customerName}>Customer: {item.user?.name || 'Unknown'}</Text>
-          <Text style={styles.orderDate}>Date: {item.createdAt ? new Date(item.createdAt).toLocaleDateString() : 'N/A'}</Text>
-          <Text style={styles.orderTotal}>Total: GH₵{item.totalAmount?.toFixed(2) || '0.00'}</Text>
+          <View style={styles.customerInfo}>
+            <MaterialIcons name="person" size={16} color={theme.textSecondary} />
+            <Text style={[styles.customerName, { color: theme.text }]}>
+              {item.user?.name || 'Unknown Customer'}
+            </Text>
+          </View>
+          <Text style={[styles.orderTotal, { color: theme.primary }]}>
+            Total: GH₵{item.totalAmount?.toFixed(2) || '0.00'}
+          </Text>
         </View>
 
         <View style={styles.orderItems}>
@@ -737,8 +847,17 @@ const SellerDashboardScreen = () => {
                 style={styles.orderItemImage} 
               />
               <View style={styles.orderItemDetails}>
-                <Text style={styles.orderItemName}>{orderItem.product?.name || 'Unknown Product'}</Text>
-                <Text style={styles.orderItemPrice}>GH₵{orderItem.price?.toFixed(2) || '0.00'} x {orderItem.quantity || 1}</Text>
+                <Text style={[styles.orderItemName, { color: theme.text }]}>
+                  {orderItem.product?.name || 'Unknown Product'}
+                </Text>
+                <View style={styles.orderItemMeta}>
+                  <Text style={[styles.orderItemPrice, { color: theme.textSecondary }]}>
+                    GH₵{orderItem.price?.toFixed(2) || '0.00'} × {orderItem.quantity || 1}
+                  </Text>
+                  <Text style={[styles.orderItemSubtotal, { color: theme.text }]}>
+                    GH₵{(orderItem.price * orderItem.quantity)?.toFixed(2) || '0.00'}
+                  </Text>
+                </View>
               </View>
             </View>
           ))}
@@ -749,7 +868,8 @@ const SellerDashboardScreen = () => {
             style={[styles.actionButton, styles.viewButton]}
             onPress={() => navigation.navigate('OrderDetails', { orderId: item._id })}
           >
-            <Text style={styles.actionButtonText}>View Details</Text>
+            <MaterialIcons name="visibility" size={18} color={theme.primary} />
+            <Text style={[styles.actionButtonText, { color: theme.primary }]}>View Details</Text>
           </TouchableOpacity>
           
           {(item.orderStatus === 'pending' || !item.orderStatus) && (
@@ -757,7 +877,8 @@ const SellerDashboardScreen = () => {
               style={[styles.actionButton, styles.acceptButton]}
               onPress={() => handleUpdateOrderStatus(item._id, 'processing')}
             >
-              <Text style={styles.actionButtonText}>Accept Order</Text>
+              <MaterialIcons name="check-circle" size={18} color="white" />
+              <Text style={[styles.actionButtonText, { color: 'white' }]}>Accept Order</Text>
             </TouchableOpacity>
           )}
           
@@ -766,7 +887,8 @@ const SellerDashboardScreen = () => {
               style={[styles.actionButton, styles.completeButton]}
               onPress={() => handleUpdateOrderStatus(item._id, 'completed')}
             >
-              <Text style={styles.actionButtonText}>Mark as Completed</Text>
+              <MaterialIcons name="done-all" size={18} color="white" />
+              <Text style={[styles.actionButtonText, { color: 'white' }]}>Mark as Completed</Text>
             </TouchableOpacity>
           )}
         </View>
@@ -826,7 +948,14 @@ const SellerDashboardScreen = () => {
       case 'orders':
         return (
           <View style={styles.tabContent}>
-            {orders.length === 0 ? (
+            {loading && !refreshing ? (
+              <View style={styles.loadingContainer}>
+                <ActivityIndicator size="large" color={theme.primary} />
+                <Text style={[styles.loadingText, { color: theme.textSecondary }]}>
+                  Loading orders...
+                </Text>
+              </View>
+            ) : orders.length === 0 ? (
               <View style={styles.emptyState}>
                 <MaterialIcons name="receipt" size={64} color={theme.textSecondary} />
                 <Text style={[styles.emptyStateText, { color: theme.textSecondary }]}>
@@ -835,9 +964,6 @@ const SellerDashboardScreen = () => {
                 <Text style={[styles.emptyStateSubText, { color: theme.textSecondary }]}>
                   When customers purchase your products, their orders will appear here.
                 </Text>
-                <Text style={[styles.emptyStateSubText, { color: theme.textSecondary }]}>
-                  Make sure your products are visible and well-priced to attract buyers.
-                </Text>
               </View>
             ) : (
               <FlatList
@@ -845,13 +971,19 @@ const SellerDashboardScreen = () => {
                 renderItem={renderOrderItem}
                 keyExtractor={(item) => item._id}
                 contentContainerStyle={styles.listContent}
-                ListEmptyComponent={() => (
-                  <View style={styles.emptyState}>
-                    <MaterialIcons name="receipt" size={64} color={theme.textSecondary} />
-                    <Text style={[styles.emptyStateText, { color: theme.textSecondary }]}>
-                      No orders found
-                    </Text>
-                  </View>
+                onEndReached={handleLoadMoreOrders}
+                onEndReachedThreshold={0.5}
+                refreshing={refreshing}
+                onRefresh={handleRefreshOrders}
+                ListFooterComponent={() => (
+                  loading && hasMoreOrders ? (
+                    <View style={styles.loadingMore}>
+                      <ActivityIndicator color={theme.primary} />
+                      <Text style={[styles.loadingMoreText, { color: theme.textSecondary }]}>
+                        Loading more orders...
+                      </Text>
+                    </View>
+                  ) : null
                 )}
               />
             )}
@@ -2040,6 +2172,11 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    padding: 20,
+  },
+  loadingText: {
+    marginTop: 12,
+    fontSize: 16,
   },
   emptyState: {
     flex: 1,
@@ -2708,6 +2845,29 @@ const styles = StyleSheet.create({
   },
   listContent: {
     paddingBottom: 16,
+  },
+  customerInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  orderItemMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  orderItemSubtotal: {
+    fontSize: 14,
+    fontWeight: '600',
+  },
+  loadingMore: {
+    paddingVertical: 16,
+    alignItems: 'center',
+    gap: 8,
+  },
+  loadingMoreText: {
+    fontSize: 14,
   },
 });
 
