@@ -1,4 +1,5 @@
 const express = require('express');
+require('dotenv').config(); // Make sure this is at the top
 const assistantRouter = express.Router();
 const OpenAI = require('openai');
 const Product = require('../models/productModel');
