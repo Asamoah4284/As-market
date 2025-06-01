@@ -1,5 +1,5 @@
 const express = require('express');
-const router = express.Router();
+const assistantRouter = express.Router();
 const OpenAI = require('openai');
 const Product = require('../models/productModel');
 
@@ -28,7 +28,7 @@ async function parseQuery(prompt) {
 }
 
 // Search products route
-router.post('/search', async (req, res) => {
+assistantRouter.post('/search', async (req, res) => {
   try {
     const { prompt } = req.body;
 
@@ -77,4 +77,4 @@ router.post('/search', async (req, res) => {
   }
 });
 
-module.exports = router; 
+module.exports = assistantRouter; 
