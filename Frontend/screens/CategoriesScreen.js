@@ -9,14 +9,20 @@ import {
   SafeAreaView,
   ActivityIndicator,
   Platform,
-  StatusBar as RNStatusBar
+  StatusBar as RNStatusBar,
+  Alert
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import Constants from 'expo-constants';
 import { API_BASE_URL } from '../config/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useDispatch } from 'react-redux';
+import { handleAddToCartNotification } from '../services/notificationService';
+import { requireAuthentication } from '../App';
 
 const CategoryScreen = ({ route, navigation }) => {
+  const dispatch = useDispatch();
   // Add default values to prevent undefined errors
   const { 
     categoryId = '1', 
@@ -118,6 +124,43 @@ const CategoryScreen = ({ route, navigation }) => {
     };
   }, [filterParams]); // Only depend on the memoized filterParams
 
+  const handleAddToCart = async (product) => {
+    // Check if user is authenticated
+    if (!(await requireAuthentication(navigation, 'add items to cart'))) {
+      return;
+    }
+    
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      // Token is guaranteed to exist at this point because of requireAuthentication
+      
+      // Make API call to add to cart
+      const response = await fetch(`${API_BASE_URL}/api/cart/add`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          productId: product._id,
+          quantity: 1
+        })
+      });
+      
+      if (response.ok) {
+        // Send notification
+        await handleAddToCartNotification(product.name, dispatch);
+        Alert.alert('Success', 'Product added to cart');
+      } else {
+        const errorData = await response.json();
+        Alert.alert('Error', errorData.message || 'Failed to add product to cart');
+      }
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      Alert.alert('Error', 'Failed to add product to cart');
+    }
+  };
+
   const renderProductItem = ({ item }) => {
     // Handle proper image path
     const imageUri = item.image && (item.image.startsWith('http') 
@@ -171,9 +214,15 @@ const CategoryScreen = ({ route, navigation }) => {
           
           {/* Price section */}
           <View style={styles.priceContainer}>
-            <Text style={styles.productPrice}>${price}</Text>
+            <Text style={styles.productPrice}>
+              <Text>GH¢</Text>
+              {price}
+            </Text>
             {isOnSale && item.originalPrice && (
-              <Text style={styles.originalPrice}>${originalPrice}</Text>
+              <Text style={styles.originalPrice}>
+                <Text>$</Text>
+                {originalPrice}
+              </Text>
             )}
           </View>
           
@@ -189,7 +238,10 @@ const CategoryScreen = ({ route, navigation }) => {
           )}
           
           {/* Add to cart button */}
-          <TouchableOpacity style={styles.addToCartButton}>
+          <TouchableOpacity 
+            style={styles.addToCartButton}
+            onPress={() => handleAddToCart(item)}
+          >
             <Ionicons name="cart-outline" size={16} color="#fff" />
             <Text style={styles.addToCartText}>Add</Text>
           </TouchableOpacity>

@@ -9,7 +9,7 @@
     "splash": {
     
       "resizeMode": "contain",
-      "backgroundColor": "#5D3FD3"
+      "backgroundColor": "#FF4757"
     },
     "updates": {
       "fallbackToCacheTimeout": 0
@@ -24,7 +24,7 @@
       "icon": "./assets/icon.png",
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#5D3FD3"
+        "backgroundColor": "#FF4757"
       },
       "package": "com.asarion.marketplace"
     },
@@ -36,7 +36,7 @@
       "eas": {
         "projectId": "987ca341-92d7-4d38-be41-f41cc65182c3"
       },
-      "API_URL": "https://unimarket-ikin.onrender.com"
+      "API_URL": "http://172.20.10.2:5000"
     }
   }
 }

@@ -113,7 +113,6 @@ const cartController = {
                 image: cartItem.product.images?.[0] || cartItem.product.image,
                 quantity: cartItem.quantity,
                 sellerId: cartItem.product.seller
-                // Add any other product fields you need
             };
 
             res.status(200).json(transformedItem);

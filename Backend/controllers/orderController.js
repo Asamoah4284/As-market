@@ -395,7 +395,7 @@ const getOrderById = asyncHandler(async (req, res) => {
 
     const order = await Order.findById(req.params.id)
       .populate('user', 'name email phone')
-      .populate('items.product', 'name image price seller');
+      .populate('items.product', 'name image price sellerPrice seller');
 
     if (!order) {
       console.log('Order not found');
@@ -406,7 +406,19 @@ const getOrderById = asyncHandler(async (req, res) => {
     // Allow access if user is admin or if it's their own order
     if (req.user.role === 'admin' || order.user._id.toString() === req.user._id.toString()) {
       console.log('Order found and access granted');
-      res.json(order);
+      
+      // Transform order items based on user role
+      const orderObj = order.toObject();
+      if (req.user.role !== 'admin') {
+        orderObj.items = orderObj.items.map(item => {
+          if (item.product) {
+            delete item.product.commission;
+          }
+          return item;
+        });
+      }
+      
+      res.json(orderObj);
     } else {
       console.log('Access denied - not admin or order owner');
       res.status(403);
@@ -427,11 +439,26 @@ const getMyOrders = asyncHandler(async (req, res) => {
     console.log('Fetching orders for user:', req.user._id);
     const orders = await Order.find({ user: req.user._id })
       .populate('user', 'name email')
-      .populate('items.product', 'name image price')
+      .populate('items.product', 'name image price sellerPrice')
       .sort('-createdAt');
 
     console.log('Found orders:', orders.length);
-    res.json(orders);
+    
+    // Transform orders to use sellerPrice for non-admin users
+    const transformedOrders = orders.map(order => {
+      const orderObj = order.toObject();
+      if (req.user.role !== 'admin') {
+        orderObj.items = orderObj.items.map(item => {
+          if (item.product) {
+            delete item.product.commission;
+          }
+          return item;
+        });
+      }
+      return orderObj;
+    });
+    
+    res.json(transformedOrders);
   } catch (error) {
     console.error('Error fetching orders:', error);
     res.status(500);
@@ -478,9 +505,6 @@ const getAllOrders = asyncHandler(async (req, res) => {
 });
 
 // @desc    Get orders by seller ID
-// @route   GET /api/orders/:sellerId
-// @access  Private
-// @desc    Get orders by seller ID
 // @route   GET /api/orders/seller/:sellerId
 // @access  Private
 const getOrdersBySellerId = asyncHandler(async (req, res) => {
@@ -504,24 +528,33 @@ const getOrdersBySellerId = asyncHandler(async (req, res) => {
       })
       .populate({
         path: 'items.product',
-        select: 'name price seller image status'
+        select: 'name price sellerPrice seller image status'
       })
       .sort('-createdAt')
       .skip(skip)
       .limit(limit);
 
-    // Transform orders to include only the seller's items
+    // Transform orders to include only the seller's items and handle price display
     const transformedOrders = orders.map(order => {
       // Only include items for this seller
       const sellerItems = order.items.filter(item =>
         item.sellerId && item.sellerId.toString() === sellerId.toString()
       );
       if (sellerItems.length === 0) return null;
-      const totalAmount = sellerItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+      
+      // Transform items to use sellerPrice for non-admin users
+      const transformedItems = sellerItems.map(item => {
+        if (item.product && req.user.role !== 'admin') {
+          delete item.product.commission;
+        }
+        return item;
+      });
+      
+      const totalAmount = transformedItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
       return {
         _id: order._id,
         user: order.user,
-        items: sellerItems,
+        items: transformedItems,
         totalAmount,
         orderStatus: order.orderStatus,
         createdAt: order.createdAt,

@@ -35,8 +35,8 @@ app.get('/', (req, res) => {
 
 // Routes
 app.use('/api/users', userRoutes);
+app.use('/api', commentRoutes);
 app.use('/api/products', productRoutes);
-app.use('/api/comments', commentRoutes);
 app.use('/api/cart', cartRoutes);
 app.use('/api/categories', categoryRoutes);
 app.use('/api/seller', sellerRoutes);

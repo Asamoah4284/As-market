@@ -3,6 +3,7 @@ const User = require('../models/User');
 const asyncHandler = require('express-async-handler');
 const sharp = require('sharp');
 const cloudinary = require('../config/cloudinary');
+const ProductViewModel = require('../models/productViewModel');
 
 // Helper function to upload to Cloudinary
 const uploadToCloudinary = async (base64Image) => {
@@ -89,14 +90,15 @@ const createProduct = asyncHandler(async (req, res) => {
     throw new Error('Not authorized as a seller');
   }
 
-  // Calculate final price based on whether it's a product or service
-  let finalPrice;
-  if (isService) {
-    finalPrice = Number(price); // Keep original price for services
-  } else {
+  // Calculate commission and final price
+  let sellerPrice = Number(price);
+  let commission = 0;
+  let finalPrice = sellerPrice;
+
+  if (!isService) {
     // Add 5% commission + 1 GHS for products and round up to next whole number + .99
-    const basePrice = Number(price) * 1.05 + 1;
-    finalPrice = Math.ceil(basePrice) + 0.99; // Round up and add .99 for marketing strategy
+    commission = (sellerPrice * 0.05) + 1;
+    finalPrice = Math.ceil(sellerPrice + commission) + 0.99; // Round up and add .99 for marketing strategy
   }
 
   // Upload main image to Cloudinary
@@ -116,7 +118,9 @@ const createProduct = asyncHandler(async (req, res) => {
   const product = await Product.create({
     name,
     description,
+    sellerPrice,
     price: finalPrice,
+    commission,
     mainCategory: category, // Store seller's category choice as mainCategory
     stock: isService ? 1 : stock, // Services always have stock of 1
     image: mainImageUrl,
@@ -158,7 +162,15 @@ const getProductById = asyncHandler(async (req, res) => {
   const product = await Product.findById(req.params.id).populate('seller', 'name email');
   
   if (product) {
-    res.json(product);
+    // Create a copy of the product to modify
+    const productResponse = product.toObject();
+    
+    // Only hide commission amount for non-admin users
+    if (!req.user || req.user.role !== 'admin') {
+      delete productResponse.commission;
+    }
+    
+    res.json(productResponse);
   } else {
     res.status(404);
     throw new Error('Product not found');
@@ -213,9 +225,24 @@ const updateProduct = asyncHandler(async (req, res) => {
     );
   }
 
+  // Calculate new commission and price if price is being updated
+  if (price !== undefined) {
+    const newSellerPrice = Number(price);
+    let newCommission = 0;
+    let newFinalPrice = newSellerPrice;
+
+    if (!product.isService) {
+      newCommission = (newSellerPrice * 0.05) + 1;
+      newFinalPrice = Math.ceil(newSellerPrice + newCommission) + 0.99;
+    }
+
+    product.sellerPrice = newSellerPrice;
+    product.commission = newCommission;
+    product.price = newFinalPrice;
+  }
+
   product.name = name || product.name;
   product.description = description || product.description;
-  product.price = price || product.price;
   product.mainCategory = category || product.mainCategory;
   product.stock = isService ? 1 : (stock || product.stock);
   product.image = mainImageUrl;
@@ -273,7 +300,20 @@ const deleteProduct = asyncHandler(async (req, res) => {
 // @access  Public
 const getProducts = asyncHandler(async (req, res) => {
   const products = await Product.find({}).populate('seller', 'name');
-  res.json(products);
+  
+  // Transform products based on user role
+  const transformedProducts = products.map(product => {
+    const productObj = product.toObject();
+    
+    // Only hide commission amount for non-admin users
+    if (!req.user || req.user.role !== 'admin') {
+      delete productObj.commission;
+    }
+    
+    return productObj;
+  });
+  
+  res.json(transformedProducts);
 });
 
 // @desc    Admin approve or reject a product and set featured status
@@ -361,21 +401,51 @@ const adminUpdateProduct = asyncHandler(async (req, res) => {
   res.json(updatedProduct);
 });
 
-// @desc    Increment product views
+// @desc    Increment product views with 1-hour cooldown per user
 // @route   POST /api/products/:id/views
 // @access  Public
 const incrementProductViews = asyncHandler(async (req, res) => {
-  const product = await Product.findById(req.params.id);
+  const { id: productId } = req.params;
   
+  // Get user identifier (either userId or IP address)
+  const userIdentifier = req.user?._id?.toString() || req.ip;
+
+  // Check if there's a recent view (within last hour)
+  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+  
+  const recentView = await ProductViewModel.findOne({
+    productId,
+    userIdentifier,
+    viewedAt: { $gte: oneHourAgo }
+  });
+
+  if (recentView) {
+    // View already counted within the last hour
+    const product = await Product.findById(productId);
+    return res.json({ views: product.views, message: 'View already counted' });
+  }
+
+  // Create new view record
+  await ProductViewModel.create({
+    productId,
+    userId: req.user?._id, // Will be undefined for anonymous users
+    userIdentifier,
+    viewedAt: new Date()
+  });
+
+  // Increment product views
+  const product = await Product.findByIdAndUpdate(
+    productId,
+    { $inc: { views: 1 } },
+    { new: true, runValidators: false }
+  );
+
   if (!product) {
     res.status(404);
     throw new Error('Product not found');
   }
 
-  product.views = (product.views || 0) + 1;
-  await product.save();
-
-  res.json({ views: product.views });
+  res.json({ views: product.views, message: 'View counted' });
 });
 
 module.exports = {

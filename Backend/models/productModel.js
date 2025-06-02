@@ -12,10 +12,20 @@ const productSchema = new mongoose.Schema(
       required: [true, 'Product description is required'],
       trim: true
     },
-    price: {
+    sellerPrice: {
       type: Number,
       required: [true, 'Product price is required'],
       min: [0, 'Price cannot be negative']
+    },
+    price: {
+      type: Number,
+      required: [true, 'Product price with commission is required'],
+      min: [0, 'Price cannot be negative']
+    },
+    commission: {
+      type: Number,
+      default: 0,
+      min: [0, 'Commission cannot be negative']
     },
     color: {
       type: String,
@@ -193,4 +203,5 @@ productSchema.statics.getCategories = function() {
 
 const Product = mongoose.model('Product', productSchema);
 
+module.exports = Product; 
 module.exports = Product; 

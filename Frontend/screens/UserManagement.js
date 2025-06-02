@@ -67,7 +67,7 @@ const UserManagement = () => {
               const token = await AsyncStorage.getItem('userToken');
               console.log('Token used for deleting user:', token);
               
-              const response = await fetch(`https://unimarket-ikin.onrender.com/api/users/${userId}`, {
+              const response = await fetch(`https://ket-ikin.onrender.com/api/users/${userId}`, {
                 method: 'DELETE',
                 headers: {
                   'Content-Type': 'application/json',

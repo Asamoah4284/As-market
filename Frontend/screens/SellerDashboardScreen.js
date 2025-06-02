@@ -118,7 +118,7 @@ const SellerDashboardScreen = () => {
   const [orderPage, setOrderPage] = useState(1);
   const [hasMoreOrders, setHasMoreOrders] = useState(true);
   const ORDERS_PER_PAGE = 10;
-  const [hasNewOrders, setHasNewOrders] = useState(false);
+  const [newOrdersCount, setNewOrdersCount] = useState(0);
   const promoteIconScale = new Animated.Value(1);
   const promoteIconRotate = new Animated.Value(0);
   const ordersIconScale = new Animated.Value(1);
@@ -809,7 +809,9 @@ const SellerDashboardScreen = () => {
           <Text style={[styles.productName, { color: theme.text }]}>{item.name}</Text>
           <View style={styles.productMetrics}>
             <View style={styles.metricItem}>
-              <Text style={[styles.metricValue, { color: theme.primary }]}>GH₵{item.price.toFixed(2)}</Text>
+              <Text style={[styles.metricValue, { color: theme.primary }]}>
+                GH₵{item.sellerPrice ? item.sellerPrice.toFixed(2) : item.price.toFixed(2)}
+              </Text>
               <Text style={[styles.metricLabel, { color: theme.textSecondary }]}>Price</Text>
             </View>
             <View style={styles.metricDivider} />
@@ -1675,7 +1677,7 @@ const SellerDashboardScreen = () => {
 
   // Add animation for orders icon when there are new orders
   useEffect(() => {
-    if (hasNewOrders) {
+    if (newOrdersCount > 0) {
       const pulseAnimation = Animated.sequence([
         Animated.timing(ordersIconScale, {
           toValue: 1.2,
@@ -1693,7 +1695,7 @@ const SellerDashboardScreen = () => {
 
       Animated.loop(pulseAnimation, { iterations: 3 }).start();
     }
-  }, [hasNewOrders]);
+  }, [newOrdersCount]);
 
   // Add this function to check for new orders
   const checkNewOrders = async () => {
@@ -1707,7 +1709,7 @@ const SellerDashboardScreen = () => {
       
       if (response.ok) {
         const data = await response.json();
-        setHasNewOrders(data.hasNewOrders);
+        setNewOrdersCount(data.newOrdersCount || 0); // Update to use count instead of boolean
       }
     } catch (error) {
       console.error('Error checking new orders:', error);
@@ -1757,15 +1759,15 @@ const SellerDashboardScreen = () => {
             <TouchableOpacity 
               style={styles.headerButton}
               onPress={() => {
-                setHasNewOrders(false);
+                setNewOrdersCount(0); // Reset count when viewing orders
                 setActiveTab('orders');
               }}
             >
               <Animated.View style={{ transform: [{ scale: ordersIconScale }] }}>
                 <MaterialIcons name="shopping-bag" size={24} color="white" />
-                {hasNewOrders && (
+                {newOrdersCount > 0 && (
                   <View style={styles.ordersBadge}>
-                    <Text style={styles.ordersBadgeText}>New</Text>
+                    <Text style={styles.ordersBadgeText}>{newOrdersCount}</Text>
                   </View>
                 )}
               </Animated.View>
@@ -2155,17 +2157,18 @@ const styles = StyleSheet.create({
     top: -2,
     right: -2,
     backgroundColor: '#E63946',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
+    minWidth: 20,
+    height: 20,
     borderRadius: 10,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 2,
     borderColor: '#5D3FD3',
+    paddingHorizontal: 4,
   },
   ordersBadgeText: {
     color: 'white',
-    fontSize: 10,
+    fontSize: 12,
     fontWeight: 'bold',
   },
   content: {

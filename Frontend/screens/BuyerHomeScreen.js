@@ -139,7 +139,7 @@ const BuyerHomeScreen = () => {
         
         if (status !== 'granted') {
           console.log('Location permission denied');
-          setLocation('New York, USA'); // Fallback location
+          setLocation('University of Capecoast, UCC'); // Fallback location
           setLocationPermission(false);
           return;
         }
@@ -148,7 +148,7 @@ const BuyerHomeScreen = () => {
         
         // Get current position
         const position = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
+          accuracy: Location.Accuracy.High, // Changed to High accuracy
         });
         
         if (position) {
@@ -162,21 +162,48 @@ const BuyerHomeScreen = () => {
           
           if (geocode && geocode.length > 0) {
             const address = geocode[0];
-            const locationString = address.city ? 
-              `${address.city}, ${address.country}` : 
-              address.region ? 
-                `${address.region}, ${address.country}` : 
-                `${address.country}`;
-                
-            console.log('Location detected:', locationString);
-            setLocation(locationString);
+            // Build a more detailed location string
+            const locationParts = [];
+            
+            // Add street/landmark if available
+            if (address.street) {
+              locationParts.push(address.street);
+            }
+            
+            // Add sublocality (neighborhood/area) if available
+            if (address.district) {
+              locationParts.push(address.district);
+            }
+            
+            // Add city if available
+            if (address.city) {
+              locationParts.push(address.city);
+            }
+            
+            // Add region if available and different from city
+            if (address.region && address.region !== address.city) {
+              locationParts.push(address.region);
+            }
+            
+            // Add country if available
+            if (address.country) {
+              locationParts.push(address.country);
+            }
+            
+            // Join all parts with commas and remove any empty parts
+            const locationString = locationParts
+              .filter(part => part && part.trim() !== '')
+              .join(', ');
+            
+            console.log('Detailed location detected:', locationString);
+            setLocation(locationString || 'Location not available');
           } else {
-            setLocation('New York, USA'); // Fallback location
+            setLocation('Capecoast, Ghana');
           }
         }
       } catch (error) {
         console.error('Error getting location:', error);
-        setLocation('New York, USA'); // Fallback location
+        setLocation('Location not available');
       }
     };
     
@@ -247,7 +274,7 @@ const BuyerHomeScreen = () => {
         if (token) {
           console.log('Token found:', token.substring(0, 10) + '...');
           
-          const response = await fetch('https://unimarket-ikin.onrender.com/api/users/profile', {
+          const response = await fetch(`${API_BASE_URL}/api/users/profile`, {
             headers: {
               'Authorization': `Bearer ${token}`,
               'Content-Type': 'application/json'
@@ -474,7 +501,7 @@ const BuyerHomeScreen = () => {
   const renderFeaturedProduct = ({ item }) => {
     const imageUri = item.image && (item.image.startsWith('http') 
       ? item.image 
-      : `https://unimarket-ikin.onrender.com${item.image}`);
+      : `${API_BASE_URL}${item.image}`);
     
     // Check if this product is in favorites
     const isFavorite = favorites.includes(item._id);
@@ -490,14 +517,42 @@ const BuyerHomeScreen = () => {
     return (
       <TouchableOpacity 
         style={styles.productCard}
-        onPress={() => {
+        onPress={async () => {
           console.log('Navigating to product details with ID:', item._id);
-          // Increment views
-          fetch(`${API_BASE_URL}/api/products/${item._id}/views`, {
-            method: 'POST',
-          })
-          .then(response => response.json())
-          .catch(error => console.error('Error incrementing views:', error));
+          try {
+            // Get user token if available
+            const token = await AsyncStorage.getItem('userToken');
+            
+            // Increment views
+            const response = await fetch(`${API_BASE_URL}/api/products/${item._id}/views`, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                ...(token && { 'Authorization': `Bearer ${token}` })
+              }
+            });
+
+            if (!response.ok) {
+              const errorText = await response.text();
+              console.error('View increment failed:', response.status, errorText);
+            } else {
+              const data = await response.json();
+              console.log('View response:', data.message, 'Current views:', data.views);
+              
+              // Update the local state to reflect the new view count
+              setFeaturedProducts(prevProducts => 
+                prevProducts.map(product => 
+                  product._id === item._id 
+                    ? { ...product, views: data.views }
+                    : product
+                )
+              );
+            }
+          } catch (error) {
+            console.error('Error incrementing views:', error);
+            // Don't show error to user since this is a background operation
+          }
           
           navigation.navigate('ProductDetails', { 
             productId: item._id
@@ -658,7 +713,7 @@ const BuyerHomeScreen = () => {
   const renderService = ({ item }) => {
     const imageUri = item.image && (item.image.startsWith('http') 
       ? item.image 
-      : `https://unimarket-ikin.onrender.com${item.image}`);
+      : `${API_BASE_URL}${item.image}`);
 
     // Check if this service is in favorites
     const isFavorite = favorites.includes(item._id);
@@ -1365,7 +1420,7 @@ const BuyerHomeScreen = () => {
                         }
                         
                         const position = await Location.getCurrentPositionAsync({
-                          accuracy: Location.Accuracy.Balanced,
+                          accuracy: Location.Accuracy.High,
                         });
                         
                         if (position) {
@@ -1377,26 +1432,47 @@ const BuyerHomeScreen = () => {
                           
                           if (geocode && geocode.length > 0) {
                             const address = geocode[0];
-                            const locationString = address.city ? 
-                              `${address.city}, ${address.country}` : 
-                              address.region ? 
-                                `${address.region}, ${address.country}` : 
-                                `${address.country}`;
+                            const locationParts = [];
                             
-                            setLocation(locationString);
+                            if (address.street) {
+                              locationParts.push(address.street);
+                            }
+                            
+                            if (address.district) {
+                              locationParts.push(address.district);
+                            }
+                            
+                            if (address.city) {
+                              locationParts.push(address.city);
+                            }
+                            
+                            if (address.region && address.region !== address.city) {
+                              locationParts.push(address.region);
+                            }
+                            
+                            if (address.country) {
+                              locationParts.push(address.country);
+                            }
+                            
+                            const locationString = locationParts
+                              .filter(part => part && part.trim() !== '')
+                              .join(', ');
+                            
+                            setLocation(locationString || 'Location not available');
                           } else {
                             setLocation('Capecoast, Ghana');
                           }
                         }
                       } catch (error) {
                         console.error('Error refreshing location:', error);
-                        setLocation('New York, USA');
+                        setLocation('Location not available');
                       }
                     };
                     
                     getLocation();
                   }}
                 >
+                  <Text style={styles.locationRefreshText}>Refresh</Text>
                 </TouchableOpacity>
               )}
             </View>
@@ -1420,12 +1496,16 @@ const BuyerHomeScreen = () => {
             onChangeText={handleSearch}
             onSubmitEditing={() => handleSearch(searchQuery)}
             returnKeyType="search"
+            placeholderTextColor="#999"
           />
           {searchQuery.length > 0 ? (
-            <TouchableOpacity onPress={() => {
-              setSearchQuery('');
-              setFeaturedProducts([]); // Clear search results
-            }}>
+            <TouchableOpacity 
+              onPress={() => {
+                setSearchQuery('');
+                setFeaturedProducts([]); // Clear search results
+              }}
+              style={styles.clearButton}
+            >
               <Ionicons name="close-circle" size={20} color="#999" />
             </TouchableOpacity>
           ) : (
@@ -1801,7 +1881,7 @@ const BuyerHomeScreen = () => {
                               </TouchableOpacity>
                             </View>
                             <View style={styles.productInfo}>
-                              <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
+                              <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
                               <View style={styles.productDetails}>
                                 <View style={styles.priceContainer}>
                                   <Text style={styles.productPrice}>GH¢{item.price.toFixed(2)}</Text>
@@ -1819,15 +1899,7 @@ const BuyerHomeScreen = () => {
                                   <Ionicons name="car-outline" size={12} color="#666" />
                                   <Text style={styles.sellerText}>15% off delivery</Text>
                                 </View>
-                                <TouchableOpacity 
-                                  style={styles.addToCartButton}
-                                  onPress={(e) => {
-                                    e.stopPropagation();
-                                    handleAddToCart(item);
-                                  }}
-                                >
-                                  <Ionicons name="cart-outline" size={20} color="#5D3FD3" />
-                                </TouchableOpacity>
+                               
                               </View>
                             </View>
                           </View>
@@ -2383,6 +2455,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    position: 'relative', // Add this to allow absolute positioning of badge
   },
   navText: {
     fontSize: 10,
@@ -2785,19 +2858,46 @@ const styles = StyleSheet.create({
   recommendedGridContainer: {
     paddingHorizontal: 8,
     // paddingBottom: 8,
-    marginRight:8,
   },
   recommendedRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 4,
     justifyContent: 'space-between',
     marginBottom: 8,
-
+  
   },
   recommendedGridItem: {
-    width: (Dimensions.get('window').width - 32) / 2, // Screen width minus padding and gap
-    marginHorizontal: 4,
+    width: (Dimensions.get('window').width - 30) / 2, // Screen width minus padding and gap
     
+  },
+  favoriteBadge: {
+    position: 'absolute',
+    top: 0,
+    right: '25%', // Adjust this value to position the badge
+    backgroundColor: '#FF4757',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1.5,
+    borderColor: '#fff',
+    zIndex: 1,
+  },
+  favoriteBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+    paddingHorizontal: 3,
+  },
+  locationRefreshText: {
+    color: '#fff',
+    fontSize: 12,
+    opacity: 0.8,
+    marginLeft: 4,
+  },
+  clearButton: {
+    padding: 4,
   },
 });
 

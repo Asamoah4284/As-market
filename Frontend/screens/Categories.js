@@ -12,14 +12,22 @@ import {
   TextInput,
   ScrollView,
   Platform,
+  Alert,
+  Animated,
 } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { useDispatch } from 'react-redux';
+import { handleAddToCartNotification } from '../services/notificationService';
+import { requireAuthentication } from '../App';
+import { API_BASE_URL } from '../config/api';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const Categories = () => {
   const navigation = useNavigation();
   const route = useRoute();
   const { categoryId, categoryName } = route.params || {};
+  const dispatch = useDispatch();
 
   const API_URL = 'http://172.20.10.2:5000'; // Local development URL - CHANGE BACK FOR PRODUCTION!
 
@@ -32,6 +40,7 @@ const Categories = () => {
   const [filterModalVisible, setFilterModalVisible] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(categoryId || 'all');
   const [showingProductCategories, setShowingProductCategories] = useState(true); // Default to product categories
+  const [buttonAnimations] = useState(() => new Map());
   
   // Using the same category structure as in SellerDashboardScreen
   const categories = {
@@ -238,6 +247,70 @@ const Categories = () => {
     setFilterModalVisible(false);
   };
   
+  const getButtonAnimation = (productId) => {
+    if (!buttonAnimations.has(productId)) {
+      buttonAnimations.set(productId, new Animated.Value(1));
+    }
+    return buttonAnimations.get(productId);
+  };
+
+  const animateButton = (productId) => {
+    const animation = getButtonAnimation(productId);
+    Animated.sequence([
+      Animated.timing(animation, {
+        toValue: 0.8,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.spring(animation, {
+        toValue: 1,
+        friction: 3,
+        tension: 40,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  };
+
+  const handleAddToCart = async (product) => {
+    // Animate the button
+    animateButton(product._id);
+    
+    // Check if user is authenticated
+    if (!(await requireAuthentication(navigation, 'add items to cart'))) {
+      return;
+    }
+    
+    try {
+      const token = await AsyncStorage.getItem('userToken');
+      // Token is guaranteed to exist at this point because of requireAuthentication
+      
+      // Make API call to add to cart
+      const response = await fetch(`${API_BASE_URL}/api/cart/add`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          productId: product._id,
+          quantity: 1
+        })
+      });
+      
+      if (response.ok) {
+        // Send notification
+        await handleAddToCartNotification(product.name, dispatch);
+        Alert.alert('Success', 'Product added to cart');
+      } else {
+        const errorData = await response.json();
+        Alert.alert('Error', errorData.message || 'Failed to add product to cart');
+      }
+    } catch (error) {
+      console.error('Error adding to cart:', error);
+      Alert.alert('Error', 'Failed to add product to cart');
+    }
+  };
+  
   const filteredProducts = products
     .filter(product => 
       product.name.toLowerCase().includes(searchQuery.toLowerCase())
@@ -261,6 +334,8 @@ const Categories = () => {
       ? item.image 
       : `${API_URL}${item.image}`);
       
+    const buttonScale = getButtonAnimation(item._id);
+
     return (
       <TouchableOpacity 
         style={styles.productCard}
@@ -285,7 +360,7 @@ const Categories = () => {
           </TouchableOpacity>
         </View>
         <View style={styles.productInfo}>
-          <Text style={styles.productName} numberOfLines={2}>{item.name}</Text>
+          <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
           <View style={styles.productDetails}>
             <View style={styles.priceContainer}>
               <Text style={styles.productPrice}>GHC{item.price.toFixed(2)}</Text>
@@ -294,30 +369,26 @@ const Categories = () => {
               )}
             </View>
           </View>
-          <View style={styles.ratingContainer}>
-            <View style={styles.starsContainer}>
-              {[1, 2, 3, 4, 5].map((star) => (
-                <Ionicons 
-                  key={star} 
-                  name={star <= (item.rating || 0) ? "star" : "star-outline"} 
-                  size={14} 
-                  color="#FFD700" 
-                />
-              ))}
-            </View>
-            <Text style={styles.ratingCount}>({item.numReviews || 0})</Text>
-          </View>
           <View style={styles.productFooter}>
             <View style={styles.sellerInfo}>
               <Ionicons name="person-outline" size={12} color="#666" />
               <Text style={styles.sellerText} numberOfLines={1}>{item.seller?.name || 'Unknown Seller'}</Text>
             </View>
-            <TouchableOpacity 
-              style={styles.addToCartButton}
-              onPress={() => console.log('Add to cart')}
+            <Animated.View 
+              style={[
+                styles.addToCartButton,
+                {
+                  transform: [{ scale: buttonScale }],
+                }
+              ]}
             >
-              <Ionicons name="cart-outline" size={20} color="#3498db" />
-            </TouchableOpacity>
+              <TouchableOpacity 
+                onPress={() => handleAddToCart(item)}
+                style={styles.addToCartButtonInner}
+              >
+                <Ionicons name="add-circle" size={24} color="#5D3FD3" />
+              </TouchableOpacity>
+            </Animated.View>
           </View>
         </View>
       </TouchableOpacity>
@@ -782,7 +853,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#333',
     marginBottom: 2,
-    // height: 40,
+    flexShrink: 1,
+    flexWrap: 'nowrap',
   },
   productDetails: {
     marginBottom: 4,
@@ -835,7 +907,15 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: 'rgba(93, 63, 211, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginLeft: 8,
+    overflow: 'hidden',
+  },
+  addToCartButtonInner: {
+    width: '100%',
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
   },

@@ -44,8 +44,10 @@ const ProductDetailsScreen = () => {
 
   // Add new state for comments
   const [comments, setComments] = useState([]);
-  const [newComment, setNewComment] = useState("");
-  const [submittingComment, setSubmittingComment] = useState(false);
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [commentError, setCommentError] = useState(null);
+  const [commentText, setCommentText] = useState('');
+  const [selectedRating, setSelectedRating] = useState(0);
 
   // Add new state for fullscreen modal
   const [isFullscreen, setIsFullscreen] = useState(false);
@@ -235,80 +237,68 @@ const ProductDetailsScreen = () => {
     }
   };
 
-  // Add function to fetch comments
+  // Add fetchComments function
   const fetchComments = async () => {
+    if (!currentProduct?._id) return;
+    
     try {
-      console.log("Fetching comments for product:", productId);
+      setLoadingComments(true);
+      setCommentError(null);
       
-      // Use the consistent API URL pattern that works
-      const apiUrl = API_BASE_URL.startsWith('http') ? API_BASE_URL : `http://${API_BASE_URL}`;
-      const response = await fetch(
-        `${apiUrl}/api/products/${productId}/comments`
-      );
-
+      const response = await fetch(`${API_BASE_URL}/api/products/${currentProduct._id}/comments`);
+      
       if (!response.ok) {
-        console.error("Failed to fetch comments:", response.status);
-        return;
+        throw new Error(`Failed to fetch comments: ${response.status}`);
       }
-
+      
       const data = await response.json();
-      console.log("Comments data:", data);
-      setComments(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error("Error fetching comments:", err);
-      // Show a message to the user
-      Alert.alert(
-        "Comments Unavailable",
-        "Couldn't load comments at this time. Please try again later."
-      );
+      setComments(data);
+    } catch (error) {
+      console.error('Error fetching comments:', error);
+      setCommentError(error.message);
+    } finally {
+      setLoadingComments(false);
     }
   };
 
-  // Add function to submit a new comment
+  // Add handleSubmitComment function
   const handleSubmitComment = async () => {
-    // Check if user is authenticated
     if (!(await requireAuthentication(navigation, 'post a comment'))) {
       return;
     }
-
-    if (!newComment.trim()) return;
-
+    
     try {
-      setSubmittingComment(true);
-      const token = await AsyncStorage.getItem("userToken");
+      const token = await AsyncStorage.getItem('userToken');
+      const response = await fetch(`${API_BASE_URL}/api/products/${currentProduct._id}/comments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          text: commentText,
+          rating: selectedRating,
+          sellerPrice: currentProduct.price
+        })
+      });
       
-      // Use the consistent API URL pattern
-      const apiUrl = API_BASE_URL.startsWith('http') ? API_BASE_URL : `http://${API_BASE_URL}`;
-      const response = await fetch(
-        `${apiUrl}/api/products/${productId}/comments`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            text: newComment,
-          }),
-        }
-      );
-
-      if (response.ok) {
-        const newCommentData = await response.json();
-        setComments([...comments, newCommentData]);
-        setNewComment("");
-        Alert.alert("Success", "Your comment has been posted!");
-        // Refresh comments to ensure we have the latest
-        fetchComments();
-      } else {
+      if (!response.ok) {
         const errorData = await response.json();
-        Alert.alert("Error", errorData.message || "Failed to post comment");
+        throw new Error(errorData.message || 'Failed to post comment');
       }
-    } catch (err) {
-      console.error("Error posting comment:", err);
-      Alert.alert("Error", "Something went wrong. Please try again.");
-    } finally {
-      setSubmittingComment(false);
+      
+      const newComment = await response.json();
+      setComments(prevComments => [newComment, ...prevComments]);
+      setCommentText('');
+      setSelectedRating(0);
+      
+      // Refresh product to get updated rating
+      if (currentProduct?._id) {
+        dispatch(fetchProductById(currentProduct._id));
+      }
+    } catch (error) {
+      console.error('Error posting comment:', error);
+      Alert.alert('Error', error.message || 'Failed to post comment. Please try again.');
     }
   };
 
@@ -1164,58 +1154,78 @@ const ProductDetailsScreen = () => {
           </View>
         </View>
 
-        {/* Add Comments Section */}
-        <View style={styles.commentsContainer}>
-          <Text style={styles.sectionTitle}>Customer Reviews</Text>
-
+        {/* Comments Section */}
+        <View style={styles.commentsSection}>
+          <Text style={styles.sectionTitle}>Comments & Reviews</Text>
+          
+          {loadingComments ? (
+            <ActivityIndicator size="small" color="#5D3FD3" />
+          ) : commentError ? (
+            <Text style={styles.errorText}>{commentError}</Text>
+          ) : comments.length === 0 ? (
+            <Text style={styles.noCommentsText}>No comments yet. Be the first to review!</Text>
+          ) : (
+            <View style={styles.commentsList}>
+              {comments.map((item) => (
+                <View key={item._id} style={styles.commentCard}>
+                  <View style={styles.commentHeader}>
+                    <Text style={styles.commentAuthor}>{item.user.name}</Text>
+                    {item.rating && (
+                      <View style={styles.commentRating}>
+                        {[1, 2, 3, 4, 5].map((star) => (
+                          <Ionicons
+                            key={star}
+                            name={star <= item.rating ? "star" : "star-outline"}
+                            size={14}
+                            color="#FFD700"
+                          />
+                        ))}
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.commentText}>{item.text}</Text>
+                  <Text style={styles.commentDate}>
+                    {new Date(item.createdAt).toLocaleDateString()}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          )}
+          
           {/* Comment Input */}
           <View style={styles.commentInputContainer}>
             <TextInput
               style={styles.commentInput}
-              placeholder="Write a comment..."
-              value={newComment}
-              onChangeText={setNewComment}
+              placeholder="Write a review..."
+              value={commentText}
+              onChangeText={setCommentText}
               multiline
             />
+            <View style={styles.ratingSelector}>
+              {[1, 2, 3, 4, 5].map((star) => (
+                <TouchableOpacity
+                  key={star}
+                  onPress={() => setSelectedRating(star)}
+                >
+                  <Ionicons
+                    name={star <= selectedRating ? "star" : "star-outline"}
+                    size={24}
+                    color="#FFD700"
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
             <TouchableOpacity
               style={[
                 styles.submitCommentButton,
-                submittingComment && styles.disabledButton,
+                (!commentText.trim() || selectedRating === 0) && styles.submitCommentButtonDisabled
               ]}
               onPress={handleSubmitComment}
-              disabled={submittingComment || !newComment.trim()}
+              disabled={!commentText.trim() || selectedRating === 0}
             >
-              {submittingComment ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
-                <Text style={styles.submitCommentText}>Post</Text>
-              )}
+              <Text style={styles.submitCommentButtonText}>Post Review</Text>
             </TouchableOpacity>
           </View>
-
-          {/* Comments List */}
-          {comments.length > 0 ? (
-            comments.map((comment, index) => (
-              <View key={comment._id || index} style={styles.commentItem}>
-                <View style={styles.commentHeader}>
-                  <View style={styles.commentUser}>
-                    <Ionicons name="person-circle" size={24} color="#666" />
-                    <Text style={styles.commentUsername}>
-                      {comment.user?.name || "Anonymous"}
-                    </Text>
-                  </View>
-                  <Text style={styles.commentDate}>
-                    {new Date(comment.createdAt).toLocaleString()}
-                  </Text>
-                </View>
-                <Text style={styles.commentText}>{comment.text}</Text>
-              </View>
-            ))
-          ) : (
-            <Text style={styles.noCommentsText}>
-              Be the first to leave a review for this product!
-            </Text>
-          )}
         </View>
       </ScrollView>
 
@@ -1546,82 +1556,74 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     marginLeft: 8,
   },
-  commentsContainer: {
-    backgroundColor: "#fff",
-    padding: 20,
-    marginTop: 10,
-    borderTopWidth: 1,
-    borderTopColor: "#e0e0e0",
-  },
-  commentInputContainer: {
-    flexDirection: "row",
-    marginBottom: 20,
-    alignItems: "flex-end",
-  },
-  commentInput: {
-    flex: 1,
-    borderWidth: 1,
-    borderColor: "#e0e0e0",
-    borderRadius: 8,
-    padding: 12,
-    fontSize: 14,
-    backgroundColor: "#f8f9fa",
-    minHeight: 80,
-    textAlignVertical: "top",
-  },
-  submitCommentButton: {
-    backgroundColor: "#5D3FD3",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-    marginLeft: 10,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  disabledButton: {
-    backgroundColor: "#9d89e3",
-  },
-  submitCommentText: {
-    color: "#fff",
-    fontWeight: "bold",
-  },
-  commentItem: {
-    backgroundColor: "#f8f9fa",
+  commentsSection: {
     padding: 16,
+    backgroundColor: '#fff',
+    marginTop: 16,
     borderRadius: 12,
-    marginBottom: 12,
   },
-  commentHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
+  commentCard: {
+    backgroundColor: '#f8f9fa',
+    padding: 12,
+    borderRadius: 8,
     marginBottom: 8,
   },
-  commentUser: {
-    flexDirection: "row",
-    alignItems: "center",
+  commentHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
   },
-  commentUsername: {
-    fontSize: 14,
-    fontWeight: "500",
-    marginLeft: 8,
-    color: "#333",
+  commentAuthor: {
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  commentRating: {
+    flexDirection: 'row',
+  },
+  commentText: {
+    color: '#666',
+    marginBottom: 4,
   },
   commentDate: {
     fontSize: 12,
-    color: "#999",
+    color: '#999',
   },
-  commentText: {
-    fontSize: 14,
-    lineHeight: 20,
-    color: "#444",
+  commentInputContainer: {
+    marginTop: 16,
+  },
+  commentInput: {
+    borderWidth: 1,
+    borderColor: '#ddd',
+    borderRadius: 8,
+    padding: 12,
+    marginBottom: 8,
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  ratingSelector: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  submitCommentButton: {
+    backgroundColor: '#5D3FD3',
+    padding: 12,
+    borderRadius: 8,
+    alignItems: 'center',
+  },
+  submitCommentButtonDisabled: {
+    backgroundColor: '#ccc',
+  },
+  submitCommentButtonText: {
+    color: '#fff',
+    fontWeight: 'bold',
   },
   noCommentsText: {
-    fontSize: 14,
-    color: "#666",
-    fontStyle: "italic",
-    textAlign: "center",
-    padding: 20,
+    textAlign: 'center',
+    color: '#666',
+    fontStyle: 'italic',
+    marginVertical: 16,
   },
   fullscreenModal: {
     flex: 1,
@@ -2020,6 +2022,9 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '500',
     fontSize: 13,
+  },
+  commentsList: {
+    marginBottom: 16,
   },
 });
 
