@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, LogBox, Animated } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, Dimensions, LogBox, Animated, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useNavigation, useRoute } from '@react-navigation/native';
 import { MaterialIcons } from '@expo/vector-icons';
@@ -23,6 +23,7 @@ import { registerForPushNotificationsAsync } from '../services/notificationServi
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
 import BannerManagement from './BannerManagement';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 // Ignore specific SVG-related warnings
 LogBox.ignoreLogs([
   'Invariant Violation: Tried to register two views with the same name RNSVGFeFlood',
@@ -69,8 +70,30 @@ const Admin = () => {
   }, [route.params]);
 
   useEffect(() => {
-    // Fetch admin dashboard data
-    fetchDashboardData();
+    // Check authentication when component mounts
+    const checkAuth = async () => {
+      try {
+        const token = await AsyncStorage.getItem('userToken');
+        if (!token) {
+          // Redirect to login if no token found
+          navigation.reset({
+            index: 0,
+            routes: [{ name: 'Login' }],
+          });
+          return;
+        }
+        // If token exists, fetch dashboard data
+        fetchDashboardData();
+      } catch (error) {
+        console.error('Error checking authentication:', error);
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Login' }],
+        });
+      }
+    };
+
+    checkAuth();
   }, []);
 
   useEffect(() => {
@@ -106,33 +129,37 @@ const Admin = () => {
   const fetchDashboardData = async () => {
     setLoading(true);
     try {
-      // Replace with actual API call
-      // const response = await fetch('your-api-endpoint/admin/dashboard');
-      // const data = await response.json();
-      // setStats(data);
-      // setTrends(data.trends);
+      const token = await AsyncStorage.getItem('userToken');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const response = await axios.get(`${API_BASE_URL}/api/admin/dashboard`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
       
-      // Simulating API response with dummy data
-      setTimeout(() => {
-        setStats({
-          totalUsers: 1250,
-          activeUsers: 876,
-          totalOrders: 3421,
-          revenue: 28750,
-        });
-        
-        // Simulated trend data
-        setTrends({
-          userGrowth: [820, 932, 1041, 1138, 1250],
-          orderTrends: [2100, 2340, 2800, 3100, 3421],
-          revenueTrends: [15200, 18400, 22300, 25800, 28750],
-          activeUserRate: 70.1
-        });
-        
-        setLoading(false);
-      }, 1000);
+      const { stats, trends } = response.data;
+      setStats(stats);
+      setTrends(trends);
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
+      if (error.response?.status === 401) {
+        // Token is invalid or expired
+        await AsyncStorage.removeItem('userToken');
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Login' }],
+        });
+      } else {
+        Alert.alert(
+          'Error',
+          'Failed to fetch dashboard data. Please try again later.'
+        );
+      }
+    } finally {
       setLoading(false);
     }
   };
@@ -344,7 +371,7 @@ const Admin = () => {
                       <MaterialIcons name="attach-money" size={20} color="#0066cc" />
                       <Text style={styles.statLabel}>Revenue</Text>
                     </View>
-                    <Text style={styles.statValue}>${stats.revenue}</Text>
+                    <Text style={styles.statValue}>GH¢{stats.revenue}</Text>
                     <View style={styles.trendIndicator}>
                       <MaterialIcons name="trending-up" size={16} color="#4CAF50" />
                       <Text style={styles.trendPositive}>+15% this month</Text>

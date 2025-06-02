@@ -381,21 +381,23 @@ const Categories = () => {
               <Ionicons name="person-outline" size={12} color="#666" />
               <Text style={styles.sellerText} numberOfLines={1}>{item.seller?.name || 'Unknown Seller'}</Text>
             </View>
-            <Animated.View 
-              style={[
-                styles.addToCartButton,
-                {
-                  transform: [{ scale: buttonScale }],
-                }
-              ]}
-            >
-              <TouchableOpacity 
-                onPress={() => handleAddToCart(item)}
-                style={styles.addToCartButtonInner}
+            {showingProductCategories && (
+              <Animated.View 
+                style={[
+                  styles.addToCartButton,
+                  {
+                    transform: [{ scale: buttonScale }],
+                  }
+                ]}
               >
-                <Ionicons name="add-circle" size={24} color="#5D3FD3" />
-              </TouchableOpacity>
-            </Animated.View>
+                <TouchableOpacity 
+                  onPress={() => handleAddToCart(item)}
+                  style={styles.addToCartButtonInner}
+                >
+                  <Ionicons name="add-circle" size={24} color="#5D3FD3" />
+                </TouchableOpacity>
+              </Animated.View>
+            )}
           </View>
         </View>
       </TouchableOpacity>
