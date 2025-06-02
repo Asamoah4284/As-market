@@ -29,6 +29,7 @@ const CategoryScreen = ({ route, navigation }) => {
     categoryName = 'Products', 
     featuredOnly = false, 
     services = false,
+    newArrivals = false,
     filter = {}
   } = route?.params || {};
   
@@ -42,8 +43,9 @@ const CategoryScreen = ({ route, navigation }) => {
     categoryName,
     featuredOnly,
     services,
+    newArrivals,
     filter
-  }), [categoryId, categoryName, featuredOnly, services, JSON.stringify(filter)]);
+  }), [categoryId, categoryName, featuredOnly, services, newArrivals, JSON.stringify(filter)]);
 
   useEffect(() => {
     let isMounted = true;
@@ -62,6 +64,13 @@ const CategoryScreen = ({ route, navigation }) => {
         // Handle different endpoint scenarios
         if (featuredOnly) {
           endpoint = `${API_BASE_URL}/api/products/featured`;
+        }
+
+        // Add new arrivals filter
+        if (newArrivals) {
+          params.append('sortBy', 'createdAt');
+          params.append('sortOrder', 'desc');
+          params.append('limit', '20');
         }
 
         // Add category filtering - check both categoryId and category name
@@ -230,21 +239,23 @@ const CategoryScreen = ({ route, navigation }) => {
           {item.isService ? (
             <Text style={styles.serviceTag}>Service</Text>
           ) : (
-            (item.countInStock === undefined || item.countInStock === null || item.countInStock > 0) ? (
-              <Text style={styles.inStock}>In Stock</Text>
-            ) : (
-              <Text style={styles.outOfStock}>Out of Stock</Text>
-            )
+            <>
+              {(item.countInStock === undefined || item.countInStock === null || item.countInStock > 0) ? (
+                <Text style={styles.inStock}>In Stock</Text>
+              ) : (
+                <Text style={styles.outOfStock}>Out of Stock</Text>
+              )}
+              
+              {/* Add to cart button - only show for non-service items */}
+              <TouchableOpacity 
+                style={styles.addToCartButton}
+                onPress={() => handleAddToCart(item)}
+              >
+                <Ionicons name="cart-outline" size={16} color="#fff" />
+                <Text style={styles.addToCartText}>Add</Text>
+              </TouchableOpacity>
+            </>
           )}
-          
-          {/* Add to cart button */}
-          <TouchableOpacity 
-            style={styles.addToCartButton}
-            onPress={() => handleAddToCart(item)}
-          >
-            <Ionicons name="cart-outline" size={16} color="#fff" />
-            <Text style={styles.addToCartText}>Add</Text>
-          </TouchableOpacity>
         </View>
       </TouchableOpacity>
     );
@@ -274,10 +285,11 @@ const CategoryScreen = ({ route, navigation }) => {
     );
   }
 
-  // Update getScreenTitle to remove newArrivals
+  // Update getScreenTitle to include newArrivals
   const getScreenTitle = () => {
     if (featuredOnly) return "Featured Products";
     if (services) return "Services";
+    if (newArrivals) return "New Arrivals";
     return categoryName || "Products";
   };
 
@@ -292,9 +304,7 @@ const CategoryScreen = ({ route, navigation }) => {
         <Text style={styles.headerTitle}>
           {getScreenTitle()}
         </Text>
-        <TouchableOpacity style={styles.searchButton} onPress={() => navigation.navigate('Search')}>
-          <Ionicons name="search-outline" size={24} color="#fff" />
-        </TouchableOpacity>
+      
       </View>
 
       {loading ? (
@@ -358,8 +368,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
+    paddingHorizontal: 8,
+    paddingVertical: 12,
     backgroundColor: '#5D3FD3',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -367,24 +377,29 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 5,
     marginBottom: 10,
-    height: Platform.OS === 'android' ? 60 : 'auto',
+    height: Platform.OS === 'android' ? 56 : 'auto',
   },
   backButton: {
-    padding: 8,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    padding: 6,
+    alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 20,
+    fontSize: Platform.OS === 'android' ? 18 : 20,
     fontWeight: 'bold',
     color: '#fff',
     flex: 1,
     textAlign: 'center',
+    marginHorizontal: 8,
+    paddingHorizontal: 4,
+    numberOfLines: 1,
+    ellipsizeMode: 'tail',
   },
   searchButton: {
-    padding: 8,
+    padding: 6,
     borderRadius: 20,
     backgroundColor: 'rgba(255,255,255,0.2)',
+    minWidth: 36,
+    alignItems: 'center',
   },
   listContainer: {
     padding: 10,

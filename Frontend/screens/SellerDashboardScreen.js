@@ -869,44 +869,38 @@ const SellerDashboardScreen = () => {
     switch (status.toLowerCase()) {
       case 'pending':
         return {
-          icon: 'schedule',
           color: '#FF9F1C',
-          bg: '#FFF3CD',
+          bg: 'rgba(255, 159, 28, 0.1)',
           text: 'Awaiting Confirmation'
         };
       case 'processing':
         return {
-          icon: 'local-shipping',
           color: '#4361EE',
-          bg: '#E8F0FE',
+          bg: 'rgba(67, 97, 238, 0.1)',
           text: 'Processing Order'
         };
       case 'completed':
         return {
-          icon: 'check-circle',
           color: '#2EC4B6',
-          bg: '#E8F5E9',
+          bg: 'rgba(46, 196, 182, 0.1)',
           text: 'Order Completed'
         };
       case 'delivered':
         return {
-          icon: 'local-shipping',
           color: '#2EC4B6',
-          bg: '#E8F5E9',
-          text: 'Delivered Successfully'
+          bg: 'rgba(46, 196, 182, 0.1)',
+          text: 'Successfully Delivered'
         };
       case 'cancelled':
         return {
-          icon: 'cancel',
           color: '#E63946',
-          bg: '#FFEBEE',
+          bg: 'rgba(230, 57, 70, 0.1)',
           text: 'Order Cancelled'
         };
       default:
         return {
-          icon: 'info',
           color: '#6c757d',
-          bg: '#F8F9FA',
+          bg: 'rgba(108, 117, 125, 0.1)',
           text: status
         };
     }
@@ -928,7 +922,6 @@ const SellerDashboardScreen = () => {
 
     return (
       <View style={[styles.orderCard, { backgroundColor: theme.cardBackground }]}>
-        {/* Order Header with Enhanced Gradient */}
         <LinearGradient
           colors={['rgba(93, 63, 211, 0.08)', 'rgba(93, 63, 211, 0.02)']}
           style={styles.orderHeaderGradient}
@@ -937,7 +930,7 @@ const SellerDashboardScreen = () => {
             <View style={styles.orderHeaderLeft}>
               <View style={styles.orderIdContainer}>
                 <View style={[styles.orderIconContainer, { backgroundColor: theme.primary + '15' }]}>
-                  <MaterialIcons name="receipt" size={18} color={theme.primary} />
+                  <MaterialIcons name="receipt" size={16} color={theme.primary} />
                 </View>
                 <View>
                   <Text style={[styles.orderId, { color: theme.text }]}>
@@ -950,11 +943,6 @@ const SellerDashboardScreen = () => {
               </View>
             </View>
             <View style={[styles.statusContainer, { backgroundColor: statusInfo.bg }]}>
-              <MaterialIcons 
-                name={statusInfo.icon} 
-                size={18} 
-                color={statusInfo.color} 
-              />
               <Text style={[styles.statusText, { color: statusInfo.color }]}>
                 {statusInfo.text}
               </Text>
@@ -962,7 +950,6 @@ const SellerDashboardScreen = () => {
           </View>
         </LinearGradient>
 
-        {/* Order Summary Section */}
         <View style={styles.orderSummarySection}>
           <View style={styles.orderSummaryRow}>
             <View style={styles.summaryItem}>
@@ -983,7 +970,6 @@ const SellerDashboardScreen = () => {
           </View>
         </View>
 
-        {/* Order Items Section */}
         <View style={styles.orderItemsContainer}>
           <View style={styles.orderItemsHeader}>
             <MaterialIcons name="inventory" size={20} color={theme.text} />
@@ -1020,7 +1006,6 @@ const SellerDashboardScreen = () => {
           ))}
         </View>
 
-        {/* Order Actions */}
         {item.orderStatus === 'pending' && (
           <View style={styles.orderActions}>
             <TouchableOpacity 
@@ -2341,42 +2326,53 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    padding: 16,
+    padding: 12,
+    paddingBottom: 8,
   },
   orderHeaderLeft: {
     flex: 1,
+    marginRight: 8,
   },
   orderIdContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 12,
+    gap: 6,
   },
   orderIconContainer: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
   },
   orderId: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
-    marginBottom: 2,
+    marginBottom: 1,
   },
   orderDate: {
-    fontSize: 13,
+    fontSize: 11,
+    opacity: 0.8,
   },
   statusContainer: {
-    flexDirection: 'row',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    height: 24,
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 1,
+    elevation: 1,
+    justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 20,
-    gap: 8,
   },
   statusText: {
-    fontSize: 13,
+    fontSize: 11,
     fontWeight: '600',
+    letterSpacing: 0.2,
+    textAlign: 'center',
   },
   orderCustomerSection: {
     flexDirection: 'row',
