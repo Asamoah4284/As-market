@@ -45,9 +45,9 @@ const Admin = () => {
     revenue: 0,
   });
   const [trends, setTrends] = useState({
-    userGrowth: [],
-    orderTrends: [],
-    revenueTrends: [],
+    userGrowth: [0, 0, 0, 0, 0],
+    orderTrends: [0, 0, 0, 0, 0],
+    revenueTrends: [0, 0, 0, 0, 0],
     activeUserRate: 0
   });
   const slideAnim = useRef(new Animated.Value(-250)).current; // Initialize off-screen
@@ -384,7 +384,11 @@ const Admin = () => {
                   <LineChart
                     data={{
                       labels: ["Jan", "Feb", "Mar", "Apr", "May"],
-                      datasets: [{ data: trends.userGrowth }]
+                      datasets: [{
+                        data: Array.isArray(trends.userGrowth)
+                          ? trends.userGrowth.map(val => (isFinite(val) ? val : 0))
+                          : [0, 0, 0, 0, 0]
+                      }]
                     }}
                     width={Dimensions.get("window").width - 40}
                     height={220}
@@ -408,7 +412,11 @@ const Admin = () => {
                   <BarChart
                     data={{
                       labels: ["Jan", "Feb", "Mar", "Apr", "May"],
-                      datasets: [{ data: trends.revenueTrends.map(val => val/1000) }]
+                      datasets: [{
+                        data: Array.isArray(trends.revenueTrends)
+                          ? trends.revenueTrends.map(val => isFinite(val) ? val / 1000 : 0)
+                          : [0, 0, 0, 0, 0]
+                      }]
                     }}
                     width={Dimensions.get("window").width - 40}
                     height={220}
