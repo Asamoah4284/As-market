@@ -1711,6 +1711,12 @@ const SellerDashboardScreen = () => {
           <View style={styles.headerIcons}>
             <TouchableOpacity 
               style={styles.headerButton}
+              onPress={() => navigation.navigate('BuyerHome')}
+            >
+              <MaterialIcons name="storefront" size={24} color="white" />
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.headerButton}
               onPress={() => navigation.navigate('PromoteStore')}
             >
               <Animated.View 

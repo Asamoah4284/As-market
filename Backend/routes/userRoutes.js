@@ -1,7 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const { adminProtect } = require('../middleware/adminAuth');
-const { protect } = require('../middleware/auth');
+const { protect, admin } = require('../middleware/auth');
 const { 
   registerUser, 
   loginUser, 
@@ -9,12 +9,17 @@ const {
   getAllUsers,
   deleteUser
 } = require('../controllers/userController');
+const { authLimiter, sensitiveOperationLimiter } = require('../middleware/rateLimiter');
 
+// Apply rate limiters to auth routes
+router.post('/register', authLimiter, registerUser);
+router.post('/login', authLimiter, loginUser);
 
-router.post('/register', registerUser);
-router.post('/login', loginUser);
+// Protected routes
 router.get('/profile', protect, getUserProfile);
-router.get('/', getAllUsers);
-router.delete('/:id', protect, adminProtect, deleteUser);
+
+// Admin routes with sensitive operation limiter
+router.get('/', protect, admin, sensitiveOperationLimiter, getAllUsers);
+router.delete('/:id', protect, admin, sensitiveOperationLimiter, deleteUser);
 
 module.exports = router; 

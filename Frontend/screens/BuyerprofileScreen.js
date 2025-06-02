@@ -22,6 +22,7 @@ const BuyerProfileScreen = ({ navigation, route }) => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isSeller, setIsSeller] = useState(false);
 
   useEffect(() => {
     checkAuthentication();
@@ -30,6 +31,7 @@ const BuyerProfileScreen = ({ navigation, route }) => {
   useEffect(() => {
     if (isAuthenticated) {
       loadUserData();
+      checkUserRole();
       if (activeTab === 'orders') {
         fetchOrders();
       }
@@ -54,6 +56,15 @@ const BuyerProfileScreen = ({ navigation, route }) => {
       }
     } catch (error) {
       console.error('Error loading user data:', error);
+    }
+  };
+
+  const checkUserRole = async () => {
+    try {
+      const userRole = await AsyncStorage.getItem('userRole');
+      setIsSeller(userRole === 'seller');
+    } catch (error) {
+      console.error('Error checking user role:', error);
     }
   };
 
@@ -195,6 +206,16 @@ const BuyerProfileScreen = ({ navigation, route }) => {
             </View>
 
             <View style={styles.profileOptions}>
+              {isSeller && (
+                <TouchableOpacity 
+                  style={styles.profileOption}
+                  onPress={() => navigation.navigate('SellerDashboard')}
+                >
+                  <Ionicons name="storefront-outline" size={24} color="#5D3FD3" />
+                  <Text style={[styles.optionText, { color: '#5D3FD3' }]}>Seller Dashboard</Text>
+                </TouchableOpacity>
+              )}
+
               <TouchableOpacity style={styles.profileOption}>
                 <Ionicons name="settings-outline" size={24} color="#666" />
                 <Text style={styles.optionText}>Settings</Text>

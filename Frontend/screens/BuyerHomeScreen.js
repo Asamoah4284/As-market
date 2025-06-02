@@ -118,6 +118,7 @@ const BuyerHomeScreen = () => {
   const [isLoadingDeals, setIsLoadingDeals] = useState(true);
   const [isLoadingBrands, setIsLoadingBrands] = useState(true);
   const shimmerValue = useRef(new Animated.Value(0)).current;
+  const [isSeller, setIsSeller] = useState(false);
   
   // Get cart items from Redux store
   const { items: cartItems } = useSelector(state => state.cart);
@@ -1401,6 +1402,19 @@ const BuyerHomeScreen = () => {
     }, 1000);
   }, []);
 
+  // Add useEffect to check if user is a seller
+  useEffect(() => {
+    const checkUserRole = async () => {
+      try {
+        const userRole = await AsyncStorage.getItem('userRole');
+        setIsSeller(userRole === 'seller');
+      } catch (error) {
+        console.error('Error checking user role:', error);
+      }
+    };
+    checkUserRole();
+  }, []);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
@@ -1409,91 +1423,34 @@ const BuyerHomeScreen = () => {
         <View style={styles.header}>
           <View style={styles.headerContent}>
             <View style={styles.brandNameContainer}>
-                <Text style={[styles.greeting, {color: '#fff'}]}>Asarion</Text>
-                <Text style={[styles.greeting, {color: '#FF4757'}]}> Marketplace</Text>
+              <Text style={[styles.greeting, {color: '#fff'}]}>Asarion</Text>
+              <Text style={[styles.greeting, {color: '#FF4757'}]}> Marketplace</Text>
             </View>
             <View style={styles.locationContainer}>
               <Ionicons name="location-outline" size={14} color="#fff" />
               <Text style={styles.locationText}>{location}</Text>
               {location === 'Loading location...' ? (
                 <Ionicons name="sync" size={14} color="#fff" style={{marginLeft: 4, opacity: 0.8}} />
-              ) : (
-                <TouchableOpacity 
-                  onPress={() => {
-                    setLocation('Loading location...');
-                    // Re-fetch location
-                    const getLocation = async () => {
-                      try {
-                        if (!Location) {
-                          setLocation('UCC, Capecoast');
-                          return;
-                        }
-                        
-                        const position = await Location.getCurrentPositionAsync({
-                          accuracy: Location.Accuracy.High,
-                        });
-                        
-                        if (position) {
-                          const { latitude, longitude } = position.coords;
-                          const geocode = await Location.reverseGeocodeAsync({
-                            latitude,
-                            longitude
-                          });
-                          
-                          if (geocode && geocode.length > 0) {
-                            const address = geocode[0];
-                            const locationParts = [];
-                            
-                            if (address.street) {
-                              locationParts.push(address.street);
-                            }
-                            
-                            if (address.district) {
-                              locationParts.push(address.district);
-                            }
-                            
-                            if (address.city) {
-                              locationParts.push(address.city);
-                            }
-                            
-                            if (address.region && address.region !== address.city) {
-                              locationParts.push(address.region);
-                            }
-                            
-                            if (address.country) {
-                              locationParts.push(address.country);
-                            }
-                            
-                            const locationString = locationParts
-                              .filter(part => part && part.trim() !== '')
-                              .join(', ');
-                            
-                            setLocation(locationString || 'Location not available');
-                          } else {
-                            setLocation('Capecoast, Ghana');
-                          }
-                        }
-                      } catch (error) {
-                        console.error('Error refreshing location:', error);
-                        setLocation('Location not available');
-                      }
-                    };
-                    
-                    getLocation();
-                  }}
-                >
-                  <Text style={styles.locationRefreshText}>Refresh</Text>
-                </TouchableOpacity>
-              )}
+              ) : null}
             </View>
           </View>
-          <TouchableOpacity 
-            style={styles.notificationButton}
-            onPress={() => setShowNotifications(true)}
-          >
-            <Ionicons name="notifications-outline" size={24} color="#fff" />
-            <NotificationBadge style={styles.headerNotificationBadge} />
-          </TouchableOpacity>
+          <View style={styles.headerIcons}>
+            {isSeller && (
+              <TouchableOpacity 
+                style={styles.headerButton}
+                onPress={() => navigation.navigate('SellerDashboard')}
+              >
+                <MaterialIcons name="dashboard" size={24} color="white" />
+              </TouchableOpacity>
+            )}
+            <TouchableOpacity 
+              style={styles.headerButton}
+              onPress={() => setShowNotifications(true)}
+            >
+              <NotificationBadge />
+              <Ionicons name="notifications-outline" size={24} color="white" />
+            </TouchableOpacity>
+          </View>
         </View>
         
         {/* Search Bar */}
@@ -2908,6 +2865,19 @@ const styles = StyleSheet.create({
   },
   clearButton: {
     padding: 4,
+  },
+  headerIcons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  headerButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
 });
 

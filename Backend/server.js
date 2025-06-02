@@ -1,6 +1,8 @@
 const dotenv = require('dotenv');
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const { apiLimiter } = require('./middleware/rateLimiter');
 const connectDB = require('./config/db');
 const userRoutes = require('./routes/userRoutes');
 const productRoutes = require('./routes/productRoutes');
@@ -14,6 +16,7 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const promotionRoutes = require('./routes/promotionRoutes');
 const bannerRoutes = require('./routes/bannerRoutes');
 const assistantRoutes = require('./routes/assistantRoutes');
+const paymentRoutes = require('./routes/paymentRoutes');
 const mongoose = require('mongoose');
 
 dotenv.config();
@@ -23,8 +26,35 @@ const app = express();
 // Connect to database
 connectDB();
 
-// Middleware
-app.use(cors());
+// Security middleware
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'", "'unsafe-eval'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https:", "blob:"],
+      connectSrc: ["'self'", "https://api.paystack.co"],
+      fontSrc: ["'self'", "https:", "data:"],
+      objectSrc: ["'none'"],
+      mediaSrc: ["'self'"],
+      frameSrc: ["'self'", "https://checkout.paystack.com"]
+    }
+  },
+  crossOriginEmbedderPolicy: false, // Required for Paystack integration
+  crossOriginResourcePolicy: { policy: "cross-origin" } // Required for image uploads
+}));
+
+// Apply rate limiting to all routes
+app.use(apiLimiter);
+
+// Enable CORS
+app.use(cors({
+  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  credentials: true
+}));
+
+// Body parser
 app.use(express.json({limit: '50mb'}));
 app.use(express.urlencoded({limit: '50mb', extended: true}));
 
@@ -35,6 +65,7 @@ app.get('/', (req, res) => {
 
 // Routes
 app.use('/api/users', userRoutes);
+app.use('/api/payments', paymentRoutes);
 app.use('/api', commentRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/cart', cartRoutes);
@@ -55,6 +86,16 @@ app.get('/api/test', async (req, res) => {
   } catch (error) {
     res.status(500).send(error.message);
   }
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  console.error(err.stack);
+  res.status(err.status || 500).json({
+    error: process.env.NODE_ENV === 'production' 
+      ? 'An error occurred' 
+      : err.message
+  });
 });
 
 const PORT = process.env.PORT || 5000;

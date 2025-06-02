@@ -4,6 +4,14 @@ const asyncHandler = require('express-async-handler');
 const sharp = require('sharp');
 const cloudinary = require('../config/cloudinary');
 const ProductViewModel = require('../models/productViewModel');
+const bcrypt = require('bcrypt');
+const rateLimit = require('express-rate-limit');
+const helmet = require('helmet');
+
+// Remove top-level await and move to a function
+const generateSalt = async () => {
+  return await bcrypt.genSalt(12);
+};
 
 // Helper function to upload to Cloudinary
 const uploadToCloudinary = async (base64Image) => {
@@ -456,5 +464,6 @@ module.exports = {
   deleteProduct,
   getProducts,
   adminUpdateProduct,
-  incrementProductViews
+  incrementProductViews,
+  generateSalt // Export the function if needed
 }; 
