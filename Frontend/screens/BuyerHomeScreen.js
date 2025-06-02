@@ -1248,9 +1248,19 @@ const BuyerHomeScreen = () => {
       );
     }
 
+    // Sort products by createdAt date in descending order (newest first)
+    const sortedProducts = [...featuredProducts].sort((a, b) => {
+      const dateA = new Date(a.createdAt || 0);
+      const dateB = new Date(b.createdAt || 0);
+      return dateB - dateA;
+    });
+
+    // Take the first 3 products (newest)
+    const newestProducts = sortedProducts.slice(0, 3);
+
     return (
       <FlatList
-        data={featuredProducts.slice(-3)}
+        data={newestProducts}
         renderItem={renderFeaturedProduct}
         keyExtractor={(item) => item._id.toString()}
         horizontal

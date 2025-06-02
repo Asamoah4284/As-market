@@ -47,7 +47,13 @@ const AllOrders = () => {
       });
       
       if (response.data) {
-        setOrders(response.data);
+        // Sort orders by createdAt in descending order (newest first)
+        const sortedOrders = response.data.sort((a, b) => {
+          const dateA = new Date(a.createdAt);
+          const dateB = new Date(b.createdAt);
+          return dateB - dateA;
+        });
+        setOrders(sortedOrders);
       }
     } catch (error) {
       console.error('Error fetching orders:', error);

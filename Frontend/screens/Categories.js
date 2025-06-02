@@ -339,7 +339,14 @@ const Categories = () => {
     return (
       <TouchableOpacity 
         style={styles.productCard}
-        onPress={() => navigation.navigate('ProductDetails', { productId: item._id })}
+        onPress={() => {
+          // Navigate to different screens based on whether it's a service or product
+          if (showingProductCategories) {
+            navigation.navigate('ProductDetails', { productId: item._id });
+          } else {
+            navigation.navigate('ServiceDetails', { serviceId: item._id });
+          }
+        }}
       >
         <View style={styles.productImageContainer}>
           <Image 

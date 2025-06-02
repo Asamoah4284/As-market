@@ -29,13 +29,17 @@ const productSchema = new mongoose.Schema(
     },
     color: {
       type: String,
-      required: [true, 'Product color is required'],
+      required: function() {
+        return !this.isService; // Only required for products, not services
+      },
       trim: true
     },
     gender: {
       type: String,
       enum: ['men', 'women', 'unisex'],
-      required: [true, 'Product gender is required']
+      required: function() {
+        return !this.isService; // Only required for products, not services
+      }
     },
     category: {
       type: String,

@@ -132,6 +132,23 @@ const BuyerProfileScreen = ({ navigation, route }) => {
     }
   };
 
+  const getStatusColor = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'pending':
+        return '#FFA500'; // Orange
+      case 'processing':
+        return '#2196F3'; // Blue
+      case 'shipped':
+        return '#9C27B0'; // Purple
+      case 'delivered':
+        return '#4CAF50'; // Green
+      case 'cancelled':
+        return '#F44336'; // Red
+      default:
+        return '#666666'; // Gray
+    }
+  };
+
   const renderGuestProfileTab = () => (
     <View style={styles.guestContainer}>
       <View style={styles.guestAvatarContainer}>
@@ -229,12 +246,28 @@ const BuyerProfileScreen = ({ navigation, route }) => {
         }
       >
         {orders.map((order) => (
-          <View key={order._id} style={styles.orderCard}>
-            <View style={styles.orderHeader}>
-              <Text style={styles.orderNumber}>Order #{order._id.slice(-6)}</Text>
-              <Text style={styles.orderDate}>
-                {new Date(order.createdAt).toLocaleDateString()}
-              </Text>
+          <TouchableOpacity 
+            key={order._id} 
+            style={styles.orderCard}
+            activeOpacity={0.9}
+            onPress={() => {
+              // You can add navigation to order details here if needed
+              console.log('Order pressed:', order._id);
+            }}
+          >
+            <View style={styles.orderCardHeader}>
+              <View style={styles.orderHeaderLeft}>
+                <Text style={styles.orderNumber}>Order #{order._id.slice(-6)}</Text>
+                <Text style={styles.orderDate}>
+                  {new Date(order.createdAt).toLocaleDateString()}
+                </Text>
+              </View>
+              <View style={[styles.statusBadge, { backgroundColor: `${getStatusColor(order.orderStatus)}15` }]}>
+                <View style={[styles.statusDot, { backgroundColor: getStatusColor(order.orderStatus) }]} />
+                <Text style={[styles.orderStatus, { color: getStatusColor(order.orderStatus) }]}>
+                  {order.orderStatus || 'Pending'}
+                </Text>
+              </View>
             </View>
             
             <View style={styles.orderItems}>
@@ -245,40 +278,39 @@ const BuyerProfileScreen = ({ navigation, route }) => {
                     style={styles.itemImage}
                   />
                   <View style={styles.itemDetails}>
-                    <Text style={styles.itemName}>{item.name}</Text>
-                    <Text style={styles.itemQuantity}>Qty: {item.quantity}</Text>
-                    <Text style={styles.itemPrice}>GH₵{item.price.toFixed(2)}</Text>
+                    <Text style={styles.itemName} numberOfLines={1}>{item.name}</Text>
+                    <View style={styles.itemMeta}>
+                      <Text style={styles.itemQuantity}>Qty: {item.quantity}</Text>
+                      <Text style={styles.itemPrice}>GH₵{item.price.toFixed(2)}</Text>
+                    </View>
                   </View>
                 </View>
               ))}
             </View>
 
-            <View style={styles.orderFooter}>
-              <View style={styles.orderStatusContainer}>
-                {/* <Text style={styles.orderStatus}>
-                  Status: <Text style={styles.statusText}>{order.orderStatus}</Text>
-                </Text> */}
+            <View style={styles.orderCardFooter}>
+              <View style={styles.paymentInfo}>
+                <Ionicons 
+                  name={order.paymentInfo?.paymentMethod === 'online' ? "card-outline" : "cash-outline"} 
+                  size={16} 
+                  color="#666" 
+                />
                 <Text style={styles.paymentMethod}>
-                  Payment: <Text style={styles.paymentMethodText}>
-                    {(order.paymentInfo?.paymentMethod === 'online' ||
-                     order.paymentInfo?.paymentMethod === 'paystack' ||
-                     order.paymentInfo?.status === 'success' ||
-                     order.paymentStatus === 'success' ||
-                     (order.paymentReference && !order.paymentReference.startsWith('POD-'))) 
-                     ? 'Online' 
-                     : (order.paymentInfo?.paymentMethod === 'pay_on_delivery' ||
-                        order.paymentMethod === 'pay_on_delivery' ||
-                        (order.paymentReference && order.paymentReference.startsWith('POD-')))
-                       ? 'Pay on Delivery'
-                       : 'Pay on Delivery'}
-                  </Text>
+                  {(order.paymentInfo?.paymentMethod === 'online' ||
+                   order.paymentInfo?.paymentMethod === 'paystack' ||
+                   order.paymentInfo?.status === 'success' ||
+                   order.paymentStatus === 'success' ||
+                   (order.paymentReference && !order.paymentReference.startsWith('POD-'))) 
+                   ? 'Online Payment' 
+                   : 'Pay on Delivery'}
                 </Text>
               </View>
-              <Text style={styles.orderTotal}>
-                Total: <Text style={styles.totalAmount}>GH₵{order.totalAmount.toFixed(2)}</Text>
-              </Text>
+              <View style={styles.totalContainer}>
+                <Text style={styles.totalLabel}>Total Amount</Text>
+                <Text style={styles.totalAmount}>GH₵{order.totalAmount.toFixed(2)}</Text>
+              </View>
             </View>
-          </View>
+          </TouchableOpacity>
         ))}
 
         {orders.length === 0 && !loading && (
@@ -416,99 +448,141 @@ const styles = StyleSheet.create({
   orderCard: {
     margin: 16,
     backgroundColor: '#fff',
-    borderRadius: 12,
+    borderRadius: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 5,
+    overflow: 'hidden',
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
   },
-  orderHeader: {
+  orderCardHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
+    alignItems: 'flex-start',
     padding: 16,
     borderBottomWidth: 1,
-    borderBottomColor: '#e0e0e0',
+    borderBottomColor: '#f5f5f5',
+    backgroundColor: '#fafafa',
+  },
+  orderHeaderLeft: {
+    flex: 1,
   },
   orderNumber: {
     fontSize: 16,
-    fontWeight: 'bold',
+    fontWeight: '700',
     color: '#333',
+    marginBottom: 4,
   },
   orderDate: {
-    fontSize: 14,
+    fontSize: 13,
     color: '#666',
+  },
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    marginLeft: 8,
+  },
+  statusDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  orderStatus: {
+    fontSize: 13,
+    fontWeight: '600',
+    textTransform: 'capitalize',
   },
   orderItems: {
     padding: 16,
   },
   orderItem: {
     flexDirection: 'row',
-    marginBottom: 12,
+    marginBottom: 16,
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: '#f5f5f5',
   },
   itemImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
+    width: 70,
+    height: 70,
+    borderRadius: 10,
     marginRight: 12,
+    backgroundColor: '#f5f5f5',
   },
   itemDetails: {
     flex: 1,
+    justifyContent: 'center',
   },
   itemName: {
-    fontSize: 14,
+    fontSize: 15,
     fontWeight: '600',
     color: '#333',
-    marginBottom: 4,
+    marginBottom: 8,
+  },
+  itemMeta: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   itemQuantity: {
+    fontSize: 13,
+    color: '#666',
+    backgroundColor: '#f5f5f5',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+  },
+  itemPrice: {
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#5D3FD3',
+  },
+  orderCardFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#f5f5f5',
+    backgroundColor: '#fafafa',
+  },
+  paymentInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+  },
+  paymentMethod: {
+    marginLeft: 6,
+    fontSize: 13,
+    color: '#666',
+    fontWeight: '500',
+  },
+  totalContainer: {
+    alignItems: 'flex-end',
+  },
+  totalLabel: {
     fontSize: 12,
     color: '#666',
     marginBottom: 2,
   },
-  itemPrice: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#5D3FD3',
-  },
-  orderFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    padding: 16,
-    borderTopWidth: 1,
-    borderTopColor: '#e0e0e0',
-    backgroundColor: '#f8f8f8',
-    borderBottomLeftRadius: 12,
-    borderBottomRightRadius: 12,
-  },
-  orderStatusContainer: {
-    flexDirection: 'column',
-  },
-  orderStatus: {
-    fontSize: 14,
-    color: '#666',
-    marginBottom: 4,
-  },
-  statusText: {
-    color: '#4CAF50',
-    fontWeight: '600',
-  },
-  paymentMethod: {
-    fontSize: 14,
-    color: '#666',
-  },
-  paymentMethodText: {
-    color: '#5D3FD3',
-    fontWeight: '600',
-  },
-  orderTotal: {
-    fontSize: 14,
-    color: '#666',
-    alignSelf: 'flex-end',
-  },
   totalAmount: {
+    fontSize: 18,
+    fontWeight: '700',
     color: '#333',
-    fontWeight: '600',
   },
   emptyState: {
     flex: 1,

@@ -397,7 +397,6 @@ const SellerDashboardScreen = () => {
       setLoading(true);
       const token = await AsyncStorage.getItem('userToken');
     
-      
       const response = await fetch(`${API_BASE_URL}/api/seller/profile`, {
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -413,20 +412,10 @@ const SellerDashboardScreen = () => {
       const data = await response.json();
       setProfileData(data);
     } catch (error) {
-      // console.error('Error fetching profile data:', error); 
-      // Use mock data as fallback
-      setProfileData({
-        name: 'John Seller',
-        email: 'john.seller@example.com',
-        phone: '+233 XX XXX XXXX',
-        bio: 'Passionate seller offering quality products to the campus community.',
-        location: 'Campus Area',
-        joinDate: 'May 2023',
-        totalSales: 152,
-        rating: 4.8,
-        avatar: null,
-        followers: 87,
-        isPremium: false
+      Alert.alert('Error', 'Failed to load your profile. Please log in again.');
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Login' }],
       });
     } finally {
       setLoading(false);
@@ -610,7 +599,7 @@ const SellerDashboardScreen = () => {
       
       // Send notification for new product (not for edits)
       if (!isEditing) {
-        // Get seller name from profile data
+        // Get seller name from profile data, fallback to 'A seller' if name is not available
         const sellerName = profileData.name || 'A seller';
         handleNewProductNotification(productData.name, sellerName);
 
@@ -1835,7 +1824,9 @@ const SellerDashboardScreen = () => {
           <View style={[styles.modalContent, { backgroundColor: theme.cardBackground }]}>
             <View style={styles.modalHeader}>
               <Text style={[styles.modalTitle, { color: theme.text }]}>
-                {isEditing ? 'Edit Product' : 'Add New Product'}
+                {isEditing 
+                  ? (productForm.isService ? 'Edit Service' : 'Edit Product')
+                  : (productForm.isService ? 'Add New Service' : 'Add New Product')}
               </Text>
               <TouchableOpacity onPress={() => setModalVisible(false)}>
                 <MaterialIcons name="close" size={24} color={theme.text} />
@@ -2087,7 +2078,9 @@ const SellerDashboardScreen = () => {
                 onPress={handleSaveProduct}
               >
                 <Text style={styles.saveButtonText}>
-                  {isEditing ? 'Update Product' : 'Create Product'}
+                  {isEditing 
+                    ? (productForm.isService ? 'Update Service' : 'Update Product')
+                    : (productForm.isService ? 'Create Service' : 'Create Product')}
                 </Text>
               </TouchableOpacity>
             </ScrollView>

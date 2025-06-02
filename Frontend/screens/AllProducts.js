@@ -21,7 +21,13 @@ const AllProducts = ({ navigation }) => {
       console.log('Fetching products from:', API_URL);
       const response = await axios.get(API_URL);
       console.log('API response:', response.data);
-      setProducts(response.data);
+      // Sort products by createdAt or approvedAt in descending order (newest first)
+      const sortedProducts = response.data.sort((a, b) => {
+        const dateA = new Date(a.approvedAt || a.createdAt);
+        const dateB = new Date(b.approvedAt || b.createdAt);
+        return dateB - dateA;
+      });
+      setProducts(sortedProducts);
       setLoading(false);
     } catch (err) {
       setError('Failed to fetch products');

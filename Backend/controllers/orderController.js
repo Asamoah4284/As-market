@@ -395,7 +395,7 @@ const getOrderById = asyncHandler(async (req, res) => {
 
     const order = await Order.findById(req.params.id)
       .populate('user', 'name email phone')
-      .populate('items.product', 'name image price sellerPrice seller');
+      .populate('items.product', 'name image price sellerPrice seller commission');
 
     if (!order) {
       console.log('Order not found');
@@ -495,9 +495,16 @@ const getAllOrders = asyncHandler(async (req, res) => {
   try {
     const orders = await Order.find({})
       .populate('user', 'id name email')
+      .populate('items.product', 'name image price sellerPrice seller commission')
       .sort({ createdAt: -1 });
 
-    res.json(orders);
+    // Transform orders to include seller price for admin
+    const transformedOrders = orders.map(order => {
+      const orderObj = order.toObject();
+      return orderObj;
+    });
+
+    res.json(transformedOrders);
   } catch (error) {
     console.error('Error fetching all orders:', error);
     res.status(500).json({ message: 'Error fetching orders' });
