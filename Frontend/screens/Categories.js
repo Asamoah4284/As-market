@@ -29,7 +29,7 @@ const Categories = () => {
   const { categoryId, categoryName } = route.params || {};
   const dispatch = useDispatch();
 
-  const API_URL = 'http://172.20.10.2:5000'; // Local development URL - CHANGE BACK FOR PRODUCTION!
+  const API_URL = 'https://unimarket-ikin.onrender.com'; // Local development URL - CHANGE BACK FOR PRODUCTION!
 
   
   const [products, setProducts] = useState([]);

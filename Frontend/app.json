@@ -9,7 +9,7 @@
     "splash": {
     
       "resizeMode": "contain",
-      "backgroundColor": "#FF4757"
+      "backgroundColor": "#d92131"
     },
     "updates": {
       "fallbackToCacheTimeout": 0
@@ -24,7 +24,7 @@
       "icon": "./assets/icon.png",
       "adaptiveIcon": {
         "foregroundImage": "./assets/icon.png",
-        "backgroundColor": "#FF4757"
+        "backgroundColor": "#d92131"
       },
       "package": "com.asarion.marketplace"
     },
