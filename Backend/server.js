@@ -41,24 +41,35 @@ app.use(helmet({
       frameSrc: ["'self'", "https://checkout.paystack.com"]
     }
   },
-  crossOriginEmbedderPolicy: false, // Required for Paystack integration
-  crossOriginResourcePolicy: { policy: "cross-origin" } // Required for image uploads
+  crossOriginEmbedderPolicy: false,
+  crossOriginResourcePolicy: { policy: "cross-origin" }
 }));
 
 // Apply rate limiting to all routes
 app.use(apiLimiter);
 
-// Enable CORS
+// Enable CORS – allow main frontend and admin frontend
+const allowedOrigins = [
+  process.env.FRONTEND_URL,
+  'http://localhost:3000',
+  'http://localhost:5173'
+].filter(Boolean);
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3000',
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+    return callback(new Error(`Not allowed by CORS: ${origin}`));
+  },
   credentials: true
 }));
 
 // Body parser
-app.use(express.json({limit: '50mb'}));
-app.use(express.urlencoded({limit: '50mb', extended: true}));
+app.use(express.json({ limit: '50mb' }));
+app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-// Basic Route for the root
+// Basic Route
 app.get('/', (req, res) => {
   res.send('Welcome to the backend API!');
 });
@@ -78,6 +89,7 @@ app.use('/api/store-promotions', promotionRoutes);
 app.use('/api/banners', bannerRoutes);
 app.use('/api/assistant', assistantRoutes);
 
+// Test route
 app.get('/api/test', async (req, res) => {
   try {
     const TestModel = mongoose.model('Test', new mongoose.Schema({ name: String }));
@@ -92,8 +104,8 @@ app.get('/api/test', async (req, res) => {
 app.use((err, req, res, next) => {
   console.error(err.stack);
   res.status(err.status || 500).json({
-    error: process.env.NODE_ENV === 'production' 
-      ? 'An error occurred' 
+    error: process.env.NODE_ENV === 'production'
+      ? 'An error occurred'
       : err.message
   });
 });
