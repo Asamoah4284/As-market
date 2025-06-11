@@ -52,7 +52,8 @@ app.use(apiLimiter);
 const allowedOrigins = [
   process.env.FRONTEND_URL,
   'http://localhost:3000',
-  'http://localhost:5173'
+  'http://localhost:5173',
+  'https://asarion-marketplace-dashboard.vercel.app/'
 ].filter(Boolean);
 
 app.use(cors({
