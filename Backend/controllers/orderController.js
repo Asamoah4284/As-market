@@ -4,6 +4,7 @@ const https = require('https');
 const asyncHandler = require('express-async-handler');
 const Product = require('../models/productModel');
 const User = require('../models/User');
+const { calculateDeliveryFee, calculateFinalTotal } = require('../utils/deliveryFee');
 
 // Paystack secret key
 const PAYSTACK_SECRET_KEY = process.env.PAYSTACK_SECRET_KEY;
@@ -187,6 +188,34 @@ const createOrder = asyncHandler(async (req, res) => {
     if (!items || items.length === 0) {
       console.error('No order items provided in request:', JSON.stringify(req.body, null, 2));
       return res.status(400).json({ message: 'No order items provided' });
+    }
+
+    // Calculate subtotal from items
+    const subtotal = items.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+    
+    // Validate that totalAmount includes correct delivery fee
+    const expectedTotal = calculateFinalTotal(subtotal);
+    const deliveryFee = calculateDeliveryFee(subtotal);
+    
+    console.log('Order validation:', {
+      subtotal,
+      deliveryFee,
+      expectedTotal,
+      providedTotal: totalAmount,
+      isCorrect: Math.abs(expectedTotal - totalAmount) < 0.01
+    });
+    
+    // Allow a small tolerance for floating point precision
+    if (Math.abs(expectedTotal - totalAmount) >= 0.01) {
+      console.error('Delivery fee validation failed:', {
+        subtotal,
+        expectedTotal,
+        providedTotal: totalAmount,
+        difference: expectedTotal - totalAmount
+      });
+      return res.status(400).json({ 
+        message: `Invalid total amount. Expected GH₵${expectedTotal.toFixed(2)} (subtotal: GH₵${subtotal.toFixed(2)} + delivery: GH₵${deliveryFee.toFixed(2)})` 
+      });
     }
 
     // Validate required shipping address

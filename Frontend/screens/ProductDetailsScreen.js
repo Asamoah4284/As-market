@@ -489,31 +489,8 @@ const ProductDetailsScreen = () => {
 
   // Add utility functions for delivery estimation
   const calculateDeliveryCost = (location) => {
-    // Simple example calculation - could be more complex with real data
-    // For this example, we'll use the distance from a fixed point (e.g., store location)
-    const storeLatitude = 5.6037; // Example store location in Ghana
-    const storeLongitude = -0.1870;
-    
-    // Calculate rough distance using Haversine formula
-    const distance = calculateDistance(
-      storeLatitude, 
-      storeLongitude,
-      location.coords.latitude,
-      location.coords.longitude
-    );
-    
-    // Base delivery fee GH₵5
-    let deliveryFee = 5;
-    
-    // Add GH₵1 for each additional km after first 2 km
-    if (distance > 2) {
-      deliveryFee += Math.ceil(distance - 2);
-    }
-    
-    // Cap the delivery fee at GH₵10
-    deliveryFee = Math.min(deliveryFee, 10);
-    
-    return deliveryFee.toFixed(2);
+    // Fixed delivery fee of GH₵5 for orders below GH₵200
+    return "5.00";
   };
   
   const estimateDeliveryTime = (location) => {
@@ -854,8 +831,8 @@ const ProductDetailsScreen = () => {
           <View style={styles.deliveryInfoContainer}>
             <Ionicons name="bicycle-outline" size={20} color="#5D3FD3" style={styles.deliveryIcon} />
             <Text style={styles.deliveryInfoText}>
-              <Text style={styles.deliveryHighlight}>Free Delivery</Text> for orders below GH₵50 {"\n"}
-              <Text style={styles.deliveryHighlight}>GH₵5 and above Delivery Fee</Text> for orders  above GH₵50 given your precise location
+              <Text style={styles.deliveryHighlight}>Free Delivery</Text> for orders above GH₵200 {"\n"}
+              <Text style={styles.deliveryHighlight}>GH₵5 Delivery Fee</Text> for orders below GH₵200 given your precise location
             </Text>
           </View>
 

@@ -227,57 +227,15 @@ const CartScreen = ({ navigation }) => {
   };
 
   const calculateDeliveryCost = (location) => {
-    // Simple example calculation - could be more complex with real data
-    // For this example, we'll use the distance from a fixed point (e.g., store location)
-    const storeLatitude = 5.6037; // Example store location in Ghana
-    const storeLongitude = -0.1870;
-    
-    // Calculate rough distance using Haversine formula
-    const distance = calculateDistance(
-      storeLatitude, 
-      storeLongitude,
-      location.coords.latitude,
-      location.coords.longitude
-    );
-    
-    // Base delivery fee GH₵5
-    let deliveryFee = 5;
-    
-    // Add GH₵1 for each additional km after first 2 km
-    if (distance > 2) {
-      deliveryFee += Math.ceil(distance - 2);
-    }
-    
-    // Cap the delivery fee at GH₵10
-    deliveryFee = Math.min(deliveryFee, 10);
-    
-    return deliveryFee.toFixed(2);
-  };
-
-  const deg2rad = (deg) => {
-    return deg * (Math.PI/180);
-  };
-  
-  const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371; // Radius of the earth in km
-    const dLat = deg2rad(lat2 - lat1);
-    const dLon = deg2rad(lon2 - lon1);
-    const a = 
-      Math.sin(dLat/2) * Math.sin(dLat/2) +
-      Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) * 
-      Math.sin(dLon/2) * Math.sin(dLon/2)
-    ; 
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)); 
-    const distance = R * c; // Distance in km
-    return distance;
+    // Fixed delivery fee of GH₵5 for orders below GH₵200
+    return "5.00";
   };
 
   const calculateFinalTotal = () => {
     const subtotal = calculateTotal();
-    // Add delivery fee if order is 50 or more
-    if (subtotal >= 50) {
-      const deliveryFee = userLocation ? parseFloat(calculateDeliveryCost(userLocation)) : 5;
-      return subtotal + deliveryFee;
+    // Add delivery fee if order is below 200
+    if (subtotal < 200) {
+      return subtotal + 5; // Fixed GH₵5 delivery fee
     }
     return subtotal;
   };
@@ -564,9 +522,9 @@ const CartScreen = ({ navigation }) => {
               <View style={styles.summaryRow}>
                 <Text style={styles.summaryText}>Delivery</Text>
                 <Text style={styles.deliveryFeeText}>
-                  {calculateTotal() < 50 ? 
+                  {calculateTotal() >= 200 ? 
                     "Free Delivery" : 
-                    `+ GH₵${userLocation ? calculateDeliveryCost(userLocation) : "5-10"} Delivery`
+                    "+ GH₵5.00 Delivery"
                   }
                 </Text>
               </View>

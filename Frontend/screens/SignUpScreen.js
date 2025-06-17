@@ -215,7 +215,7 @@ function SignUpScreen({ navigation }) {
                 <Ionicons name="mail-outline" size={20} color="#888" style={styles.inputIcon} />
                 <TextInput 
                   style={styles.textInput}
-                  placeholder="Enter your university email"
+                  placeholder="Enter your email"
                   placeholderTextColor="#999"
                   keyboardType="email-address"
                   autoCapitalize="none"

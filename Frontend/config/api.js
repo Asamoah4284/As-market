@@ -8,6 +8,8 @@ export const API_ENDPOINTS = {
   // Auth endpoints
   LOGIN: `${API_BASE_URL}/api/users/login`,
   REGISTER: `${API_BASE_URL}/api/users/register`,
+  FORGOT_PASSWORD: `${API_BASE_URL}/api/users/forgot-password`,
+  RESET_PASSWORD: `${API_BASE_URL}/api/users/reset-password`,
   
   // Order endpoints
   CREATE_ORDER: `${API_BASE_URL}/api/orders`,

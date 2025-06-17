@@ -1916,12 +1916,12 @@ const SellerDashboardScreen = () => {
                           <Picker
                             selectedValue={productForm.gender}
                             onValueChange={(value) => setProductForm({...productForm, gender: value})}
-                            style={{ color: theme.text }}
+                            style={{ color: '#000000' }}
                           >
-                            <Picker.Item label="Select Gender" value="" />
-                            <Picker.Item label="Men" value="men" />
-                            <Picker.Item label="Women" value="women" />
-                            <Picker.Item label="Unisex" value="unisex" />
+                            <Picker.Item label="Select Gender" value="" color="#000000" />
+                            <Picker.Item label="Men" value="men" color="#000000" />
+                            <Picker.Item label="Women" value="women" color="#000000" />
+                            <Picker.Item label="Unisex" value="unisex" color="#000000" />
                           </Picker>
                         </View>
                       </View>
@@ -2067,12 +2067,24 @@ const SellerDashboardScreen = () => {
               <TouchableOpacity 
                 style={[styles.saveButton, { backgroundColor: theme.primary }]}
                 onPress={handleSaveProduct}
+                disabled={loading}
               >
-                <Text style={styles.saveButtonText}>
-                  {isEditing 
-                    ? (productForm.isService ? 'Update Service' : 'Update Product')
-                    : (productForm.isService ? 'Create Service' : 'Create Product')}
-                </Text>
+                {loading ? (
+                  <View style={styles.saveButtonLoading}>
+                    <ActivityIndicator size="small" color="white" />
+                    <Text style={styles.saveButtonText}>
+                      {isEditing 
+                        ? (productForm.isService ? 'Updating Service...' : 'Updating Product...')
+                        : (productForm.isService ? 'Creating Service...' : 'Creating Product...')}
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={styles.saveButtonText}>
+                    {isEditing 
+                      ? (productForm.isService ? 'Update Service' : 'Update Product')
+                      : (productForm.isService ? 'Create Service' : 'Create Product')}
+                  </Text>
+                )}
               </TouchableOpacity>
             </ScrollView>
           </View>
@@ -3262,6 +3274,12 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     borderRadius: 16,
     opacity: 0.5,
+  },
+  saveButtonLoading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
   },
 });
 

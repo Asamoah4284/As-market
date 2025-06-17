@@ -84,10 +84,10 @@ const CategoryScreen = ({ route, navigation }) => {
         // Add service/product filter
         params.append('isService', services ? 'true' : 'false');
         
-        // Add any additional filters from the filter prop
+        // Add any additional filters from the filter prop (except searchTerm which we'll handle client-side)
         if (filter && Object.keys(filter).length > 0) {
           Object.entries(filter).forEach(([key, value]) => {
-            if (value && key !== 'categoryId' && key !== 'category') { // Skip already handled filters
+            if (value && key !== 'categoryId' && key !== 'category' && key !== 'searchTerm') {
               params.append(key, value);
             }
           });
@@ -103,8 +103,28 @@ const CategoryScreen = ({ route, navigation }) => {
           throw new Error(`Failed to fetch products. Status: ${response.status}`);
         }
         
-        const fetchedData = await response.json();
+        let fetchedData = await response.json();
         console.log('Fetched products:', fetchedData); // Debug log
+        
+        // Handle searchTerm filtering client-side
+        if (filter.searchTerm && filter.searchTerm.trim()) {
+          const searchTerm = filter.searchTerm.toLowerCase().trim();
+          fetchedData = fetchedData.filter(product => {
+            const productName = (product.name || '').toLowerCase();
+            const productDescription = (product.description || '').toLowerCase();
+            const productCategory = (product.category || '').toLowerCase();
+            const productSubcategory = (product.subcategory || '').toLowerCase();
+            const productMainCategory = (product.mainCategory || '').toLowerCase();
+            
+            return productName.includes(searchTerm) ||
+                   productDescription.includes(searchTerm) ||
+                   productCategory.includes(searchTerm) ||
+                   productSubcategory.includes(searchTerm) ||
+                   productMainCategory.includes(searchTerm);
+          });
+          
+          console.log(`Filtered ${fetchedData.length} products for search term: "${searchTerm}"`);
+        }
         
         if (isMounted) {
           setProducts(fetchedData);

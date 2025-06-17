@@ -308,7 +308,10 @@ function LoginScreen({ navigation, route }) {
               </View>
             ) : null}
             
-            <TouchableOpacity style={styles.forgotPasswordButton}>
+            <TouchableOpacity 
+              style={styles.forgotPasswordButton}
+              onPress={() => navigation.navigate('ForgotPassword')}
+            >
               <Text style={styles.forgotPasswordText}>Forgot Password?</Text>
             </TouchableOpacity>
             

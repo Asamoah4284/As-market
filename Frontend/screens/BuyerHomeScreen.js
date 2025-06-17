@@ -119,6 +119,7 @@ const BuyerHomeScreen = () => {
   const [isLoadingBrands, setIsLoadingBrands] = useState(true);
   const shimmerValue = useRef(new Animated.Value(0)).current;
   const [isSeller, setIsSeller] = useState(false);
+  const searchTimeoutRef = useRef(null);
   
   // Get cart items from Redux store
   const { items: cartItems } = useSelector(state => state.cart);
@@ -423,31 +424,83 @@ const BuyerHomeScreen = () => {
     }
 
     try {
-      const response = await fetch(`${API_BASE_URL}/api/assistant/search`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ prompt: query }),
-      });
-
-      const data = await response.json();
-      console.log('Search results:', data);
-
+      setIsSearching(true);
+      
+      // Fetch all products from backend
+      const response = await fetch(`${url}`);
+      
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to search products');
+        throw new Error('Failed to fetch products');
       }
 
+      const allProducts = await response.json();
+      
+      // Filter products by name (case-insensitive)
+      const filteredProducts = allProducts.filter(product => {
+        const productName = product.name ? product.name.toLowerCase() : '';
+        const productDescription = product.description ? product.description.toLowerCase() : '';
+        const productCategory = product.category ? product.category.toLowerCase() : '';
+        const productSubcategory = product.subcategory ? product.subcategory.toLowerCase() : '';
+        const searchTerm = query.toLowerCase();
+        
+        // Check if product name, description, category, or subcategory contains the search term
+        return productName.includes(searchTerm) || 
+               productDescription.includes(searchTerm) || 
+               productCategory.includes(searchTerm) ||
+               productSubcategory.includes(searchTerm);
+      });
+
+      console.log(`Found ${filteredProducts.length} products matching "${query}"`);
+      
       // Update the featured products with search results
-      setFeaturedProducts(data.products);
+      setFeaturedProducts(filteredProducts);
       
       // Optional: Text-to-speech feedback
-      Speech.speak(`Found ${data.products.length} matching products`);
+      if (filteredProducts.length > 0) {
+        Speech.speak(`Found ${filteredProducts.length} matching products`);
+      } else {
+        Speech.speak('No products found');
+      }
 
     } catch (err) {
       console.error('Search error:', err);
       Alert.alert('Search Error', 'Failed to search products. Please try again.');
+    } finally {
+      setIsSearching(false);
     }
+  };
+
+  const handleSearchTextChange = (text) => {
+    setSearchQuery(text);
+    
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    
+    // If text is empty, reset to original products
+    if (!text.trim()) {
+      // Fetch original products
+      const fetchOriginalProducts = async () => {
+        try {
+          const response = await fetch(`${url}`);
+          if (response.ok) {
+            const products = await response.json();
+            const nonServiceProducts = products.filter(product => product.isService !== true);
+            setFeaturedProducts(nonServiceProducts);
+          }
+        } catch (error) {
+          console.error('Error fetching original products:', error);
+        }
+      };
+      fetchOriginalProducts();
+      return;
+    }
+    
+    // Set a timeout to debounce the search
+    searchTimeoutRef.current = setTimeout(() => {
+      handleSearch(text);
+    }, 500); // Wait 500ms after user stops typing
   };
 
   const handleAddToCart = async (product) => {
@@ -849,9 +902,9 @@ const BuyerHomeScreen = () => {
           </View>
         ) : searchError ? (
           <Text style={styles.errorText}>{searchError}</Text>
-        ) : searchResults.length > 0 ? (
+        ) : featuredProducts.length > 0 ? (
           <FlatList
-            data={searchResults}
+            data={featuredProducts}
             renderItem={renderFeaturedProduct}
             keyExtractor={(item) => item._id}
             horizontal={false}
@@ -859,7 +912,11 @@ const BuyerHomeScreen = () => {
             contentContainerStyle={styles.searchResultsList}
           />
         ) : searchQuery.trim() ? (
-          <Text style={styles.noResultsText}>No products found</Text>
+          <View style={styles.noResultsContainer}>
+            <Ionicons name="search-outline" size={48} color="#ccc" />
+            <Text style={styles.noResultsText}>No products found for "{searchQuery}"</Text>
+            <Text style={styles.noResultsSubtext}>Try searching with different keywords</Text>
+          </View>
         ) : null}
       </View>
     );
@@ -1415,6 +1472,15 @@ const BuyerHomeScreen = () => {
     checkUserRole();
   }, []);
 
+  // Cleanup search timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, []);
+
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
@@ -1458,9 +1524,9 @@ const BuyerHomeScreen = () => {
           <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
-            placeholder="Try 'white shoes for men under GHS50'..."
+            placeholder="Search products by name..."
             value={searchQuery}
-            onChangeText={handleSearch}
+            onChangeText={handleSearchTextChange}
             onSubmitEditing={() => handleSearch(searchQuery)}
             returnKeyType="search"
             placeholderTextColor="#999"
@@ -1469,7 +1535,24 @@ const BuyerHomeScreen = () => {
             <TouchableOpacity 
               onPress={() => {
                 setSearchQuery('');
-                setFeaturedProducts([]); // Clear search results
+                // Clear timeout if exists
+                if (searchTimeoutRef.current) {
+                  clearTimeout(searchTimeoutRef.current);
+                }
+                // Fetch original products
+                const fetchOriginalProducts = async () => {
+                  try {
+                    const response = await fetch(`${url}`);
+                    if (response.ok) {
+                      const products = await response.json();
+                      const nonServiceProducts = products.filter(product => product.isService !== true);
+                      setFeaturedProducts(nonServiceProducts);
+                    }
+                  } catch (error) {
+                    console.error('Error fetching original products:', error);
+                  }
+                };
+                fetchOriginalProducts();
               }}
               style={styles.clearButton}
             >
@@ -1599,9 +1682,9 @@ const BuyerHomeScreen = () => {
                     onPress={() => navigation.navigate('CategoriesScreen', { 
                       categoryName: 'Women',
                       filter: {
-                        featuredType: 'women',
-                        category: 'CLOTHING_FASHION',
-                        gender: 'women'
+                        searchTerm: 'women',
+                        sortBy: 'views',
+                        sortOrder: 'desc'
                       }
                     })}
                   >
@@ -1619,9 +1702,9 @@ const BuyerHomeScreen = () => {
                     onPress={() => navigation.navigate('CategoriesScreen', { 
                       categoryName: 'Men',
                       filter: {
-                        featuredType: 'men',
-                        category: 'CLOTHING_FASHION',
-                        gender: 'men'
+                        searchTerm: 'men',
+                        sortBy: 'views',
+                        sortOrder: 'desc'
                       }
                     })}
                   >
@@ -1639,8 +1722,7 @@ const BuyerHomeScreen = () => {
                     onPress={() => navigation.navigate('CategoriesScreen', { 
                       categoryName: 'Asarion',
                       filter: {
-                        featuredType: 'featured',
-                        isVerified: true,
+                        searchTerm: 'asarion',
                         sortBy: 'views',
                         sortOrder: 'desc'
                       }
@@ -1663,8 +1745,6 @@ const BuyerHomeScreen = () => {
                     onPress={() => navigation.navigate('CategoriesScreen', { 
                       categoryName: 'Shoes',
                       filter: {
-                        category: 'CLOTHING_FASHION',
-                        subcategory: 'shoes',
                         searchTerm: 'shoes',
                         sortBy: 'views',
                         sortOrder: 'desc'
@@ -1685,13 +1765,9 @@ const BuyerHomeScreen = () => {
                     onPress={() => navigation.navigate('CategoriesScreen', { 
                       categoryName: 'Watches',
                       filter: {
-                        category: 'ELECTRONICS',
-                        subcategory: 'watches',
-                        $or: [
-                          { name: { $regex: 'watch', $options: 'i' } },
-                          { description: { $regex: 'watch', $options: 'i' } }
-                        ],
-                        sort: { views: -1 }
+                        searchTerm: 'watch',
+                        sortBy: 'views',
+                        sortOrder: 'desc'
                       }
                     })}
                   >
@@ -1709,8 +1785,6 @@ const BuyerHomeScreen = () => {
                     onPress={() => navigation.navigate('CategoriesScreen', { 
                       categoryName: 'Bags',
                       filter: {
-                        category: 'CLOTHING_FASHION',
-                        subcategory: 'bags',
                         searchTerm: 'bag',
                         sortBy: 'views',
                         sortOrder: 'desc'
@@ -1731,9 +1805,6 @@ const BuyerHomeScreen = () => {
                     onPress={() => navigation.navigate('CategoriesScreen', { 
                       categoryName: 'Crop Tops',
                       filter: {
-                        category: 'CLOTHING_FASHION',
-                        subcategory: 'tops',
-                        gender: 'women',
                         searchTerm: 'crop top',
                         sortBy: 'views',
                         sortOrder: 'desc'
@@ -1749,6 +1820,9 @@ const BuyerHomeScreen = () => {
                     </View>
                   </TouchableOpacity>
                 </View>
+
+              
+              
               </View>
             </View>
 
@@ -2727,6 +2801,19 @@ const styles = StyleSheet.create({
     color: '#666',
     fontSize: 16,
     marginTop: 40,
+  },
+  noResultsContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 40,
+    paddingHorizontal: 20,
+  },
+  noResultsSubtext: {
+    textAlign: 'center',
+    color: '#999',
+    fontSize: 14,
+    marginTop: 8,
   },
   errorText: {
     textAlign: 'center',

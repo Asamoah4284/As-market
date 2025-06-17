@@ -11,10 +11,13 @@ import * as Device from 'expo-device';
 import Constants from 'expo-constants';
 import { setPushToken, addNotification } from './store/slices/notificationSlice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Linking from 'expo-linking';
 // Import screens
 import WelcomeScreen from './screens/WelcomeScreen';
 import SignUpScreen from './screens/SignUpScreen';
 import LoginScreen from './screens/LoginScreen';
+import ForgotPasswordScreen from './screens/ForgotPasswordScreen';
+import ResetPasswordScreen from './screens/ResetPasswordScreen';
 import AIProductSearch from './screens/AIProductSearch';
 import BuyerHomeScreen from './screens/BuyerHomeScreen';
 import BuyerProfileScreen from './screens/BuyerprofileScreen';
@@ -26,7 +29,6 @@ import SellerDashboardScreen from './screens/SellerDashboardScreen';
 import SellerProfileScreen from './screens/SellerProfileScreen';
 import Admin from './screens/Admin';
 import CheckoutForm from './screens/CheckoutForm';
-
 
 import PaymentScreen from './screens/PaymentScreen';
 import PaymentSuccessScreen from './screens/PaymentSuccessScreen';
@@ -184,6 +186,27 @@ function AppContent() {
   const responseListener = useRef();
   const dispatch = useDispatch();
 
+  // Deep link handling
+  const handleDeepLink = (url) => {
+    console.log('Deep link received:', url);
+    
+    if (url) {
+      const parsedUrl = Linking.parse(url);
+      console.log('Parsed URL:', parsedUrl);
+      
+      if (parsedUrl.hostname === 'reset-password') {
+        const token = parsedUrl.queryParams?.token;
+        if (token) {
+          console.log('Navigating to ResetPassword with token:', token);
+          navigate('ResetPassword', { token });
+        } else {
+          console.log('No token found in reset password link');
+          Alert.alert('Invalid Link', 'The password reset link is invalid. Please request a new one.');
+        }
+      }
+    }
+  };
+
   useEffect(() => {
     // Check if onboarding is completed
     const checkInitialRoute = async () => {
@@ -200,6 +223,18 @@ function AppContent() {
     };
 
     checkInitialRoute();
+
+    // Handle initial deep link
+    Linking.getInitialURL().then((url) => {
+      if (url) {
+        handleDeepLink(url);
+      }
+    });
+
+    // Handle deep links when app is already running
+    const subscription = Linking.addEventListener('url', (event) => {
+      handleDeepLink(event.url);
+    });
 
     // Register for push notifications
     registerForPushNotificationsAsync()
@@ -270,6 +305,7 @@ function AppContent() {
     });
 
     return () => {
+      subscription?.remove();
       notificationListener.current &&
         Notifications.removeNotificationSubscription(notificationListener.current);
       responseListener.current &&
@@ -283,7 +319,17 @@ function AppContent() {
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer ref={navigationRef}>
+      <NavigationContainer 
+        ref={navigationRef}
+        linking={{
+          prefixes: ['asarion://'],
+          config: {
+            screens: {
+              ResetPassword: 'reset-password',
+            },
+          },
+        }}
+      >
         <Stack.Navigator 
           initialRouteName={initialRoute}
           screenOptions={{
@@ -343,12 +389,11 @@ function AppContent() {
           <Stack.Screen name="SellerProfile" component={SellerProfileScreen} />
           <Stack.Screen name="Payment" component={PaymentScreen} />
 
-
-
-          
           <Stack.Screen name="PromoteStore" component={PromoteStoreScreen} />
           <Stack.Screen name="PaymentSuccess" component={PaymentSuccessScreen} options={{ gestureEnabled: false }} />
           <Stack.Screen name="Favorites" component={FavoritesScreen} />
+          <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
+          <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
         </Stack.Navigator>
         <StatusBar style="auto" />
       </NavigationContainer>

@@ -18,7 +18,8 @@
       "**/*"
     ],
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.asarion.marketplace"
     },
     "android": {
       "icon": "./assets/icon.png",
@@ -26,12 +27,26 @@
         "foregroundImage": "./assets/icon.png",
         "backgroundColor": "#d92131"
       },
-      "package": "com.asarion.marketplace"
+      "package": "com.asarion.marketplace",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "asarion",
+              "host": "reset-password"
+            }
+          ],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"
     },
     "plugins": [],
+    "scheme": "asarion",
     "extra": {
       "eas": {
         "projectId": "987ca341-92d7-4d38-be41-f41cc65182c3"
