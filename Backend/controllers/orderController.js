@@ -332,12 +332,13 @@ const createOrder = asyncHandler(async (req, res) => {
       console.log('Order created successfully:', createdOrder._id);
       
       // Update stock for each product in the order
+      console.log('Starting stock update for order items:', items.length);
       for (const item of items) {
         try {
           // Log the entire item to see its structure
-          console.log('Processing order item:', item);
+          console.log('Processing order item:', JSON.stringify(item, null, 2));
           
-          // Get the product ID - handle both _id and productId cases
+          // Get the product ID - handle both productId (from cart) and _id cases
           const productId = item.productId || item._id;
           if (!productId) {
             console.error('No product ID found in item:', item);
@@ -351,6 +352,8 @@ const createOrder = asyncHandler(async (req, res) => {
             console.error(`Product ${productId} not found`);
             continue;
           }
+
+          console.log(`Found product: ${product.name}, current stock: ${product.stock}, isService: ${product.isService}`);
 
           // Only update stock if it's not a service
           if (!product.isService) {
@@ -377,6 +380,7 @@ const createOrder = asyncHandler(async (req, res) => {
             const newStock = currentStock - orderQuantity;
             product.stock = newStock;
             await product.save();
+            console.log(`Successfully updated stock for product ${product._id}: ${currentStock} -> ${newStock}`);
           } else {
             console.log(`Product ${product._id} is a service, skipping stock update`);
           }
@@ -386,6 +390,7 @@ const createOrder = asyncHandler(async (req, res) => {
           continue;
         }
       }
+      console.log('Completed stock update for all order items');
 
       // Clear user's cart
       try {

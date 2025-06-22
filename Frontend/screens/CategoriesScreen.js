@@ -159,6 +159,12 @@ const CategoryScreen = ({ route, navigation }) => {
       return;
     }
     
+    // Check if product has stock available
+    if (product.stock <= 0) {
+      Alert.alert('Out of Stock', 'This product is currently out of stock.');
+      return;
+    }
+    
     try {
       const token = await AsyncStorage.getItem('userToken');
       // Token is guaranteed to exist at this point because of requireAuthentication

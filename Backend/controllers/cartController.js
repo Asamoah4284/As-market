@@ -1,4 +1,5 @@
 const Cart = require('../models/cartModel');
+const Product = require('../models/productModel');
 
 const cartController = {
     // Add item to cart
@@ -13,10 +14,34 @@ const cartController = {
             const { productId, quantity } = req.body;
             const userId = req.user._id;
 
+            // First, check if the product exists and has sufficient stock
+            const product = await Product.findById(productId);
+            if (!product) {
+                return res.status(404).json({ 
+                    message: 'Product not found' 
+                });
+            }
+
+            // Check if requested quantity is available
+            if (product.stock < quantity) {
+                return res.status(400).json({ 
+                    message: `Only ${product.stock} units available in stock` 
+                });
+            }
+
+            // Check if product is already in cart
             let cartItem = await Cart.findOne({ user: userId, product: productId });
 
             if (cartItem) {
-                cartItem.quantity += quantity;
+                // Check if adding more quantity would exceed available stock
+                const newTotalQuantity = cartItem.quantity + quantity;
+                if (product.stock < newTotalQuantity) {
+                    return res.status(400).json({ 
+                        message: `Cannot add ${quantity} more units. Only ${product.stock - cartItem.quantity} additional units available` 
+                    });
+                }
+                
+                cartItem.quantity = newTotalQuantity;
                 await cartItem.save();
             } else {
                 cartItem = await Cart.create({
@@ -25,6 +50,10 @@ const cartController = {
                     user: userId
                 });
             }
+
+            // Note: Stock is NOT decreased here - it will be decreased when order is completed
+            // This prevents stock from being held indefinitely in carts
+            // Stock validation is still performed to ensure users can't add more than available
 
             await cartItem.populate('product');
             const transformedItem = {
@@ -98,11 +127,40 @@ const cartController = {
     updateCartItem: async (req, res) => {
         try {
             const { quantity } = req.body;
-            const cartItem = await Cart.findByIdAndUpdate(
-                req.params.id,
-                { quantity },
-                { new: true }
-            ).populate('product');
+            const cartItemId = req.params.id;
+            
+            // Find the cart item
+            const cartItem = await Cart.findById(cartItemId).populate('product');
+            if (!cartItem) {
+                return res.status(404).json({ 
+                    message: 'Cart item not found' 
+                });
+            }
+
+            // Check if user owns this cart item
+            if (cartItem.user.toString() !== req.user._id.toString()) {
+                return res.status(403).json({ 
+                    message: 'Not authorized to update this cart item' 
+                });
+            }
+
+            const product = await Product.findById(cartItem.product._id);
+            if (!product) {
+                return res.status(404).json({ 
+                    message: 'Product not found' 
+                });
+            }
+
+            // Check if new quantity exceeds available stock
+            if (product.stock < quantity) {
+                return res.status(400).json({ 
+                    message: `Only ${product.stock} units available in stock` 
+                });
+            }
+
+            // Update cart item quantity (stock is not modified here)
+            cartItem.quantity = quantity;
+            await cartItem.save();
 
             // Transform response
             const transformedItem = {
@@ -117,17 +175,46 @@ const cartController = {
 
             res.status(200).json(transformedItem);
         } catch (error) {
-            res.status(500).json({ message: error.message });
+            console.error('Update cart item error:', error);
+            res.status(500).json({ 
+                message: error.message || 'Error updating cart item',
+                details: error.toString()
+            });
         }
     },
 
     // Remove item from cart
     removeFromCart: async (req, res) => {
         try {
-            await Cart.findByIdAndDelete(req.params.id);
-            res.status(200).json({ message: 'Item removed from cart' });
+            const cartItemId = req.params.id;
+            
+            // Find the cart item to verify it exists
+            const cartItem = await Cart.findById(cartItemId);
+            if (!cartItem) {
+                return res.status(404).json({ 
+                    message: 'Cart item not found' 
+                });
+            }
+
+            // Check if user owns this cart item
+            if (cartItem.user.toString() !== req.user._id.toString()) {
+                return res.status(403).json({ 
+                    message: 'Not authorized to remove this cart item' 
+                });
+            }
+
+            // Remove the cart item (stock is not modified here)
+            await Cart.findByIdAndDelete(cartItemId);
+            
+            res.status(200).json({ 
+                message: 'Item removed from cart'
+            });
         } catch (error) {
-            res.status(500).json({ message: error.message });
+            console.error('Remove from cart error:', error);
+            res.status(500).json({ 
+                message: error.message || 'Error removing item from cart',
+                details: error.toString()
+            });
         }
     }
 };

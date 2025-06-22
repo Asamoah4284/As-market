@@ -18,6 +18,7 @@ import {
   Linking,
   Platform,
   Animated,
+  Share,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation, useRoute, useFocusEffect } from "@react-navigation/native";
@@ -41,6 +42,7 @@ const ProductDetailsScreen = () => {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const windowWidth = Dimensions.get("window").width;
   const flatListRef = React.useRef(null);
+  const [addingToCart, setAddingToCart] = useState(false);
 
   // Add new state for comments
   const [comments, setComments] = useState([]);
@@ -66,6 +68,11 @@ const ProductDetailsScreen = () => {
 
   // Add animation for pulsing location marker
   const [pulseAnim] = useState(new Animated.Value(0));
+
+  // Add slideshow state
+  const [isSlideshowActive, setIsSlideshowActive] = useState(true);
+  const [slideshowInterval, setSlideshowInterval] = useState(null);
+  const slideshowDuration = 3000; // 3 seconds per image
 
   // Add useFocusEffect to refresh product data when screen is focused
   useFocusEffect(
@@ -195,6 +202,35 @@ const ProductDetailsScreen = () => {
     }
   }, [currentProduct]);
 
+  // Add slideshow management effects
+  useEffect(() => {
+    // Start slideshow when product loads and has multiple images
+    if (currentProduct && currentProduct.additionalImages && currentProduct.additionalImages.length > 0) {
+      startSlideshow();
+    }
+
+    // Cleanup slideshow on unmount
+    return () => {
+      stopSlideshow();
+    };
+  }, [currentProduct]);
+
+  // Add effect to handle slideshow when user manually scrolls
+  useEffect(() => {
+    // Stop slideshow when user manually changes image
+    if (slideshowInterval) {
+      stopSlideshow();
+      // Restart after 3 seconds of inactivity
+      const restartTimer = setTimeout(() => {
+        if (currentProduct && currentProduct.additionalImages && currentProduct.additionalImages.length > 0) {
+          startSlideshow();
+        }
+      }, 3000);
+
+      return () => clearTimeout(restartTimer);
+    }
+  }, [activeImageIndex]);
+
   // Function to fetch similar products
   const fetchSimilarProducts = async () => {
     if (!currentProduct || !currentProduct.category) {
@@ -308,6 +344,16 @@ const ProductDetailsScreen = () => {
       return;
     }
 
+    // Check if requested quantity is available
+    if (currentProduct.stock < quantity) {
+      Alert.alert(
+        "Insufficient Stock", 
+        `Only ${currentProduct.stock} units available. Please reduce quantity.`
+      );
+      return;
+    }
+
+    setAddingToCart(true);
     try {
       const token = await AsyncStorage.getItem("userToken");
       
@@ -327,8 +373,13 @@ const ProductDetailsScreen = () => {
       });
 
       if (response.ok) {
+        const result = await response.json();
+        
         // Send notification
         await handleAddToCartNotification(currentProduct.name, dispatch);
+        
+        // Note: Stock is not decreased when adding to cart, only when order is completed
+        // So we don't need to refresh the product data here
         
         Alert.alert("Success", "Product added to cart successfully!", [
           { 
@@ -350,6 +401,8 @@ const ProductDetailsScreen = () => {
     } catch (err) {
       console.error("Error adding to cart:", err);
       Alert.alert("Error", "Something went wrong. Please try again.");
+    } finally {
+      setAddingToCart(false);
     }
   };
 
@@ -360,13 +413,72 @@ const ProductDetailsScreen = () => {
   };
 
   const increaseQuantity = () => {
-    setQuantity(quantity + 1);
+    if (currentProduct && currentProduct.stock && quantity < currentProduct.stock) {
+      setQuantity(quantity + 1);
+    } else {
+      Alert.alert("Stock Limit", `Only ${currentProduct?.stock || 0} units available.`);
+    }
   };
 
   // Add this function to handle image press
   const handleImagePress = (index) => {
     setActiveImageIndex(index);
     setIsFullscreen(true);
+  };
+
+  // Add slideshow control functions
+  const startSlideshow = () => {
+    if (!currentProduct?.additionalImages || currentProduct.additionalImages.length === 0) {
+      return; // No additional images to slideshow
+    }
+
+    const totalImages = [currentProduct.image, ...currentProduct.additionalImages].length;
+    
+    const interval = setInterval(() => {
+      setActiveImageIndex((prevIndex) => {
+        const nextIndex = (prevIndex + 1) % totalImages;
+        
+        // Scroll to the next image
+        flatListRef.current?.scrollToIndex({
+          index: nextIndex,
+          animated: true,
+        });
+        
+        return nextIndex;
+      });
+    }, slideshowDuration);
+
+    setSlideshowInterval(interval);
+    setIsSlideshowActive(true);
+  };
+
+  const stopSlideshow = () => {
+    if (slideshowInterval) {
+      clearInterval(slideshowInterval);
+      setSlideshowInterval(null);
+    }
+    setIsSlideshowActive(false);
+  };
+
+  const toggleSlideshow = () => {
+    if (isSlideshowActive) {
+      stopSlideshow();
+    } else {
+      startSlideshow();
+    }
+  };
+
+  const handleSlideshowTouch = () => {
+    // Pause slideshow when user touches the image
+    if (isSlideshowActive) {
+      stopSlideshow();
+      // Restart after 5 seconds of inactivity
+      setTimeout(() => {
+        if (!isSlideshowActive) {
+          startSlideshow();
+        }
+      }, 5000);
+    }
   };
 
   // Add function to handle contact seller
@@ -485,6 +597,48 @@ const ProductDetailsScreen = () => {
       });
     
     setContactModalVisible(false);
+  };
+
+  // Add function to share product
+  const handleShareProduct = async () => {
+    if (!currentProduct?._id) {
+      Alert.alert("Error", "Product information not available for sharing.");
+      return;
+    }
+
+    try {
+      // Create the deep link URL
+      const deepLinkUrl = `asarion://product?id=${currentProduct._id}`;
+      
+      // Create a fallback web URL (you can replace this with your actual website URL)
+      const webUrl = `https://your-website.com/product/${currentProduct._id}`;
+      
+      // Create the share message
+      const shareMessage = `Check out this amazing product: ${currentProduct.name}\n\nPrice: GH₵${currentProduct.price?.toFixed(2)}\n\n${deepLinkUrl}\n\nIf the link doesn't work, visit: ${webUrl}`;
+      
+      // Share the product
+      const result = await Share.share({
+        message: shareMessage,
+        title: currentProduct.name,
+        url: deepLinkUrl, // This will be used on platforms that support it
+      });
+      
+      if (result.action === Share.sharedAction) {
+        if (result.activityType) {
+          // Shared with activity type (e.g., WhatsApp, Facebook, etc.)
+          console.log('Shared with activity type:', result.activityType);
+        } else {
+          // Shared, but we don't know the activity type
+          console.log('Shared successfully');
+        }
+      } else if (result.action === Share.dismissedAction) {
+        // Dismissed
+        console.log('Share dismissed');
+      }
+    } catch (error) {
+      console.error('Error sharing product:', error);
+      Alert.alert("Error", "Failed to share product. Please try again.");
+    }
   };
 
   // Add utility functions for delivery estimation
@@ -678,9 +832,17 @@ const ProductDetailsScreen = () => {
           <Ionicons name="arrow-back" size={24} color="#333" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Product Details</Text>
-        <TouchableOpacity style={styles.favoriteButton}>
-          <Ionicons name="heart-outline" size={24} color="#333" />
-        </TouchableOpacity>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity 
+            style={styles.headerButton}
+            onPress={handleShareProduct}
+          >
+            <Ionicons name="share-outline" size={24} color="#333" />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.headerButton}>
+            <Ionicons name="heart-outline" size={24} color="#333" />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
@@ -688,6 +850,18 @@ const ProductDetailsScreen = () => {
         <View style={styles.imageContainer}>
           {currentProduct?.additionalImages && Array.isArray(currentProduct.additionalImages) && currentProduct.additionalImages.length > 0 ? (
             <>
+              {/* Slideshow Control Button */}
+              <TouchableOpacity 
+                style={styles.slideshowControlButton}
+                onPress={toggleSlideshow}
+              >
+                <Ionicons 
+                  name={isSlideshowActive ? "pause" : "play"} 
+                  size={20} 
+                  color="#fff" 
+                />
+              </TouchableOpacity>
+
               <FlatList
                 ref={flatListRef}
                 data={[currentProduct.image, ...currentProduct.additionalImages]}
@@ -703,10 +877,12 @@ const ProductDetailsScreen = () => {
                   }
                 }}
                 scrollEventThrottle={16}
+                onTouchStart={handleSlideshowTouch}
                 renderItem={({ item, index }) => (
                   <TouchableOpacity 
                     style={[styles.imageSlide, { width: windowWidth }]}
                     onPress={() => handleImagePress(index)}
+                    activeOpacity={0.9}
                   >
                     <Image
                       source={{ uri: item }}
@@ -743,6 +919,14 @@ const ProductDetailsScreen = () => {
                   ))}
                 </View>
               )}
+
+              {/* Slideshow Status Indicator */}
+              {isSlideshowActive && (
+                <View style={styles.slideshowIndicator}>
+                  <Ionicons name="play-circle" size={16} color="#fff" />
+                  <Text style={styles.slideshowIndicatorText}>Auto</Text>
+                </View>
+              )}
             </>
           ) : (
             // Fallback to single image
@@ -771,21 +955,21 @@ const ProductDetailsScreen = () => {
               <View style={styles.stockStatusIndicator}>
                 <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
                 <Text style={[styles.stockStatusText, styles.inStockText]}>
-                  In Stock
+                  In Stock ({currentProduct.stock} available)
                 </Text>
               </View>
             ) : currentProduct.stock > 0 ? (
               <View style={styles.stockStatusIndicator}>
                 <Ionicons name="alert-circle" size={16} color="#FFC107" />
                 <Text style={[styles.stockStatusText, styles.lowStockText]}>
-                   Low Stock
+                   Low Stock ({currentProduct.stock} remaining)
                 </Text>
               </View>
             ) : (
               <View style={styles.stockStatusIndicator}>
                 <Ionicons name="close-circle" size={16} color="#F44336" />
                 <Text style={[styles.stockStatusText, styles.outOfStockText]}>
-                   Out of Stock
+                   Out of Stock (0 available)
                 </Text>
               </View>
             )}
@@ -819,12 +1003,21 @@ const ProductDetailsScreen = () => {
           
           {/* Rating Stars Row */}
           <View style={styles.ratingStarsContainer}>
-            <Ionicons name="star" size={18} color="#FFD700" style={styles.starIcon} />
-            <Ionicons name="star" size={18} color="#FFD700" style={styles.starIcon} />
-            <Ionicons name="star" size={18} color="#FFD700" style={styles.starIcon} />
-            <Ionicons name="star-half" size={18} color="#FFD700" style={styles.starIcon} />
-            <Ionicons name="star-half" size={18} color="#FFD700" style={styles.starIcon} />
-            <Text style={styles.reviewsText}>Reviews</Text>
+            <View style={styles.ratingSection}>
+              <Ionicons name="star" size={18} color="#FFD700" style={styles.starIcon} />
+              <Ionicons name="star" size={18} color="#FFD700" style={styles.starIcon} />
+              <Ionicons name="star" size={18} color="#FFD700" style={styles.starIcon} />
+              <Ionicons name="star-half" size={18} color="#FFD700" style={styles.starIcon} />
+              <Ionicons name="star-half" size={18} color="#FFD700" style={styles.starIcon} />
+              <Text style={styles.reviewsText}>Reviews</Text>
+            </View>
+            <TouchableOpacity 
+              style={styles.shareButton}
+              onPress={handleShareProduct}
+            >
+              <Ionicons name="share-outline" size={20} color="#5D3FD3" />
+              <Text style={styles.shareButtonText}>Share</Text>
+            </TouchableOpacity>
           </View>
 
           {/* Delivery Information */}
@@ -856,6 +1049,17 @@ const ProductDetailsScreen = () => {
               <Text style={styles.specLabel}>Category</Text>
               <Text style={styles.specValue}>
                 {currentProduct.category || "Electronics"}
+              </Text>
+            </View>
+            <View style={styles.specItem}>
+              <Text style={styles.specLabel}>Stock Available</Text>
+              <Text style={[
+                styles.specValue,
+                currentProduct.stock > 5 ? styles.inStockText : 
+                currentProduct.stock > 0 ? styles.lowStockText : 
+                styles.outOfStockText
+              ]}>
+                {currentProduct.stock || 0} units
               </Text>
             </View>
             <View style={styles.specItem}>
@@ -1107,28 +1311,7 @@ const ProductDetailsScreen = () => {
             )}
           </View>
 
-          {/* Seller Info */}
-          <View style={styles.sellerContainer}>
-            <Text style={styles.sectionTitle}>Seller Information</Text>
-            <View style={styles.sellerInfo}>
-              <Ionicons name="person-circle-outline" size={40} color="#666" />
-              <View style={styles.sellerDetails}>
-                <Text style={styles.sellerName}>
-                  {currentProduct.seller?.name || "Marketplace Seller"}
-                </Text>
-                <Text style={styles.sellerRating}>
-                  <Ionicons name="star" size={14} color="#FFD700" />
-                  {currentProduct.seller?.rating || "4.8"} Seller Rating
-                </Text>
-              </View>
-              <TouchableOpacity 
-                style={styles.contactButton}
-                onPress={handleContactSeller}
-              >
-                <Text style={styles.contactButtonText}>Contact</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
+        
         </View>
 
         {/* Comments Section */}
@@ -1215,10 +1398,15 @@ const ProductDetailsScreen = () => {
           </Text>
         </View>
         <TouchableOpacity
-          style={styles.addToCartButton}
+          style={[styles.addToCartButton, addingToCart && styles.addToCartButtonDisabled]}
           onPress={handleAddToCart}
+          disabled={addingToCart}
         >
-          <Text style={styles.addToCartText}>Add to Cart</Text>
+          {addingToCart ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <Text style={styles.addToCartText}>Add to Cart</Text>
+          )}
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -1289,13 +1477,18 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#333",
   },
-  favoriteButton: {
+  headerButtons: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  headerButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
     backgroundColor: "#f0f0f0",
     justifyContent: "center",
     alignItems: "center",
+    marginLeft: 8,
   },
   container: {
     flex: 1,
@@ -1376,7 +1569,12 @@ const styles = StyleSheet.create({
   ratingStarsContainer: {
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "space-between",
     marginVertical: 5,
+  },
+  ratingSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   reviewsText: {
     fontSize: 14,
@@ -1532,6 +1730,9 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontWeight: "bold",
     marginLeft: 8,
+  },
+  addToCartButtonDisabled: {
+    backgroundColor: '#ccc',
   },
   commentsSection: {
     padding: 16,
@@ -2002,6 +2203,60 @@ const styles = StyleSheet.create({
   },
   commentsList: {
     marginBottom: 16,
+  },
+  slideshowControlButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 10,
+    width: 40,
+    height: 40,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  slideshowIndicator: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    zIndex: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  slideshowIndicatorText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+    marginLeft: 4,
+  },
+  ratingSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  shareButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  shareButtonText: {
+    fontSize: 14,
+    color: '#5D3FD3',
+    fontWeight: '500',
+    marginLeft: 4,
   },
 });
 

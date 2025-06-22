@@ -203,6 +203,15 @@ function AppContent() {
           console.log('No token found in reset password link');
           Alert.alert('Invalid Link', 'The password reset link is invalid. Please request a new one.');
         }
+      } else if (parsedUrl.hostname === 'product') {
+        const productId = parsedUrl.queryParams?.id;
+        if (productId) {
+          console.log('Navigating to ProductDetails with productId:', productId);
+          navigate('ProductDetails', { productId });
+        } else {
+          console.log('No product ID found in product link');
+          Alert.alert('Invalid Link', 'The product link is invalid.');
+        }
       }
     }
   };
@@ -326,6 +335,7 @@ function AppContent() {
           config: {
             screens: {
               ResetPassword: 'reset-password',
+              ProductDetails: 'product',
             },
           },
         }}

@@ -178,8 +178,16 @@ const CartScreen = ({ navigation }) => {
       }
     } catch (err) {
       console.error('Error updating quantity:', err);
+      
+      // Handle specific stock-related errors
+      if (err.response && err.response.status === 400) {
+        Alert.alert('Stock Limit', err.response.data.message || 'Insufficient stock available');
+      } else {
+        Alert.alert('Error', 'Failed to update quantity');
+      }
+      
+      // Revert optimistic update
       fetchCartItems();
-      Alert.alert('Error', 'Failed to update quantity');
     }
   };
 

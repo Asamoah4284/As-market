@@ -9,6 +9,8 @@ import {
   SafeAreaView,
   RefreshControl,
   Alert,
+  Linking,
+  Platform,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -16,7 +18,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 import { API_ENDPOINTS } from '../config/api';
 
-const BuyerProfileScreen = ({ navigation, route }) => {
+const BuyercdfileScreen = ({ navigation, route }) => {
   const [activeTab, setActiveTab] = useState(route.params?.initialTab || 'profile');
   const [userData, setUserData] = useState(null);
   const [orders, setOrders] = useState([]);
@@ -143,6 +145,62 @@ const BuyerProfileScreen = ({ navigation, route }) => {
     }
   };
 
+  const handleHelpAndSupport = () => {
+    const phoneNumber = "0542343069";
+    
+    // Format the number - ensure it has international format
+    let formattedPhone = phoneNumber.replace(/[^\d+]/g, "");
+    
+    // If number doesn't start with +, add Ghana's country code
+    if (!formattedPhone.startsWith('+')) {
+      // If it starts with 0, replace the 0 with +233
+      if (formattedPhone.startsWith('0')) {
+        formattedPhone = '+233' + formattedPhone.substring(1);
+      } else {
+        // Otherwise just add +233 prefix
+        formattedPhone = '+233' + formattedPhone;
+      }
+    }
+    
+    const message = "Hello! I need help and support with my Asarion Marketplace account.";
+    
+    // Try multiple WhatsApp URL formats for better compatibility
+    const whatsappUrl = `whatsapp://send?phone=${formattedPhone}&text=${encodeURIComponent(message)}`;
+    const whatsappUrlAlt = `https://wa.me/${formattedPhone}?text=${encodeURIComponent(message)}`;
+    
+    // First try the deep link format
+    Linking.canOpenURL(whatsappUrl)
+      .then(supported => {
+        if (supported) {
+          return Linking.openURL(whatsappUrl);
+        } else {
+          // If deep link doesn't work, try the web URL format
+          Linking.canOpenURL(whatsappUrlAlt)
+            .then(webSupported => {
+              if (webSupported) {
+                return Linking.openURL(whatsappUrlAlt);
+              } else {
+                Alert.alert(
+                  "WhatsApp Issue", 
+                  "Unable to open WhatsApp. Please make sure WhatsApp is installed correctly or try reinstalling the app.",
+                  [
+                    { 
+                      text: "Copy Number", 
+                      onPress: () => {
+                        Alert.alert("Phone number copied", `${formattedPhone}`);
+                      }
+                    },
+                    { text: "OK" }
+                  ]
+                );
+              }
+            })
+            .catch(err => console.error('Error opening WhatsApp web link:', err));
+        }
+      })
+      .catch(err => console.error('Error opening WhatsApp:', err));
+  };
+
   const getStatusColor = (status) => {
     switch (status?.toLowerCase()) {
       case 'pending':
@@ -221,7 +279,7 @@ const BuyerProfileScreen = ({ navigation, route }) => {
                 <Text style={styles.optionText}>Settings</Text>
               </TouchableOpacity>
 
-              <TouchableOpacity style={styles.profileOption}>
+              <TouchableOpacity style={styles.profileOption} onPress={handleHelpAndSupport}>
                 <Ionicons name="help-circle-outline" size={24} color="#666" />
                 <Text style={styles.optionText}>Help & Support</Text>
               </TouchableOpacity>
@@ -682,4 +740,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default BuyerProfileScreen;
+export default BuyercdfileScreen;

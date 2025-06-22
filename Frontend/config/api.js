@@ -2,7 +2,9 @@
 import Constants from 'expo-constants';
 
 // Get the API URL from app.json or use local development URL
-export const API_BASE_URL = Constants.expoConfig?.extra?.API_URL || 'http://172.20.10.2:5000';
+export const API_BASE_URL = Constants.expoConfig?.extra?.API_URL || 'https://unimarket-ikin.onrender.com';
+
+console.log('API_BASE_URL configured as:', API_BASE_URL);
 
 export const API_ENDPOINTS = {
   // Auth endpoints
@@ -19,7 +21,7 @@ export const API_ENDPOINTS = {
   // Product endpoints
   GET_PRODUCTS: `${API_BASE_URL}/api/products`,
   GET_PRODUCT: (id) => `${API_BASE_URL}/api/products/${id}`,
-  
+
   // Cart endpoints
   GET_CART: `${API_BASE_URL}/api/cart`,
   UPDATE_CART: `${API_BASE_URL}/api/cart`,

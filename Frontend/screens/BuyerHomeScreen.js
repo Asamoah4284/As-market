@@ -1,77 +1,60 @@
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
-  Text,
   StyleSheet,
   ScrollView,
-  TouchableOpacity,
-  Image,
-  TextInput,
-  FlatList,
   StatusBar,
   SafeAreaView,
   Modal,
   Dimensions,
   Platform,
   Alert,
-  PermissionsAndroid,
   ActivityIndicator,
   Animated,
+  RefreshControl,
+  FlatList,
+  TouchableOpacity,
+  Image,
+  Text,
 } from 'react-native';
-import { useState, useEffect, useRef } from 'react';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
-import * as Location from 'expo-location';
 import { useSelector, useDispatch } from 'react-redux';
 import NotificationCenter from '../components/NotificationCenter';
-import NotificationBadge from '../components/NotificationBadge';
-import { handleAddToCartNotification } from '../services/notificationService';
-import { requireAuthentication } from '../App'; // Import the authentication helper
+import { requireAuthentication } from '../utils/authUtils';
 import { API_BASE_URL } from '../config/api';
 import * as Speech from 'expo-speech';
-import { LinearGradient } from 'expo-linear-gradient';
 
-// Mock data - replace with actual API calls
-const FEATURED_PRODUCTS = [
-  {
-    _id: '1',
-    name: 'Premium Headphones',
-    price: 129.99,
-    image: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
-    rating: 4.8,
-  },
-  {
-    _id: '2',
-    name: 'Smart Watch',
-    price: 199.99,
-    image: 'https://images.unsplash.com/photo-1546868871-7041f2a55e12?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
-    rating: 4.5,
-  },
-  {
-    _id: '3',
-    name: 'Wireless Earbuds',
-    price: 89.99,
-    image: 'https://images.unsplash.com/photo-1606220588913-b3aacb4d2f46?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
-    rating: 4.7,
-  },
-  {
-    _id: '4',
-    name: 'Bluetooth Speaker',
-    price: 79.99,
-    image: 'https://images.unsplash.com/photo-1608043152269-423dbba4e7e1?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80',
-    rating: 4.6,
-  },
-];
+// Import extracted components
+import Header from '../components/Header';
+import SearchBar from '../components/SearchBar';
+import ProductCard from '../components/ProductCard';
+import BannerCarousel from '../components/BannerCarousel';
+import BottomNavigation from '../components/BottomNavigation';
+import ProductsSection from '../components/sections/ProductsSection';
+import CategoriesSection from '../components/sections/CategoriesSection';
 
-const CATEGORIES = [
-  { id: '1', name: 'Electronic', icon: 'devices', color: '#FF6B6B', categoryId: '1' },
-  { id: '2', name: 'Fashion', icon: 'checkroom', color: '#4ECDC4', categoryId: '2' },
-  { id: '3', name: 'Home', icon: 'home', color: '#FFD166', categoryId: '3' },
-  { id: '4', name: 'Beauty', icon: 'spa', color: '#FF9F9F', categoryId: '4' },
-  { id: '5', name: 'Sneakers', icon: 'sports-basketball', color: '#6A0572', categoryId: '5' },
-  { id: '6', name: 'Books', icon: 'menu-book', color: '#1A535C', categoryId: '6' },
-];
+// Import skeleton components
+import { 
+  ProductSkeleton, 
+  BannerSkeleton, 
+  CategorySkeleton, 
+  ServiceSkeleton, 
+  DealSkeleton, 
+  BrandSkeleton 
+} from '../components/SkeletonComponents';
 
+// Import custom hooks
+import { useLocation } from '../hooks/useLocation';
+import { useProducts } from '../hooks/useProducts';
+import { useFavorites } from '../hooks/useFavorites';
+import { useUser } from '../hooks/useUser';
+import { useBanners } from '../hooks/useBanners';
+
+// Import services
+import { productService } from '../services/productService';
+
+// Mock data
 const SPECIAL_OFFERS = [
   {
     id: '1',
@@ -87,132 +70,50 @@ const SPECIAL_OFFERS = [
   }
 ];
 
-let url = `${API_BASE_URL}/api/products`;
-
 const BuyerHomeScreen = () => {
+  const navigation = useNavigation();
+  const dispatch = useDispatch();
+  
+  // State
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState(null);
-  const [featuredProducts, setFeaturedProducts] = useState([]);
-  const [categories, setCategories] = useState(CATEGORIES);
-  const navigation = useNavigation();
-  const [userName, setUserName] = useState('User');
   const [fullScreenImage, setFullScreenImage] = useState(null);
-  const [services, setServices] = useState([]);
   const [specialOffers, setSpecialOffers] = useState(SPECIAL_OFFERS);
   const [activeOfferIndex, setActiveOfferIndex] = useState(0);
-  const specialOffersScrollViewRef = useRef(null);
-  const [location, setLocation] = useState('Loading location...');
-  const [locationPermission, setLocationPermission] = useState(false);
-  const [favorites, setFavorites] = useState([]);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [banners, setBanners] = useState([]);
-  const bannersScrollViewRef = useRef(null);
-  const [activeBannerIndex, setActiveBannerIndex] = useState(0);
-  const [isLoadingProducts, setIsLoadingProducts] = useState(true);
-  const [isLoadingBanners, setIsLoadingBanners] = useState(true);
-  const [isLoadingServices, setIsLoadingServices] = useState(true);
   const [isLoadingCategories, setIsLoadingCategories] = useState(true);
-  const [isLoadingNewArrivals, setIsLoadingNewArrivals] = useState(true);
   const [isLoadingDeals, setIsLoadingDeals] = useState(true);
   const [isLoadingBrands, setIsLoadingBrands] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const shimmerValue = useRef(new Animated.Value(0)).current;
-  const [isSeller, setIsSeller] = useState(false);
   const searchTimeoutRef = useRef(null);
   
   // Get cart items from Redux store
   const { items: cartItems } = useSelector(state => state.cart);
-  const dispatch = useDispatch();
 
-  // Location detection useEffect
-  useEffect(() => {
-    const getLocation = async () => {
-      try {
-        // Check if expo-location is available
-        if (!Location) {
-          console.log('Expo Location is not available');
-          setLocation('UCC, Capecoast'); // Fallback location
-          return;
-        }
-        
-        // Request location permission
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        
-        if (status !== 'granted') {
-          console.log('Location permission denied');
-          setLocation('University of Capecoast, UCC'); // Fallback location
-          setLocationPermission(false);
-          return;
-        }
-        
-        setLocationPermission(true);
-        
-        // Get current position
-        const position = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.High, // Changed to High accuracy
-        });
-        
-        if (position) {
-          const { latitude, longitude } = position.coords;
-          
-          // Reverse geocode to get the address
-          const geocode = await Location.reverseGeocodeAsync({
-            latitude,
-            longitude
-          });
-          
-          if (geocode && geocode.length > 0) {
-            const address = geocode[0];
-            // Build a more detailed location string
-            const locationParts = [];
-            
-            // Add street/landmark if available
-            if (address.street) {
-              locationParts.push(address.street);
-            }
-            
-            // Add sublocality (neighborhood/area) if available
-            if (address.district) {
-              locationParts.push(address.district);
-            }
-            
-            // Add city if available
-            if (address.city) {
-              locationParts.push(address.city);
-            }
-            
-            // Add region if available and different from city
-            if (address.region && address.region !== address.city) {
-              locationParts.push(address.region);
-            }
-            
-            // Add country if available
-            if (address.country) {
-              locationParts.push(address.country);
-            }
-            
-            // Join all parts with commas and remove any empty parts
-            const locationString = locationParts
-              .filter(part => part && part.trim() !== '')
-              .join(', ');
-            
-            console.log('Detailed location detected:', locationString);
-            setLocation(locationString || 'Location not available');
-          } else {
-            setLocation('Capecoast, Ghana');
-          }
-        }
-      } catch (error) {
-        console.error('Error getting location:', error);
-        setLocation('Location not available');
-      }
-    };
-    
-    getLocation();
-  }, []);
+  // Custom hooks
+  const { location } = useLocation();
+  const { 
+    featuredProducts, 
+    setFeaturedProducts, 
+    services, 
+    isLoadingProducts, 
+    isLoadingServices, 
+    isLoadingNewArrivals,
+    searchTimeoutRef: productsSearchTimeoutRef,
+    fetchProducts,
+    fetchServices,
+    handleSearch,
+    fetchOriginalProducts,
+    fetchProductsByCategory 
+  } = useProducts();
+  const { favorites, toggleFavorite, reloadFavorites } = useFavorites(navigation);
+  const { userName, isSeller, reloadUserData } = useUser();
+  const { banners, isLoadingBanners, reloadBanners } = useBanners();
 
-  // Add shimmer animation
+  // Shimmer animation
   useEffect(() => {
     const startShimmerAnimation = () => {
       Animated.loop(
@@ -234,135 +135,19 @@ const BuyerHomeScreen = () => {
     startShimmerAnimation();
   }, []);
 
-  // Modify the fetchProducts useEffect
-  useEffect(() => {
-    const fetchProducts = async () => {
-      setIsLoadingProducts(true);
-      setIsLoadingNewArrivals(true);
-      try {
-        const response = await fetch(`${url}`);
-        console.log('Products API Response Status:', response.status);
-        
-        if (response.ok) {
-          const products = await response.json();
-          console.log('Fetched products:', products);
-          const nonServiceProducts = products.filter(product => product.isService !== true);
-          setFeaturedProducts(nonServiceProducts);
-        } else {
-          console.log('Using mock data due to API failure');
-          setFeaturedProducts(FEATURED_PRODUCTS);
-        }
-      } catch (error) {
-        console.error('Error fetching products:', error);
-        console.log('Using mock data due to error');
-        setFeaturedProducts(FEATURED_PRODUCTS);
-      } finally {
-        // Simulate minimum loading time for better UX
-        setTimeout(() => {
-          setIsLoadingProducts(false);
-          setIsLoadingNewArrivals(false);
-        }, 1000);
-      }
-    };
-
-    fetchProducts();
-  }, []);
-
-  useEffect(() => {
-    const getUserData = async () => {
-      try {
-        const token = await AsyncStorage.getItem('userToken');
-        
-        if (token) {
-          console.log('Token found:', token.substring(0, 10) + '...');
-          
-          const response = await fetch(`${API_BASE_URL}/api/users/profile`, {
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json'
-            }
-          });
-
-          console.log('User data response status:', response.status);
-          
-          if (response.ok) {
-            const userData = await response.json();
-            console.log('User data received:', userData);
-            setUserName(userData.username || userData.name || userData.firstName || 'User');
-          } else {
-            const errorText = await response.text();
-            console.error('Failed to fetch user data. Status:', response.status, 'Error:', errorText);
-            setUserName('User');
-          }
-        } else {
-          console.log('No user token found');
-          setUserName('Guest');
-        }
-      } catch (error) {
-        console.error('Error fetching user data:', error.message);
-        setUserName('User');
-      }
-    };
-
-    getUserData();
-  }, []);
-
-  // Update the services useEffect
-  useEffect(() => {
-    const fetchServices = async () => {
-      setIsLoadingServices(true);
-      try {
-        const response = await fetch(`${url}`);
-        console.log('Products API Response Status:', response.status);
-        
-        if (response.ok) {
-          const products = await response.json();
-          const serviceProducts = products.filter(product => 
-            product.isService === true || product.featuredType === 'featured-service'
-          );
-          console.log('Filtered services:', serviceProducts);
-          setServices(serviceProducts);
-        } else {
-          console.log('Failed to fetch services');
-          setServices([]); // Set empty array if fetch fails
-        }
-      } catch (error) {
-        console.error('Error fetching services:', error);
-        setServices([]); // Set empty array on error
-      } finally {
-        setTimeout(() => {
-          setIsLoadingServices(false);
-        }, 1000);
-      }
-    };
-
-    fetchServices();
-  }, []);
-
-  // Add a useEffect for the auto-scrolling carousel functionality
+  // Auto-scroll special offers
   useEffect(() => {
     let interval;
     
-    // Start auto-scrolling when component mounts
     const startAutoScroll = () => {
       interval = setInterval(() => {
-        if (specialOffersScrollViewRef.current) {
-          const nextIndex = (activeOfferIndex + 1) % specialOffers.length;
-          const slideWidth = 280 + 15; // card width + margin
-          
-          specialOffersScrollViewRef.current.scrollTo({
-            x: nextIndex * slideWidth,
-            animated: true,
-          });
-          
-          setActiveOfferIndex(nextIndex);
-        }
-      }, 3000); // Auto-scroll every 3 seconds
+        const nextIndex = (activeOfferIndex + 1) % specialOffers.length;
+        setActiveOfferIndex(nextIndex);
+      }, 3000);
     };
     
     startAutoScroll();
     
-    // Clean up interval on component unmount
     return () => {
       if (interval) {
         clearInterval(interval);
@@ -370,106 +155,37 @@ const BuyerHomeScreen = () => {
     };
   }, [activeOfferIndex, specialOffers.length]);
 
-  // Add new useEffect to load favorites from AsyncStorage
+  // Loading states for static data
   useEffect(() => {
-    const loadFavorites = async () => {
-      try {
-        const storedFavorites = await AsyncStorage.getItem('favorites');
-        if (storedFavorites) {
-          setFavorites(JSON.parse(storedFavorites));
-          console.log('Loaded favorites from storage:', JSON.parse(storedFavorites));
-        }
-      } catch (error) {
-        console.error('Error loading favorites:', error);
-      }
-    };
+    // Simulate loading for categories
+    setIsLoadingCategories(true);
+    setTimeout(() => {
+      setIsLoadingCategories(false);
+    }, 1000);
 
-    loadFavorites();
+    // Simulate loading for deals
+    setIsLoadingDeals(true);
+    setTimeout(() => {
+      setIsLoadingDeals(false);
+    }, 1000);
+
+    // Simulate loading for brands
+    setIsLoadingBrands(true);
+    setTimeout(() => {
+      setIsLoadingBrands(false);
+    }, 1000);
   }, []);
 
-  // Function to toggle favorite status
-  const toggleFavorite = async (productId) => {
-    // Check if user is authenticated
-    if (!(await requireAuthentication(navigation, 'add to favorites'))) {
-      return;
-    }
-    
-    try {
-      let newFavorites;
-      if (favorites.includes(productId)) {
-        // Remove from favorites
-        newFavorites = favorites.filter(id => id !== productId);
-      } else {
-        // Add to favorites
-        newFavorites = [...favorites, productId];
+  // Cleanup search timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
       }
+    };
+  }, []);
 
-      // Update state
-      setFavorites(newFavorites);
-      
-      // Store in AsyncStorage
-      await AsyncStorage.setItem('favorites', JSON.stringify(newFavorites));
-      console.log('Favorites updated:', newFavorites);
-    } catch (error) {
-      console.error('Error updating favorites:', error);
-    }
-  };
-
-  const handleSearch = async (query) => {
-    setSearchQuery(query);
-    
-    // If query is empty, return early
-    if (!query.trim()) {
-      return;
-    }
-
-    try {
-      setIsSearching(true);
-      
-      // Fetch all products from backend
-      const response = await fetch(`${url}`);
-      
-      if (!response.ok) {
-        throw new Error('Failed to fetch products');
-      }
-
-      const allProducts = await response.json();
-      
-      // Filter products by name (case-insensitive)
-      const filteredProducts = allProducts.filter(product => {
-        const productName = product.name ? product.name.toLowerCase() : '';
-        const productDescription = product.description ? product.description.toLowerCase() : '';
-        const productCategory = product.category ? product.category.toLowerCase() : '';
-        const productSubcategory = product.subcategory ? product.subcategory.toLowerCase() : '';
-        const searchTerm = query.toLowerCase();
-        
-        // Check if product name, description, category, or subcategory contains the search term
-        return productName.includes(searchTerm) || 
-               productDescription.includes(searchTerm) || 
-               productCategory.includes(searchTerm) ||
-               productSubcategory.includes(searchTerm);
-      });
-
-      console.log(`Found ${filteredProducts.length} products matching "${query}"`);
-      
-      // Update the featured products with search results
-      setFeaturedProducts(filteredProducts);
-      
-      // Optional: Text-to-speech feedback
-      if (filteredProducts.length > 0) {
-        Speech.speak(`Found ${filteredProducts.length} matching products`);
-      } else {
-        Speech.speak('No products found');
-      }
-
-    } catch (err) {
-      console.error('Search error:', err);
-      Alert.alert('Search Error', 'Failed to search products. Please try again.');
-    } finally {
-      setIsSearching(false);
-    }
-  };
-
+  // Event handlers
   const handleSearchTextChange = (text) => {
     setSearchQuery(text);
     
@@ -480,19 +196,6 @@ const BuyerHomeScreen = () => {
     
     // If text is empty, reset to original products
     if (!text.trim()) {
-      // Fetch original products
-      const fetchOriginalProducts = async () => {
-        try {
-          const response = await fetch(`${url}`);
-          if (response.ok) {
-            const products = await response.json();
-            const nonServiceProducts = products.filter(product => product.isService !== true);
-            setFeaturedProducts(nonServiceProducts);
-          }
-        } catch (error) {
-          console.error('Error fetching original products:', error);
-        }
-      };
       fetchOriginalProducts();
       return;
     }
@@ -500,396 +203,119 @@ const BuyerHomeScreen = () => {
     // Set a timeout to debounce the search
     searchTimeoutRef.current = setTimeout(() => {
       handleSearch(text);
-    }, 500); // Wait 500ms after user stops typing
+    }, 500);
   };
 
-  const handleAddToCart = async (product) => {
-    // Check if user is authenticated
-    if (!(await requireAuthentication(navigation, 'add items to cart'))) {
-      return;
-    }
-    
+  const handleProductPress = async (product) => {
+    console.log('Navigating to product details with ID:', product._id);
     try {
-      const token = await AsyncStorage.getItem('userToken');
-      // Token is guaranteed to exist at this point because of requireAuthentication
+      // Increment views
+      const newViews = await productService.incrementViews(product._id);
       
-      // Make API call to add to cart
-      const response = await fetch(`${url}/api/cart/add`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          productId: product._id,
-          quantity: 1
-        })
-      });
-      
-      if (response.ok) {
-        // Send notification
-        await handleAddToCartNotification(product.name, dispatch);
-        Alert.alert('Success', 'Product added to cart');
-      } else {
-        const errorData = await response.json();
-        Alert.alert('Error', errorData.message || 'Failed to add product to cart');
+      if (newViews !== null) {
+        // Update the local state to reflect the new view count
+        setFeaturedProducts(prevProducts => 
+          prevProducts.map(p => 
+            p._id === product._id 
+              ? { ...p, views: newViews }
+              : p
+          )
+        );
       }
     } catch (error) {
-      console.error('Error adding to cart:', error);
-      Alert.alert('Error', 'Failed to add product to cart');
+      console.error('Error incrementing views:', error);
     }
+    
+    navigation.navigate('ProductDetails', { 
+      productId: product._id
+    });
   };
 
   const handleBookService = async (service) => {
-    // Check if user is authenticated
     if (!(await requireAuthentication(navigation, 'book a service'))) {
       return;
     }
     
-    // Navigate to service booking screen with service details
     navigation.navigate('ServiceBooking', {
       service: service
     });
   };
 
-  const renderFeaturedProduct = ({ item }) => {
-    const imageUri = item.image && (item.image.startsWith('http') 
-      ? item.image 
-      : `${API_BASE_URL}${item.image}`);
+  const handleAddToCart = async (product) => {
+    if (!(await requireAuthentication(navigation, 'add items to cart'))) {
+      return;
+    }
     
-    // Check if this product is in favorites
-    const isFavorite = favorites.includes(item._id);
-    
-    // Log product details for debugging
-    console.log('Product:', item.name);
-    console.log('Product ID:', item._id);
-    console.log('Stock:', item.countInStock);
-    console.log('Is New:', item.isNew);
-    console.log('Is Service:', item.isService);
-    console.log('Is Favorite:', isFavorite);
-
-    return (
-      <TouchableOpacity 
-        style={styles.productCard}
-        onPress={async () => {
-          console.log('Navigating to product details with ID:', item._id);
-          try {
-            // Get user token if available
-            const token = await AsyncStorage.getItem('userToken');
-            
-            // Increment views
-            const response = await fetch(`${API_BASE_URL}/api/products/${item._id}/views`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Accept': 'application/json',
-                ...(token && { 'Authorization': `Bearer ${token}` })
-              }
-            });
-
-            if (!response.ok) {
-              const errorText = await response.text();
-              console.error('View increment failed:', response.status, errorText);
-            } else {
-              const data = await response.json();
-              console.log('View response:', data.message, 'Current views:', data.views);
-              
-              // Update the local state to reflect the new view count
-              setFeaturedProducts(prevProducts => 
-                prevProducts.map(product => 
-                  product._id === item._id 
-                    ? { ...product, views: data.views }
-                    : product
-                )
-              );
-            }
-          } catch (error) {
-            console.error('Error incrementing views:', error);
-            // Don't show error to user since this is a background operation
-          }
-          
-          navigation.navigate('ProductDetails', { 
-            productId: item._id
-          });
-        }}
-      >
-        <View style={styles.productImageContainer}>
-          <Image 
-            source={{ uri: item.image }} 
-            style={styles.productImage}
-            onError={(error) => console.error('Image loading error:', error.nativeEvent.error)}
-            onLoad={() => console.log('Image loaded successfully:', imageUri)}
-          />
-          {/* Show New badge only for new products */}
-          {item.isNew === true && (
-            <View style={[styles.productBadge, { backgroundColor: '#FF6B6B' }]}>
-              <Text style={styles.productBadgeText}>New</Text>
-            </View>
-          )}
-          {/* Show Out of Stock badge only for non-service products with zero stock and not new */}
-          {!item.isNew && !item.isService && item.countInStock === 0 && (
-            <View style={[styles.productBadge, { backgroundColor: '#FF4757' }]}>
-              <Text style={styles.productBadgeText}>Out of Stock</Text>
-            </View>
-          )}
-          <TouchableOpacity 
-            style={styles.favoriteButton}
-            onPress={(e) => {
-              e.stopPropagation(); // Prevent triggering the parent onPress
-              toggleFavorite(item._id);
-            }}
-          >
-            <Ionicons 
-              name={isFavorite ? "heart" : "heart-outline"} 
-              size={20} 
-              color={isFavorite ? "#FFD700" : "#fff"} 
-            />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.productInfo}>
-          <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
-          <View style={styles.productDetails}>
-            <View style={styles.priceContainer}>
-              <Text style={styles.productPrice}>GH¢{item.price.toFixed(2)}</Text>
-              {item.originalPrice && (
-                <Text style={styles.originalPrice}>GH¢{item.originalPrice.toFixed(2)}</Text>
-              )}
-            </View>
-              {/* number of views */}
-            <View style={styles.viewsContainer}>
-              <Ionicons name="eye-outline" size={12} color="#666" />
-              <Text style={styles.viewsText}>{item.views || 0}</Text>
-            </View>
-          </View>
-          <View style={styles.productFooter}>
-            <View style={styles.sellerInfo}>
-              <Ionicons name="car-outline" size={12} color="#666" />
-              <Text style={styles.sellerText}>15% off delivery</Text>
-            </View>
-         
-          </View>
-        </View>
-      </TouchableOpacity>
-    );
+    await productService.addToCart(product, dispatch);
   };
 
-  // Update the fetchProductsByCategory function
-  const fetchProductsByCategory = async (categoryId, categoryName) => {
-    setIsLoadingProducts(true);
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    
     try {
-      // Fetch all products first
-      const response = await fetch(`${url}`);
-      console.log('Products API Response Status:', response.status);
-      
-      if (response.ok) {
-        const products = await response.json();
-        console.log('Fetched products:', products);
-        
-        // Filter products by category name (case-insensitive)
-        const filteredProducts = products.filter(product => {
-          // Check if product matches the category in any of these fields
-          const matchesCategory = 
-            (product.category && product.category.toLowerCase() === categoryName.toLowerCase()) ||
-            (product.mainCategory && product.mainCategory.toLowerCase() === categoryName.toLowerCase()) ||
-            (product.subcategory && product.subcategory.toLowerCase() === categoryName.toLowerCase());
-
-          // Only include non-service products
-          return matchesCategory && !product.isService;
-        });
-
-        console.log(`Found ${filteredProducts.length} products in category ${categoryName}`);
-        
-        if (filteredProducts.length === 0) {
-          Alert.alert(
-            'No Products Found',
-            `No products found in the ${categoryName} category.`,
-            [{ text: 'OK' }]
-          );
-        }
-
-        return filteredProducts;
-      } else {
-        console.log('Failed to fetch category products');
-        Alert.alert(
-          'Error',
-          'Failed to fetch products. Please try again.',
-          [{ text: 'OK' }]
-        );
-        return [];
-      }
-    } catch (error) {
-      console.error('Error fetching category products:', error);
-      Alert.alert(
-        'Error',
-        'An error occurred while fetching products. Please try again.',
-        [{ text: 'OK' }]
-      );
-      return [];
-    } finally {
-      setIsLoadingProducts(false);
-    }
-  };
-
-  // Update the renderCategory function to handle the category name properly
-  const renderCategory = ({ item }) => (
-    <TouchableOpacity 
-      style={styles.categoryCard}
-      onPress={async () => {
-        try {
-          // Show loading state
-          setIsLoadingProducts(true);
-          
-          // Navigate to Categories screen with both categoryId and categoryName
-          navigation.navigate('CategoriesScreen', { 
-            categoryId: item.categoryId,
-            categoryName: item.name,
-            filter: {
-              categoryId: item.categoryId,
-              category: item.name
-            }
-          });
-        } catch (error) {
-          console.error('Error handling category tap:', error);
-          Alert.alert('Error', 'Failed to load category products');
-        } finally {
-          setIsLoadingProducts(false);
-        }
-      }}
-    >
-      <View style={[styles.categoryIconContainer, { backgroundColor: `${item.color}20` }]}>
-        <MaterialIcons name={item.icon} size={28} color={item.color} />
-      </View>
-      <Text style={styles.categoryName}>{item.name}</Text>
-    </TouchableOpacity>
-  );
-
-  // Add new render function specifically for services
-  const renderService = ({ item }) => {
-    const imageUri = item.image && (item.image.startsWith('http') 
-      ? item.image 
-      : `${API_BASE_URL}${item.image}`);
-
-    // Check if this service is in favorites
-    const isFavorite = favorites.includes(item._id);
-
-    console.log('Service:', item.name);
-    console.log('Service ID:', item._id);
-    console.log('Original image path:', item.image);
-    console.log('Constructed image URI:', imageUri);
-    console.log('Is Favorite:', isFavorite);
-
-    return (
-      <TouchableOpacity 
-        style={styles.productCard}
-        onPress={() => {
-          console.log('Navigating to service details with ID:', item._id);
-          navigation.navigate('ServiceDetails', { 
-            serviceId: item._id
-          });
-        }}
-      >
-        <View style={styles.productImageContainer}>
-          <Image 
-            source={{ uri: item.image }} 
-            style={styles.productImage}
-            onError={(error) => console.error('Image loading error:', error.nativeEvent.error)}
-            onLoad={() => console.log('Image loaded successfully:', imageUri)}
-          />
-          <View style={[styles.productBadge, { backgroundColor: '#4ECDC4' }]}>
-            <Text style={styles.productBadgeText}>Service</Text>
-          </View>
-          <TouchableOpacity 
-            style={styles.favoriteButton}
-            onPress={(e) => {
-              e.stopPropagation(); // Prevent triggering the parent onPress
-              toggleFavorite(item._id);
-            }}
-          >
-            <Ionicons 
-              name={isFavorite ? "heart" : "heart-outline"} 
-              size={20} 
-              color={isFavorite ? "#FFD700" : "#fff"} 
-            />
-          </TouchableOpacity>
-        </View>
-        <View style={styles.productInfo}>
-          <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
-          <View style={styles.productDetails}>
-            <View style={styles.priceContainer}>
-              <Text style={styles.productPrice}>GHS{item.price.toFixed(2)}</Text>
-            </View>
-            {item.rating && (
-              <View style={styles.ratingContainer}>
-                <View style={styles.starsContainer}>
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <Ionicons 
-                      key={star} 
-                      name={star <= 4 ? "star" : "star-outline"} 
-                      size={14} 
-                      color="#FFD700" 
-                    />
-                  ))}
-                </View>
-              </View>
-            )}
-          </View>
-          <View style={styles.productFooter}>
-            <View style={styles.sellerInfo}>
-              <Ionicons name="time-outline" size={12} color="#666" />
-              <Text style={styles.sellerText}>Available Now</Text>
-            </View>
-            <TouchableOpacity 
-              style={styles.bookServiceButton}
-              onPress={() => handleBookService(item)}
-            >
-              <Ionicons name="calendar" size={20} color="#4ECDC4" />
-            </TouchableOpacity>
-          </View>
-        </View>
-      </TouchableOpacity>
-    );
-  };
-
-  // Modify the fetchBanners useEffect
-  useEffect(() => {
-    const fetchBanners = async () => {
+      // Reset all loading states
+      setIsLoadingProducts(true);
       setIsLoadingBanners(true);
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/banners`);
-        const data = await res.json();
-        setBanners(data);
-      } catch (e) {
-        setBanners([]);
-      } finally {
-        // Simulate minimum loading time for better UX
-        setTimeout(() => {
-          setIsLoadingBanners(false);
-        }, 1000);
-      }
-    };
-    fetchBanners();
-  }, []);
+      setIsLoadingServices(true);
+      setIsLoadingCategories(true);
+      setIsLoadingNewArrivals(true);
+      setIsLoadingDeals(true);
+      setIsLoadingBrands(true);
 
-  // Auto-scroll banners
-  useEffect(() => {
-    let interval;
-    if (banners.length > 1) {
-      interval = setInterval(() => {
-        if (bannersScrollViewRef.current) {
-          const nextIndex = (activeBannerIndex + 1) % banners.length;
-          const slideWidth = 280 + 15;
-          bannersScrollViewRef.current.scrollTo({
-            x: nextIndex * slideWidth,
-            animated: true,
-          });
-          setActiveBannerIndex(nextIndex);
-        }
-      }, 3000);
+      // Fetch all data
+      await Promise.all([
+        fetchProducts(),
+        fetchServices(),
+        reloadBanners(),
+        reloadUserData(),
+        reloadFavorites()
+      ]);
+
+      // Simulate minimum loading time for better UX
+      setTimeout(() => {
+        setIsLoadingProducts(false);
+        setIsLoadingBanners(false);
+        setIsLoadingServices(false);
+        setIsLoadingCategories(false);
+        setIsLoadingNewArrivals(false);
+        setIsLoadingDeals(false);
+        setIsLoadingBrands(false);
+        setRefreshing(false);
+        
+        Alert.alert('Success', 'Content refreshed successfully!', [{ text: 'OK' }]);
+      }, 1000);
+
+    } catch (error) {
+      console.error('Error during refresh:', error);
+      setTimeout(() => {
+        setIsLoadingProducts(false);
+        setIsLoadingBanners(false);
+        setIsLoadingServices(false);
+        setIsLoadingCategories(false);
+        setIsLoadingNewArrivals(false);
+        setIsLoadingDeals(false);
+        setIsLoadingBrands(false);
+        setRefreshing(false);
+      }, 1000);
     }
-    return () => interval && clearInterval(interval);
-  }, [activeBannerIndex, banners.length]);
+  };
 
-  // Add this after the search bar component
+  const handleNotificationPress = () => {
+    setShowNotifications(true);
+  };
+
+  const handleSellerDashboardPress = () => {
+    navigation.navigate('SellerDashboard');
+  };
+
+  const handleClearSearch = () => {
+    setSearchQuery('');
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+  };
+
+  // Render functions for sections
   const renderSearchResults = () => {
     if (!searchQuery.trim()) return null;
 
@@ -905,11 +331,29 @@ const BuyerHomeScreen = () => {
         ) : featuredProducts.length > 0 ? (
           <FlatList
             data={featuredProducts}
-            renderItem={renderFeaturedProduct}
+            renderItem={({ item }) => (
+              <ProductCard
+                item={item}
+                isFavorite={favorites.includes(item._id)}
+                onPress={() => handleProductPress(item)}
+                onToggleFavorite={toggleFavorite}
+                onBookService={handleBookService}
+              />
+            )}
             keyExtractor={(item) => item._id}
             horizontal={false}
             numColumns={2}
             contentContainerStyle={styles.searchResultsList}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                colors={['#5D3FD3']}
+                tintColor="#5D3FD3"
+                title="Pull to refresh"
+                titleColor="#5D3FD3"
+              />
+            }
           />
         ) : searchQuery.trim() ? (
           <View style={styles.noResultsContainer}>
@@ -922,418 +366,12 @@ const BuyerHomeScreen = () => {
     );
   };
 
-  // Add ProductSkeleton component
-  const ProductSkeleton = () => {
-    const translateX = shimmerValue.interpolate({
-      inputRange: [0, 1],
-      outputRange: [-100, 300],
-    });
-
-    return (
-      <View style={styles.productCard}>
-        <View style={styles.productImageContainer}>
-          <View style={styles.skeletonImage}>
-            <Animated.View
-              style={[
-                styles.shimmer,
-                {
-                  transform: [{ translateX }],
-                },
-              ]}
-            />
-          </View>
-        </View>
-        <View style={styles.productInfo}>
-          <View style={styles.skeletonTitle}>
-            <Animated.View
-              style={[
-                styles.shimmer,
-                {
-                  transform: [{ translateX }],
-                },
-              ]}
-            />
-          </View>
-          <View style={styles.skeletonPrice}>
-            <Animated.View
-              style={[
-                styles.shimmer,
-                {
-                  transform: [{ translateX }],
-                },
-              ]}
-            />
-          </View>
-        </View>
-      </View>
-    );
-  };
-
-  // Add BannerSkeleton component
-  const BannerSkeleton = () => {
-    const translateX = shimmerValue.interpolate({
-      inputRange: [0, 1],
-      outputRange: [-200, 400],
-    });
-
-    return (
-      <View style={styles.specialOfferCard}>
-        <View style={styles.skeletonBanner}>
-          <Animated.View
-            style={[
-              styles.shimmer,
-              {
-                transform: [{ translateX }],
-              },
-            ]}
-          />
-        </View>
-      </View>
-    );
-  };
-
-  // Add CategorySkeleton component
-  const CategorySkeleton = () => {
-    const translateX = shimmerValue.interpolate({
-      inputRange: [0, 1],
-      outputRange: [-100, 300],
-    });
-
-    return (
-      <View style={styles.categoryCard}>
-        <View style={[styles.categoryIconContainer, { backgroundColor: '#E1E9EE' }]}>
-          <Animated.View
-            style={[
-              styles.shimmer,
-              {
-                transform: [{ translateX }],
-              },
-            ]}
-          />
-        </View>
-        <View style={[styles.skeletonCategoryName, { backgroundColor: '#E1E9EE' }]}>
-          <Animated.View
-            style={[
-              styles.shimmer,
-              {
-                transform: [{ translateX }],
-              },
-            ]}
-          />
-        </View>
-      </View>
-    );
-  };
-
-  // Add ServiceSkeleton component
-  const ServiceSkeleton = () => {
-    const translateX = shimmerValue.interpolate({
-      inputRange: [0, 1],
-      outputRange: [-100, 300],
-    });
-
-    return (
-      <View style={styles.productCard}>
-        <View style={styles.skeletonImage}>
-          <Animated.View
-            style={[
-              styles.shimmer,
-              {
-                transform: [{ translateX }],
-              },
-            ]}
-          />
-        </View>
-        <View style={styles.productInfo}>
-          <View style={styles.skeletonTitle}>
-            <Animated.View
-              style={[
-                styles.shimmer,
-                {
-                  transform: [{ translateX }],
-                },
-              ]}
-            />
-          </View>
-          <View style={styles.skeletonPrice}>
-            <Animated.View
-              style={[
-                styles.shimmer,
-                {
-                  transform: [{ translateX }],
-                },
-              ]}
-            />
-          </View>
-        </View>
-      </View>
-    );
-  };
-
-  // Add DealSkeleton component
-  const DealSkeleton = () => {
-    const translateX = shimmerValue.interpolate({
-      inputRange: [0, 1],
-      outputRange: [-100, 300],
-    });
-
-    return (
-      <View style={styles.dealCard}>
-        <View style={styles.skeletonDealImage}>
-          <Animated.View
-            style={[
-              styles.shimmer,
-              {
-                transform: [{ translateX }],
-              },
-            ]}
-          />
-        </View>
-        <View style={styles.dealInfo}>
-          <View style={styles.skeletonDealTitle}>
-            <Animated.View
-              style={[
-                styles.shimmer,
-                {
-                  transform: [{ translateX }],
-                },
-              ]}
-            />
-          </View>
-          <View style={styles.skeletonDealDescription}>
-            <Animated.View
-              style={[
-                styles.shimmer,
-                {
-                  transform: [{ translateX }],
-                },
-              ]}
-            />
-          </View>
-        </View>
-      </View>
-    );
-  };
-
-  // Add BrandSkeleton component
-  const BrandSkeleton = () => {
-    const translateX = shimmerValue.interpolate({
-      inputRange: [0, 1],
-      outputRange: [-100, 300],
-    });
-
-    return (
-      <View style={styles.brandCircle}>
-        <View style={[styles.skeletonBrandLogo, { backgroundColor: '#E1E9EE' }]}>
-          <Animated.View
-            style={[
-              styles.shimmer,
-              {
-                transform: [{ translateX }],
-              },
-            ]}
-          />
-        </View>
-        <View style={[styles.skeletonBrandName, { backgroundColor: '#E1E9EE' }]}>
-          <Animated.View
-            style={[
-              styles.shimmer,
-              {
-                transform: [{ translateX }],
-              },
-            ]}
-          />
-        </View>
-      </View>
-    );
-  };
-
-  // Modify the banner section in render
-  const renderBannerSection = () => {
-    if (isLoadingBanners) {
-      return (
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          pagingEnabled
-        >
-          {[1, 2].map((_, index) => (
-            <BannerSkeleton key={index} />
-          ))}
-        </ScrollView>
-      );
-    }
-
-    return (
-      <ScrollView
-        ref={bannersScrollViewRef}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        pagingEnabled
-        onMomentumScrollEnd={(event) => {
-          const slideWidth = 280 + 15;
-          const offsetX = event.nativeEvent.contentOffset.x;
-          const activeIndex = Math.round(offsetX / slideWidth);
-          setActiveBannerIndex(activeIndex);
-        }}
-      >
-        {banners.map((banner) => (
-          <TouchableOpacity
-            key={banner._id}
-            style={styles.specialOfferCard}
-            onPress={() => {
-              if (banner.linkType === 'seller') {
-                navigation.navigate('CategoriesScreen', { sellerId: banner.linkId });
-              } else if (banner.linkType === 'product') {
-                navigation.navigate('ProductDetails', { productId: banner.linkId });
-              }
-            }}
-          >
-            <Image source={{ uri: banner.image }} style={styles.offerBackgroundImage} />
-            <View style={styles.offerContentWrapper}>
-              <View style={styles.offerContent}>
-                <Text style={styles.offerHeading}>{banner.title}</Text>
-                <Text style={styles.offerDetails}>{banner.description}</Text>
-                {banner.buttonText ? (
-                  <TouchableOpacity style={styles.offerButton}>
-                    <Text style={styles.offerButtonText}>{banner.buttonText}</Text>
-                  </TouchableOpacity>
-                ) : null}
-              </View>
-            </View>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-    );
-  };
-
-  // Modify the products section in render to include loading state
-  const renderProductsSection = () => {
-    if (isLoadingProducts) {
-      return (
-        <FlatList
-          data={[1, 2, 3, 4]}
-          renderItem={() => <ProductSkeleton />}
-          keyExtractor={(item) => item.toString()}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.productsList}
-        />
-      );
-    }
-
-    return (
-      <FlatList
-        data={featuredProducts}
-        renderItem={renderFeaturedProduct}
-        keyExtractor={(item) => item._id.toString()}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.productsList}
-      />
-    );
-  };
-
-  // Add render functions for other sections with loading states
-  const renderCategoriesSection = () => {
-    if (isLoadingCategories) {
-      return (
-        <FlatList
-          data={[1, 2, 3, 4, 5]}
-          renderItem={() => <CategorySkeleton />}
-          keyExtractor={(item) => item.toString()}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesList}
-        />
-      );
-    }
-
-    return (
-      <FlatList
-        data={categories}
-        renderItem={renderCategory}
-        keyExtractor={(item) => item.id}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.categoriesList}
-      />
-    );
-  };
-
-  const renderServicesSection = () => {
-    if (isLoadingServices) {
-      return (
-        <FlatList
-          data={[1, 2, 3]}
-          renderItem={() => <ServiceSkeleton />}
-          keyExtractor={(item) => item.toString()}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.productsList}
-        />
-      );
-    }
-
-    return (
-      <FlatList
-        data={services}
-        renderItem={renderService}
-        keyExtractor={(item) => item._id.toString()}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.productsList}
-        ListEmptyComponent={() => (
-          <View style={styles.emptyStateContainer}>
-            <Text style={styles.emptyStateText}>No services available</Text>
-          </View>
-        )}
-      />
-    );
-  };
-
-  const renderNewArrivalsSection = () => {
-    if (isLoadingNewArrivals) {
-      return (
-        <FlatList
-          data={[1, 2, 3]}
-          renderItem={() => <ProductSkeleton />}
-          keyExtractor={(item) => item.toString()}
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.productsList}
-        />
-      );
-    }
-
-    // Sort products by createdAt date in descending order (newest first)
-    const sortedProducts = [...featuredProducts].sort((a, b) => {
-      const dateA = new Date(a.createdAt || 0);
-      const dateB = new Date(b.createdAt || 0);
-      return dateB - dateA;
-    });
-
-    // Take the first 3 products (newest)
-    const newestProducts = sortedProducts.slice(0, 3);
-
-    return (
-      <FlatList
-        data={newestProducts}
-        renderItem={renderFeaturedProduct}
-        keyExtractor={(item) => item._id.toString()}
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.productsList}
-      />
-    );
-  };
-
   const renderDealsSection = () => {
     if (isLoadingDeals) {
       return (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dealsContainer}>
           {[1, 2, 3].map((item) => (
-            <DealSkeleton key={item} />
+            <DealSkeleton key={item} shimmerValue={shimmerValue} />
           ))}
         </ScrollView>
       );
@@ -1394,7 +432,7 @@ const BuyerHomeScreen = () => {
       return (
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {[1, 2, 3, 4].map((item) => (
-            <BrandSkeleton key={item} />
+            <BrandSkeleton key={item} shimmerValue={shimmerValue} />
           ))}
         </ScrollView>
       );
@@ -1437,396 +475,362 @@ const BuyerHomeScreen = () => {
     );
   };
 
-  // Add loading states for static data
-  useEffect(() => {
-    // Simulate loading for categories
-    setIsLoadingCategories(true);
-    setTimeout(() => {
-      setCategories(CATEGORIES);
-      setIsLoadingCategories(false);
-    }, 1000);
+  const renderTrendingCategoriesGrid = () => (
+    <View style={[styles.sectionContainer, { marginBottom: 20 }]}>
+      <View style={styles.sectionHeader}>
+        <View style={styles.sectionTitleContainer}>
+          <View style={[styles.sectionTitleAccent, {backgroundColor: '#FFD166'}]}></View>
+          <Text style={styles.sectionTitle}>Trending Categories</Text>
+        </View>
+      </View>
+      <View style={styles.gridContainer}>
+        {/* First Row */}
+        <View style={styles.gridRow}>
+          <TouchableOpacity 
+            style={styles.gridItem}
+            onPress={() => navigation.navigate('CategoriesScreen', { 
+              categoryName: 'New Arrivals',
+              filter: {
+                sortBy: 'createdAt',
+                sortOrder: 'desc',
+                limit: 20
+              }
+            })}
+          >
+            <Image 
+              source={{ uri: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?ixlib=rb-4.0.3' }} 
+              style={styles.gridImage}
+            />
+            <View style={styles.gridOverlay}>
+              <Text style={styles.gridTitle}>New</Text>
+            </View>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.gridItem}
+            onPress={() => navigation.navigate('CategoriesScreen', { 
+              categoryName: 'Women',
+              filter: {
+                searchTerm: 'women',
+                sortBy: 'views',
+                sortOrder: 'desc'
+              }
+            })}
+          >
+            <Image 
+              source={{ uri: 'https://images.unsplash.com/photo-1535043934128-cf0b28d52f95?ixlib=rb-4.0.3' }} 
+              style={styles.gridImage}
+            />
+            <View style={styles.gridOverlay}>
+              <Text style={styles.gridTitle}>Women</Text>
+            </View>
+          </TouchableOpacity>
 
-    // Simulate loading for deals
-    setIsLoadingDeals(true);
-    setTimeout(() => {
-      setIsLoadingDeals(false);
-    }, 1000);
+          <TouchableOpacity 
+            style={styles.gridItem}
+            onPress={() => navigation.navigate('CategoriesScreen', { 
+              categoryName: 'Men',
+              filter: {
+                searchTerm: 'men',
+                sortBy: 'views',
+                sortOrder: 'desc'
+              }
+            })}
+          >
+            <Image 
+              source={{ uri: 'https://images.unsplash.com/photo-1550246140-29f40b909e5a?ixlib=rb-4.0.3' }} 
+              style={styles.gridImage}
+            />
+            <View style={styles.gridOverlay}>
+              <Text style={styles.gridTitle}>Men</Text>
+            </View>
+          </TouchableOpacity>
 
-    // Simulate loading for brands
-    setIsLoadingBrands(true);
-    setTimeout(() => {
-      setIsLoadingBrands(false);
-    }, 1000);
-  }, []);
+          <TouchableOpacity 
+            style={styles.gridItem}
+            onPress={() => navigation.navigate('CategoriesScreen', { 
+              categoryName: 'Asarion',
+              filter: {
+                searchTerm: 'asarion',
+                sortBy: 'views',
+                sortOrder: 'desc'
+              }
+            })}
+          >
+            <Image 
+              source={require('../assets/images/Asarion2.png')} 
+              style={styles.gridImage}
+            />
+            <View style={styles.gridOverlay}>
+              <Text style={styles.gridTitle}>Market</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
 
-  // Add useEffect to check if user is a seller
-  useEffect(() => {
-    const checkUserRole = async () => {
-      try {
-        const userRole = await AsyncStorage.getItem('userRole');
-        setIsSeller(userRole === 'seller');
-      } catch (error) {
-        console.error('Error checking user role:', error);
-      }
-    };
-    checkUserRole();
-  }, []);
+        {/* Second Row */}
+        <View style={styles.gridRow}>
+          <TouchableOpacity 
+            style={styles.gridItem}
+            onPress={() => navigation.navigate('CategoriesScreen', { 
+              categoryName: 'Shoes',
+              filter: {
+                searchTerm: 'shoes',
+                sortBy: 'views',
+                sortOrder: 'desc'
+              }
+            })}
+          >
+            <Image 
+              source={{ uri: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?ixlib=rb-4.0.3' }} 
+              style={styles.gridImage}
+            />
+            <View style={styles.gridOverlay}>
+              <Text style={styles.gridTitle}>Shoes</Text>
+            </View>
+          </TouchableOpacity>
 
-  // Cleanup search timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (searchTimeoutRef.current) {
-        clearTimeout(searchTimeoutRef.current);
-      }
-    };
-  }, []);
+          <TouchableOpacity 
+            style={styles.gridItem}
+            onPress={() => navigation.navigate('CategoriesScreen', { 
+              categoryName: 'Watches',
+              filter: {
+                searchTerm: 'watch',
+                sortBy: 'views',
+                sortOrder: 'desc'
+              }
+            })}
+          >
+            <Image 
+              source={{ uri: 'https://images.unsplash.com/photo-1524592094714-0f0654e20314?ixlib=rb-4.0.3' }} 
+              style={styles.gridImage}
+            />
+            <View style={styles.gridOverlay}>
+              <Text style={styles.gridTitle}>Watches</Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.gridItem}
+            onPress={() => navigation.navigate('CategoriesScreen', { 
+              categoryName: 'Bags',
+              filter: {
+                searchTerm: 'bag',
+                sortBy: 'views',
+                sortOrder: 'desc'
+              }
+            })}
+          >
+            <Image 
+              source={{ uri: 'https://i.pinimg.com/474x/0b/8f/d9/0b8fd9d0b8f2006f2af7077c273a5375.jpg' }} 
+              style={styles.gridImage}
+            />
+            <View style={styles.gridOverlay}>
+              <Text style={styles.gridTitle}>Bags</Text>
+            </View>
+          </TouchableOpacity>
+
+          <TouchableOpacity 
+            style={styles.gridItem}
+            onPress={() => navigation.navigate('CategoriesScreen', { 
+              categoryName: 'Crop Tops',
+              filter: {
+                searchTerm: 'crop top',
+                sortBy: 'views',
+                sortOrder: 'desc'
+              }
+            })}
+          >
+            <Image 
+              source={{ uri: 'https://images.unsplash.com/photo-1583292650898-7d22cd27ca6f?ixlib=rb-4.0.3' }} 
+              style={styles.gridImage}
+            />
+            <View style={styles.gridOverlay}>
+              <Text style={styles.gridTitle}>Crop Tops</Text>
+            </View>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </View>
+  );
+
+  const renderRecommendedSection = () => {
+    // Sort products by createdAt date in descending order (newest first)
+    const sortedProducts = [...featuredProducts].sort((a, b) => {
+      const dateA = new Date(a.createdAt || 0);
+      const dateB = new Date(b.createdAt || 0);
+      return dateB - dateA;
+    });
+
+    return (
+      <View style={[styles.sectionContainer, { marginBottom: 20 }]}>
+        <View style={styles.sectionHeader}>
+          <View style={styles.sectionTitleContainer}>
+            <View style={[styles.sectionTitleAccent, {backgroundColor: '#FF6B6B'}]}></View>
+            <Text style={styles.sectionTitle}>Recommended for You</Text>
+          </View>
+          <TouchableOpacity 
+            style={styles.seeAllButton} 
+            onPress={() => navigation.navigate('CategoriesScreen', { recommended: true })}
+          >
+            <Text style={styles.seeAllText}>See All</Text>
+            <Ionicons name="chevron-forward" size={16} color="#5D3FD3" />
+          </TouchableOpacity>
+        </View>
+
+        {isLoadingProducts ? (
+          <View style={styles.recommendedGridContainer}>
+            <View style={styles.recommendedRow}>
+              {[1, 2].map((item) => (
+                <View key={item} style={styles.recommendedGridItem}>
+                  <ProductSkeleton shimmerValue={shimmerValue} />
+                </View>
+              ))}
+            </View>
+            <View style={styles.recommendedRow}>
+              {[3, 4].map((item) => (
+                <View key={item} style={styles.recommendedGridItem}>
+                  <ProductSkeleton shimmerValue={shimmerValue} />
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : (
+          <View style={styles.recommendedGridContainer}>
+            {Array.from({ length: Math.ceil(sortedProducts.length / 2) }).map((_, rowIndex) => (
+              <View key={rowIndex} style={styles.recommendedRow}>
+                {sortedProducts.slice(rowIndex * 2, rowIndex * 2 + 2).map((item) => (
+                  <TouchableOpacity 
+                    key={item._id}
+                    style={styles.recommendedGridItem}
+                    onPress={() => handleProductPress(item)}
+                  >
+                    <ProductCard
+                      item={item}
+                      isFavorite={favorites.includes(item._id)}
+                      onPress={() => handleProductPress(item)}
+                      onToggleFavorite={toggleFavorite}
+                      onBookService={handleBookService}
+                    />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ))}
+          </View>
+        )}
+      </View>
+    );
+  };
 
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
       <View style={styles.container}>
-        {/* Header with extra padding for Android */}
-        <View style={styles.header}>
-          <View style={styles.headerContent}>
-            <View style={styles.brandNameContainer}>
-              <Text style={[styles.greeting, {color: '#fff'}]}>Asarion</Text>
-              <Text style={[styles.greeting, {color: '#FF4757'}]}> Marketplace</Text>
-            </View>
-            <View style={styles.locationContainer}>
-              <Ionicons name="location-outline" size={14} color="#fff" />
-              <Text style={styles.locationText}>{location}</Text>
-              {location === 'Loading location...' ? (
-                <Ionicons name="sync" size={14} color="#fff" style={{marginLeft: 4, opacity: 0.8}} />
-              ) : null}
-            </View>
-          </View>
-          <View style={styles.headerIcons}>
-            {isSeller && (
-              <TouchableOpacity 
-                style={styles.headerButton}
-                onPress={() => navigation.navigate('SellerDashboard')}
-              >
-                <MaterialIcons name="dashboard" size={24} color="white" />
-              </TouchableOpacity>
-            )}
-            <TouchableOpacity 
-              style={styles.headerButton}
-              onPress={() => setShowNotifications(true)}
-            >
-              <NotificationBadge />
-              <Ionicons name="notifications-outline" size={24} color="white" />
-            </TouchableOpacity>
-          </View>
-        </View>
+        {/* Header */}
+        <Header
+          location={location}
+          refreshing={refreshing}
+          isSeller={isSeller}
+          onRefresh={handleRefresh}
+          onNotificationPress={handleNotificationPress}
+          onSellerDashboardPress={handleSellerDashboardPress}
+          navigation={navigation}
+        />
         
         {/* Search Bar */}
-        <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color="#999" style={styles.searchIcon} />
-          <TextInput
-            style={styles.searchInput}
-            placeholder="Search products by name..."
-            value={searchQuery}
-            onChangeText={handleSearchTextChange}
-            onSubmitEditing={() => handleSearch(searchQuery)}
-            returnKeyType="search"
-            placeholderTextColor="#999"
-          />
-          {searchQuery.length > 0 ? (
-            <TouchableOpacity 
-              onPress={() => {
-                setSearchQuery('');
-                // Clear timeout if exists
-                if (searchTimeoutRef.current) {
-                  clearTimeout(searchTimeoutRef.current);
-                }
-                // Fetch original products
-                const fetchOriginalProducts = async () => {
-                  try {
-                    const response = await fetch(`${url}`);
-                    if (response.ok) {
-                      const products = await response.json();
-                      const nonServiceProducts = products.filter(product => product.isService !== true);
-                      setFeaturedProducts(nonServiceProducts);
-                    }
-                  } catch (error) {
-                    console.error('Error fetching original products:', error);
-                  }
-                };
-                fetchOriginalProducts();
-              }}
-              style={styles.clearButton}
-            >
-              <Ionicons name="close-circle" size={20} color="#999" />
-            </TouchableOpacity>
-          ) : (
-            <TouchableOpacity style={styles.searchButton}>
-              <Ionicons name="mic" size={20} color="#fff" />
-            </TouchableOpacity>
-          )}
-        </View>
+        <SearchBar
+          searchQuery={searchQuery}
+          onSearchTextChange={handleSearchTextChange}
+          onSearchSubmit={handleSearch}
+          onClearSearch={handleClearSearch}
+          onFetchOriginalProducts={fetchOriginalProducts}
+        />
         
         {/* Conditional Rendering: Show either search results or regular content */}
         {searchQuery.trim() ? (
           renderSearchResults()
         ) : (
-          <ScrollView showsVerticalScrollIndicator={false} style={styles.scrollContent}>
+          <ScrollView 
+            showsVerticalScrollIndicator={false} 
+            style={styles.scrollContent}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                colors={['#5D3FD3']}
+                tintColor="#5D3FD3"
+                title="Pull to refresh"
+                titleColor="#5D3FD3"
+              />
+            }
+          >
             {/* Banner Carousel Section */}
             <View style={styles.specialOffersContainer}>
               <View style={styles.specialOffersHeader}>
                 <Text style={styles.specialOffersTitle}>#SpecialForYou</Text>
-                <TouchableOpacity>
-               
-                </TouchableOpacity>
               </View>
-              {renderBannerSection()}
+              <BannerCarousel
+                banners={banners}
+                isLoading={isLoadingBanners}
+                navigation={navigation}
+                BannerSkeleton={BannerSkeleton}
+              />
             </View>
             
             {/* Categories */}
-            <View style={styles.sectionContainer}>
-              <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Categories</Text>
-                <TouchableOpacity onPress={() => navigation.navigate('CategoriesScreen')}>
-                  <Text style={styles.seeAllText}>See All</Text>
-                </TouchableOpacity>
-              </View>
-              {renderCategoriesSection()}
-            </View>
+            <CategoriesSection
+              isLoading={isLoadingCategories}
+              navigation={navigation}
+            />
             
             {/* Featured Products */}
-            <View style={styles.sectionContainer}>
-              <View style={styles.sectionHeader}>
-                <View style={styles.sectionTitleContainer}>
-                  <View style={styles.sectionTitleAccent}></View>
-                  <Text style={styles.sectionTitle}>Featured Products</Text>
-                </View>
-                <TouchableOpacity 
-                  style={styles.seeAllButton} 
-                  onPress={() => navigation.navigate('CategoriesScreen', { featuredOnly: true })}
-                >
-                  <Text style={styles.seeAllText}>See All</Text>
-                  <Ionicons name="chevron-forward" size={16} color="#5D3FD3" />
-                </TouchableOpacity>
-              </View>
-              {renderProductsSection()}
-            </View>
+            <ProductsSection
+              title="Featured Products"
+              products={featuredProducts}
+              isLoading={isLoadingProducts}
+              navigation={navigation}
+              favorites={favorites}
+              onToggleFavorite={toggleFavorite}
+              onProductPress={handleProductPress}
+              onBookService={handleBookService}
+              accentColor="#5D3FD3"
+              seeAllParams={{ featuredOnly: true }}
+              shimmerValue={shimmerValue}
+            />
             
             {/* New Arrivals */}
-            <View style={[styles.sectionContainer, { marginBottom: 20 }]}>
-              <View style={styles.sectionHeader}>
-                <View style={styles.sectionTitleContainer}>
-                  <View style={[styles.sectionTitleAccent, {backgroundColor: '#5D3FD3'}]}></View>
-                  <Text style={styles.sectionTitle}>New Arrivals</Text>
-                </View>
-                <TouchableOpacity 
-                  style={styles.seeAllButton} 
-                  onPress={() => navigation.navigate('CategoriesScreen', { newArrivals: true })}
-                >
-                  <Text style={styles.seeAllText}>See All</Text>
-                  <Ionicons name="chevron-forward" size={16} color="#5D3FD3" />
-                </TouchableOpacity>
-              </View>
-              {renderNewArrivalsSection()}
-            </View>
+            <ProductsSection
+              title="New Arrivals"
+              products={featuredProducts.slice(0, 3)}
+              isLoading={isLoadingNewArrivals}
+              navigation={navigation}
+              favorites={favorites}
+              onToggleFavorite={toggleFavorite}
+              onProductPress={handleProductPress}
+              onBookService={handleBookService}
+              accentColor="#5D3FD3"
+              seeAllParams={{ newArrivals: true }}
+              shimmerValue={shimmerValue}
+            />
 
             {/* Services */}
-            <View style={[styles.sectionContainer, { marginBottom: 20 }]}>
-              <View style={styles.sectionHeader}>
-                <View style={styles.sectionTitleContainer}>
-                  <View style={[styles.sectionTitleAccent, {backgroundColor: '#4ECDC4'}]}></View>
-                  <Text style={styles.sectionTitle}>Services</Text>
-                </View>
-                <TouchableOpacity 
-                  style={styles.seeAllButton} 
-                  onPress={() => navigation.navigate('CategoriesScreen', { services: true })}
-                >
-                  <Text style={styles.seeAllText}>See All</Text>
-                  <Ionicons name="chevron-forward" size={16} color="#5D3FD3" />
-                </TouchableOpacity>
-              </View>
-              {renderServicesSection()}
-            </View>
+            <ProductsSection
+              title="Services"
+              products={services}
+              isLoading={isLoadingServices}
+              navigation={navigation}
+              favorites={favorites}
+              onToggleFavorite={toggleFavorite}
+              onProductPress={handleProductPress}
+              onBookService={handleBookService}
+              accentColor="#4ECDC4"
+              seeAllParams={{ services: true }}
+              shimmerValue={shimmerValue}
+            />
 
             {/* Trending Categories Grid */}
-            <View style={[styles.sectionContainer, { marginBottom: 20 }]}>
-              <View style={styles.sectionHeader}>
-                <View style={styles.sectionTitleContainer}>
-                  <View style={[styles.sectionTitleAccent, {backgroundColor: '#FFD166'}]}></View>
-                  <Text style={styles.sectionTitle}>Trending Categories</Text>
-                </View>
-              </View>
-              <View style={styles.gridContainer}>
-                {/* First Row */}
-                <View style={styles.gridRow}>
-                  <TouchableOpacity 
-                    style={styles.gridItem}
-                    onPress={() => navigation.navigate('CategoriesScreen', { 
-                      categoryName: 'New Arrivals',
-                      filter: {
-                        sortBy: 'createdAt',
-                        sortOrder: 'desc',
-                        limit: 20
-                      }
-                    })}
-                  >
-                    <Image 
-                      source={{ uri: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?ixlib=rb-4.0.3' }} 
-                      style={styles.gridImage}
-                    />
-                    <View style={styles.gridOverlay}>
-                      <Text style={styles.gridTitle}>New</Text>
-                    </View>
-                  </TouchableOpacity>
-                  
-                  <TouchableOpacity 
-                    style={styles.gridItem}
-                    onPress={() => navigation.navigate('CategoriesScreen', { 
-                      categoryName: 'Women',
-                      filter: {
-                        searchTerm: 'women',
-                        sortBy: 'views',
-                        sortOrder: 'desc'
-                      }
-                    })}
-                  >
-                    <Image 
-                      source={{ uri: 'https://images.unsplash.com/photo-1535043934128-cf0b28d52f95?ixlib=rb-4.0.3' }} 
-                      style={styles.gridImage}
-                    />
-                    <View style={styles.gridOverlay}>
-                      <Text style={styles.gridTitle}>Women</Text>
-                    </View>
-                  </TouchableOpacity>
+            {renderTrendingCategoriesGrid()}
 
-                  <TouchableOpacity 
-                    style={styles.gridItem}
-                    onPress={() => navigation.navigate('CategoriesScreen', { 
-                      categoryName: 'Men',
-                      filter: {
-                        searchTerm: 'men',
-                        sortBy: 'views',
-                        sortOrder: 'desc'
-                      }
-                    })}
-                  >
-                    <Image 
-                      source={{ uri: 'https://images.unsplash.com/photo-1550246140-29f40b909e5a?ixlib=rb-4.0.3' }} 
-                      style={styles.gridImage}
-                    />
-                    <View style={styles.gridOverlay}>
-                      <Text style={styles.gridTitle}>Men</Text>
-                    </View>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity 
-                    style={styles.gridItem}
-                    onPress={() => navigation.navigate('CategoriesScreen', { 
-                      categoryName: 'Asarion',
-                      filter: {
-                        searchTerm: 'asarion',
-                        sortBy: 'views',
-                        sortOrder: 'desc'
-                      }
-                    })}
-                  >
-                    <Image 
-                      source={require('../assets/images/Asarion2.png')} 
-                      style={styles.gridImage}
-                    />
-                    <View style={styles.gridOverlay}>
-                      <Text style={styles.gridTitle}>Asarion</Text>
-                    </View>
-                  </TouchableOpacity>
-                </View>
-
-                {/* Second Row */}
-                <View style={styles.gridRow}>
-                  <TouchableOpacity 
-                    style={styles.gridItem}
-                    onPress={() => navigation.navigate('CategoriesScreen', { 
-                      categoryName: 'Shoes',
-                      filter: {
-                        searchTerm: 'shoes',
-                        sortBy: 'views',
-                        sortOrder: 'desc'
-                      }
-                    })}
-                  >
-                    <Image 
-                      source={{ uri: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?ixlib=rb-4.0.3' }} 
-                      style={styles.gridImage}
-                    />
-                    <View style={styles.gridOverlay}>
-                      <Text style={styles.gridTitle}>Shoes</Text>
-                    </View>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity 
-                    style={styles.gridItem}
-                    onPress={() => navigation.navigate('CategoriesScreen', { 
-                      categoryName: 'Watches',
-                      filter: {
-                        searchTerm: 'watch',
-                        sortBy: 'views',
-                        sortOrder: 'desc'
-                      }
-                    })}
-                  >
-                    <Image 
-                      source={{ uri: 'https://images.unsplash.com/photo-1524592094714-0f0654e20314?ixlib=rb-4.0.3' }} 
-                      style={styles.gridImage}
-                    />
-                    <View style={styles.gridOverlay}>
-                      <Text style={styles.gridTitle}>Watches</Text>
-                    </View>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity 
-                    style={styles.gridItem}
-                    onPress={() => navigation.navigate('CategoriesScreen', { 
-                      categoryName: 'Bags',
-                      filter: {
-                        searchTerm: 'bag',
-                        sortBy: 'views',
-                        sortOrder: 'desc'
-                      }
-                    })}
-                  >
-                    <Image 
-                      source={{ uri: 'https://i.pinimg.com/474x/0b/8f/d9/0b8fd9d0b8f2006f2af7077c273a5375.jpg' }} 
-                      style={styles.gridImage}
-                    />
-                    <View style={styles.gridOverlay}>
-                      <Text style={styles.gridTitle}>Bags</Text>
-                    </View>
-                  </TouchableOpacity>
-
-                  <TouchableOpacity 
-                    style={styles.gridItem}
-                    onPress={() => navigation.navigate('CategoriesScreen', { 
-                      categoryName: 'Crop Tops',
-                      filter: {
-                        searchTerm: 'crop top',
-                        sortBy: 'views',
-                        sortOrder: 'desc'
-                      }
-                    })}
-                  >
-                    <Image 
-                      source={{ uri: 'https://images.unsplash.com/photo-1583292650898-7d22cd27ca6f?ixlib=rb-4.0.3' }} 
-                      style={styles.gridImage}
-                    />
-                    <View style={styles.gridOverlay}>
-                      <Text style={styles.gridTitle}>Crop Tops</Text>
-                    </View>
-                  </TouchableOpacity>
-                </View>
-
-              
-              
-              </View>
-            </View>
-
-            {/* After Trending Categories Grid, add: */}
+            {/* Special Offers & Deals */}
             <View style={[styles.sectionContainer, { marginBottom: 20 }]}>
               <View style={styles.sectionHeader}>
                 <View style={styles.sectionTitleContainer}>
@@ -1834,7 +838,6 @@ const BuyerHomeScreen = () => {
                   <Text style={styles.sectionTitle}>Special Offers & Deals</Text>
                 </View>
               </View>
-              
               {renderDealsSection()}
             </View>
 
@@ -1846,171 +849,23 @@ const BuyerHomeScreen = () => {
                   <Text style={styles.sectionTitle}>Featured Brands</Text>
                 </View>
               </View>
-
-              {/* Brand Logos */}
               <View style={styles.brandContainer}>
                 {renderBrandsSection()}
               </View>
             </View>
 
             {/* Recommended for You Section */}
-            <View style={[styles.sectionContainer, { marginBottom: 20 }]}>
-              <View style={styles.sectionHeader}>
-                <View style={styles.sectionTitleContainer}>
-                  <View style={[styles.sectionTitleAccent, {backgroundColor: '#FF6B6B'}]}></View>
-                  <Text style={styles.sectionTitle}>Recommended for You</Text>
-                </View>
-                <TouchableOpacity 
-                  style={styles.seeAllButton} 
-                  onPress={() => navigation.navigate('CategoriesScreen', { recommended: true })}
-                >
-                  <Text style={styles.seeAllText}>See All</Text>
-                  <Ionicons name="chevron-forward" size={16} color="#5D3FD3" />
-                </TouchableOpacity>
-              </View>
-
-              {isLoadingProducts ? (
-                <View style={styles.recommendedGridContainer}>
-                  <View style={styles.recommendedRow}>
-                    {[1, 2].map((item) => (
-                      <View key={item} style={styles.recommendedGridItem}>
-                        <ProductSkeleton />
-                      </View>
-                    ))}
-                  </View>
-                  <View style={styles.recommendedRow}>
-                    {[3, 4].map((item) => (
-                      <View key={item} style={styles.recommendedGridItem}>
-                        <ProductSkeleton />
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              ) : (
-                <View style={styles.recommendedGridContainer}>
-                  {Array.from({ length: Math.ceil(featuredProducts.length / 2) }).map((_, rowIndex) => (
-                    <View key={rowIndex} style={styles.recommendedRow}>
-                      {featuredProducts.slice(rowIndex * 2, rowIndex * 2 + 2).map((item) => (
-                        <TouchableOpacity 
-                          key={item._id}
-                          style={styles.recommendedGridItem}
-                          onPress={() => navigation.navigate('ProductDetails', { productId: item._id })}
-                        >
-                          <View style={styles.productCard}>
-                            <View style={styles.productImageContainer}>
-                              <Image 
-                                source={{ uri: item.image }} 
-                                style={styles.productImage}
-                              />
-                              {item.isNew && (
-                                <View style={[styles.productBadge, { backgroundColor: '#FF6B6B' }]}>
-                                  <Text style={styles.productBadgeText}>New</Text>
-                                </View>
-                              )}
-                              <TouchableOpacity 
-                                style={styles.favoriteButton}
-                                onPress={(e) => {
-                                  e.stopPropagation();
-                                  toggleFavorite(item._id);
-                                }}
-                              >
-                                <Ionicons 
-                                  name={favorites.includes(item._id) ? "heart" : "heart-outline"} 
-                                  size={20} 
-                                  color={favorites.includes(item._id) ? "#FFD700" : "#fff"} 
-                                />
-                              </TouchableOpacity>
-                            </View>
-                            <View style={styles.productInfo}>
-                              <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
-                              <View style={styles.productDetails}>
-                                <View style={styles.priceContainer}>
-                                  <Text style={styles.productPrice}>GH¢{item.price.toFixed(2)}</Text>
-                                  {item.originalPrice && (
-                                    <Text style={styles.originalPrice}>GH¢{item.originalPrice.toFixed(2)}</Text>
-                                  )}
-                                </View>
-                                <View style={styles.viewsContainer}>
-                                  <Ionicons name="eye-outline" size={12} color="#666" />
-                                  <Text style={styles.viewsText}>{item.views || 0}</Text>
-                                </View>
-                              </View>
-                              <View style={styles.productFooter}>
-                                <View style={styles.sellerInfo}>
-                                  <Ionicons name="car-outline" size={12} color="#666" />
-                                  <Text style={styles.sellerText}>15% off delivery</Text>
-                                </View>
-                               
-                              </View>
-                            </View>
-                          </View>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
-                  ))}
-                </View>
-              )}
-            </View>
+            {renderRecommendedSection()}
           </ScrollView>
         )}
 
         {/* Bottom Navigation */}
-        <View style={styles.bottomNavigation}>
-          <TouchableOpacity 
-            style={styles.navItem} 
-            onPress={() => navigation.navigate('BuyerHome')}
-          >
-            <Ionicons name="home" size={22} color="#5D3FD3" />
-            <Text style={[styles.navText, styles.activeNavText]}>Home</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.navItem} 
-            onPress={() => navigation.navigate('Categories')}
-          >
-            <Ionicons name="grid-outline" size={22} color="#999" />
-            <Text style={styles.navText}>Categories</Text>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.centerButton}
-            onPress={() => navigation.navigate('Cart')}
-          >
-            <View style={styles.centerButtonInner}>
-              <Ionicons name="cart" size={24} color="#fff" />
-              {cartItems && cartItems.length > 0 && (
-                <View style={styles.cartBadge}>
-                  <Text style={styles.cartBadgeText}>{cartItems.length}</Text>
-                </View>
-              )}
-            </View>
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.navItem} 
-            onPress={() => navigation.navigate('Favorites')}
-          >
-            <Ionicons 
-              name={favorites.length > 0 ? "heart" : "heart-outline"} 
-              size={22} 
-              color={favorites.length > 0 ? "#FF4757" : "#999"} 
-            />
-            <Text style={styles.navText}>Favorites</Text>
-            {favorites.length > 0 && (
-              <View style={styles.favoriteBadge}>
-                <Text style={styles.favoriteBadgeText}>{favorites.length}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.navItem} 
-            onPress={() => navigation.navigate('Profile')}
-          >
-            <Ionicons name="person-outline" size={22} color="#999" />
-            <Text style={styles.navText}>Profile</Text>
-          </TouchableOpacity>
-        </View>
+        <BottomNavigation
+          navigation={navigation}
+          cartItems={cartItems}
+          favorites={favorites}
+          currentScreen="BuyerHome"
+        />
         
         {/* Full Screen Image Modal */}
         <Modal
@@ -2048,81 +903,6 @@ const BuyerHomeScreen = () => {
 };
 
 const styles = StyleSheet.create({
-  // Skeleton styles
-  skeletonBanner: {
-    width: 280,
-    height: 160,
-    backgroundColor: '#E1E9EE',
-    borderRadius: 15,
-    overflow: 'hidden',
-  },
-  skeletonImage: {
-    width: '100%',
-    height: 100,
-    backgroundColor: '#E1E9EE',
-    overflow: 'hidden',
-  },
-  skeletonTitle: {
-    width: '80%',
-    height: 15,
-    backgroundColor: '#E1E9EE',
-    marginVertical: 5,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  skeletonPrice: {
-    width: '40%',
-    height: 15,
-    backgroundColor: '#E1E9EE',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  skeletonDealImage: {
-    width: '100%',
-    height: 100,
-    backgroundColor: '#E1E9EE',
-    overflow: 'hidden',
-  },
-  skeletonDealTitle: {
-    width: '80%',
-    height: 15,
-    backgroundColor: '#E1E9EE',
-    marginVertical: 5,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  skeletonDealDescription: {
-    width: '40%',
-    height: 15,
-    backgroundColor: '#E1E9EE',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  skeletonBrandLogo: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-  },
-  skeletonBrandName: {
-    width: 80,
-    height: 15,
-    backgroundColor: '#E1E9EE',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  skeletonCategoryName: {
-    width: 80,
-    height: 15,
-    backgroundColor: '#E1E9EE',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  shimmer: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#F8F8F8',
-    opacity: 0.5,
-  },
   safeArea: {
     flex: 1,
     backgroundColor: '#fff',
@@ -2132,85 +912,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#fff',
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: Platform.OS === 'android' ? 16 : 20,
-    paddingTop: Platform.OS === 'android' ? 20: 24,
-    backgroundColor: '#5D3FD3',
-    borderBottomLeftRadius: 0,
-    borderBottomRightRadius: 0,
-    height: Platform.OS === 'android' ? 100 : 100,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 3 },
-    shadowOpacity: 0.1,
-    shadowRadius: 5,
-    elevation: 5,
-  },
-  headerContent: {
+  scrollContent: {
     flex: 1,
-  },
-  greeting: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#fff', // Changed to white to show on red background
-  },
-  brandNameContainer: {
-    flexDirection: 'row',
-  },
-  subtitle: {
-    fontSize: 14,
-    color: '#fff', // Changed to white to show on red background
-    marginTop: 2,
-    opacity: 0.9,
-  },
-  notificationButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)', // Translucent white
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderRadius: 25,
-    marginHorizontal: 16,
-    marginTop: -20,
-    marginBottom: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-    zIndex: 2,
-  },
-  searchIcon: {
-    marginRight: 8,
-  },
-  searchInput: {
-    flex: 1,
-    height: 40,
-    fontSize: 16,
-    color: '#333',
-    paddingVertical: 8,
-  },
-  searchButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: '#5D3FD3',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginLeft: 8,
+    marginBottom: 60,
   },
   specialOffersContainer: {
     marginTop: 10,
@@ -2227,79 +931,6 @@ const styles = StyleSheet.create({
     fontWeight: 'bold',
     color: '#333',
   },
-  seeAllLink: {
-    fontSize: 14,
-    color: '#3498db',
-  },
-  specialOfferCard: {
-    width: 280,
-    height: 160,
-    borderRadius: 15,
-    marginRight: 15,
-    overflow: 'hidden',
-    position: 'relative',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-
-  },
-  offerBackgroundImage: {
-    position: 'absolute',
-    width: '100%',
-    height: '100%',
-    opacity: 0.85,
-  },
-  offerContentWrapper: {
-    flex: 1,
-    flexDirection: 'row',
-    padding: 15,
-    position: 'relative',
-    zIndex: 1,
-  },
-  offerImageContainer: {
-    width: 100,
-    height: 130,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  offerImage: {
-    width: 90,
-    height: 90,
-    borderRadius: 45,
-  },
-  offerContent: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  offerHeading: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
-  },
-  offerDiscount: {
-    fontSize: 28,
-    fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 5,
-  },
-  offerDetails: {
-    fontSize: 12,
-    color: '#666',
-    marginBottom: 12,
-  },
-  offerButton: {
-    backgroundColor: '#f9004d',
-    paddingHorizontal: 18,
-    paddingVertical: 8,
-    borderRadius: 25,
-    alignSelf: 'flex-start',
-  },
-  offerButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 12,
-  },
   sectionContainer: {
     marginTop: 16,
   },
@@ -2309,203 +940,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: 16,
     marginBottom: 12,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: '#333',
-  },
-  seeAllText: {
-    fontSize: 14,
-    color: '#3498db',
-    fontWeight: '500',
-  },
-  categoriesList: {
-    paddingHorizontal: 12,
-  },
-  categoryCard: {
-    alignItems: 'center',
-    marginHorizontal: 12,
-    width: 50,
-  },
-  categoryIconContainer: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#e6f2ff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  categoryName: {
-    fontSize: 10,
-    color: '#333',
-    textAlign: 'center',
-  },
-  productsList: {
-    paddingHorizontal: 12,
-  },
-  productCard: {
-    width: 180,
-    backgroundColor: '#fff',
-    marginHorizontal: 8,
-    overflow: 'hidden',
-   
-    marginBottom: 8,
-  },
-  productImageContainer: {
-    position: 'relative',
-    height: 100,
-  },
-  productImage: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#f0f0f0',
-    resizeMode: 'cover',
-  },
-  productBadge: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    backgroundColor: '#FF6B6B',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  productBadgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  favoriteButton: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  productInfo: {
-    padding: 12,
-  },
-  productName: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 6,
-  },
-  productDetails: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  priceContainer: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-  },
-  productPrice: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#3498db',
-  },
-  originalPrice: {
-    fontSize: 12,
-    color: '#999',
-    textDecorationLine: 'line-through',
-    marginLeft: 4,
-  },
-  ratingContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255, 215, 0, 0.1)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  starsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  ratingText: {
-    fontSize: 12,
-    color: '#666',
-    marginLeft: 2,
-    fontWeight: '500',
-  },
-  productFooter: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  sellerInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  sellerText: {
-    fontSize: 10,
-    color: '#666',
-    marginLeft: 2,
-  },
-  addToCartButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(52, 152, 219, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  bookServiceButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(78, 205, 196, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  scrollContent: {
-    flex: 1,
-    marginBottom: 60, // Add space for the bottom navigation
-  },
-  bottomNavigation: {
-    flexDirection: 'row',
-    height: 60,
-    backgroundColor: '#fff',
-    borderTopWidth: 1,
-    borderTopColor: '#e9e9e9',
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    paddingVertical: 8,
-    paddingHorizontal: 10,
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    zIndex: 999,
-  },
-  navItem: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative', // Add this to allow absolute positioning of badge
-  },
-  navText: {
-    fontSize: 10,
-    marginTop: 4,
-    color: '#999',
-  },
-  activeNavText: {
-    color: '#5D3FD3',
-    fontWeight: 'bold',
   },
   sectionTitleContainer: {
     flexDirection: 'row',
@@ -2518,6 +952,11 @@ const styles = StyleSheet.create({
     marginRight: 8,
     borderRadius: 2,
   },
+  sectionTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
   seeAllButton: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2526,21 +965,10 @@ const styles = StyleSheet.create({
     paddingVertical: 4,
     borderRadius: 16,
   },
-  fullScreenContainer: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.9)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  fullScreenImage: {
-    width: '100%',
-    height: '80%',
-  },
-  closeButton: {
-    position: 'absolute',
-    top: 40,
-    right: 20,
-    zIndex: 10,
+  seeAllText: {
+    fontSize: 14,
+    color: '#3498db',
+    fontWeight: '500',
   },
   gridContainer: {
     paddingHorizontal: 8,
@@ -2584,14 +1012,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: 'bold',
     textAlign: 'center',
-  },
-  emptyStateContainer: {
-    padding: 20,
-    alignItems: 'center',
-  },
-  emptyStateText: {
-    color: '#666',
-    fontSize: 14,
   },
   dealsContainer: {
     paddingHorizontal: 16,
@@ -2663,119 +1083,21 @@ const styles = StyleSheet.create({
     color: '#333',
     fontWeight: '500',
   },
-  collectionsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginTop: 16,
+  fullScreenContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.9)',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  collectionCard: {
-    width: (Dimensions.get('window').width - 48) / 2,
-    height: 150,
-    overflow: 'hidden',
-    position: 'relative',
-    shadowColor: '#000',
-  
-    elevation: 4,
-  },
-  collectionImage: {
+  fullScreenImage: {
     width: '100%',
-    height: '100%',
-    resizeMode: 'cover',
+    height: '80%',
   },
-  collectionOverlay: {
+  closeButton: {
     position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    padding: 16,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
-  },
-  collectionTitle: {
-    fontSize: 16,
-    fontWeight: 'bold',
-    color: '#fff',
-    marginBottom: 4,
-  },
-  collectionSubtitle: {
-    fontSize: 14,
-    color: 'rgba(255,255,255,0.8)',
-  },
-  serviceLabel: {
-    fontSize: 12,
-    color: '#666',
-    marginLeft: 2,
-  },
-  centerButton: {
-    top: -30,
-    width: 58,
-    height: 58,
-    borderRadius: 29,
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-  },
-  centerButtonInner: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: '#5D3FD3',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cartBadge: {
-    position: 'absolute',
-    top: -2,
-    right: -2,
-    backgroundColor: '#FF4757',
-    borderRadius: 10,
-    minWidth: 20,
-    height: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#fff',
-  },
-  cartBadgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 'bold',
-    paddingHorizontal: 3,
-  },
-  paginationDotsContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginTop: 12,
-  },
-  paginationDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#D9D9D9',
-    marginHorizontal: 4,
-  },
-  paginationDotActive: {
-    backgroundColor: '#5D3FD3',
-    width: 16,
-  },
-  locationContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 4,
-  },
-  locationText: {
-    fontSize: 14,
-    color: '#fff',
-    marginLeft: 4,
-    marginRight: 4,
-    opacity: 0.9,
+    top: 40,
+    right: 20,
+    zIndex: 10,
   },
   searchResultsContainer: {
     flex: 1,
@@ -2796,18 +1118,18 @@ const styles = StyleSheet.create({
     color: '#666',
     fontSize: 16,
   },
-  noResultsText: {
-    textAlign: 'center',
-    color: '#666',
-    fontSize: 16,
-    marginTop: 40,
-  },
   noResultsContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     paddingTop: 40,
     paddingHorizontal: 20,
+  },
+  noResultsText: {
+    textAlign: 'center',
+    color: '#666',
+    fontSize: 16,
+    marginTop: 40,
   },
   noResultsSubtext: {
     textAlign: 'center',
@@ -2822,149 +1144,17 @@ const styles = StyleSheet.create({
     marginTop: 40,
     paddingHorizontal: 20,
   },
-  skeletonImage: {
-    width: '100%',
-    height: 100,
-    backgroundColor: '#E1E9EE',
-    overflow: 'hidden',
-  },
-  skeletonTitle: {
-    width: '80%',
-    height: 15,
-    backgroundColor: '#E1E9EE',
-    marginVertical: 5,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  skeletonPrice: {
-    width: '40%',
-    height: 15,
-    backgroundColor: '#E1E9EE',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  skeletonBanner: {
-    width: 280,
-    height: 160,
-    backgroundColor: '#E1E9EE',
-    borderRadius: 15,
-    overflow: 'hidden',
-  },
-  shimmer: {
-    width: '100%',
-    height: '100%',
-    backgroundColor: '#F8F8F8',
-    opacity: 0.5,
-  },
-  skeletonDealImage: {
-    width: '100%',
-    height: 100,
-    backgroundColor: '#E1E9EE',
-    overflow: 'hidden',
-  },
-  skeletonDealTitle: {
-    width: '80%',
-    height: 15,
-    backgroundColor: '#E1E9EE',
-    marginVertical: 5,
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  skeletonDealDescription: {
-    width: '40%',
-    height: 15,
-    backgroundColor: '#E1E9EE',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  skeletonBrandLogo: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-  },
-  skeletonBrandName: {
-    width: 80,
-    height: 15,
-    backgroundColor: '#E1E9EE',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  skeletonCategoryName: {
-    width: 80,
-    height: 15,
-    backgroundColor: '#E1E9EE',
-    borderRadius: 4,
-    overflow: 'hidden',
-  },
-  viewsContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.05)',
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 10,
-  },
-  viewsText: {
-    fontSize: 10,
-    color: '#666',
-    marginLeft: 4,
-  },
   recommendedGridContainer: {
     paddingHorizontal: 8,
-    // paddingBottom: 8,
   },
   recommendedRow: {
     flexDirection: 'row',
     gap: 4,
     justifyContent: 'space-between',
     marginBottom: 8,
-  
   },
   recommendedGridItem: {
-    width: (Dimensions.get('window').width - 30) / 2, // Screen width minus padding and gap
-    
-  },
-  favoriteBadge: {
-    position: 'absolute',
-    top: 0,
-    right: '25%', // Adjust this value to position the badge
-    backgroundColor: '#FF4757',
-    borderRadius: 10,
-    minWidth: 18,
-    height: 18,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: '#fff',
-    zIndex: 1,
-  },
-  favoriteBadgeText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 'bold',
-    paddingHorizontal: 3,
-  },
-  locationRefreshText: {
-    color: '#fff',
-    fontSize: 12,
-    opacity: 0.8,
-    marginLeft: 4,
-  },
-  clearButton: {
-    padding: 4,
-  },
-  headerIcons: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  headerButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    width: (Dimensions.get('window').width - 30) / 2,
   },
 });
 
