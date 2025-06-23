@@ -12,12 +12,8 @@ const PaystackPayment = ({
   reference = Math.floor(Math.random() * 1000000000 + 1).toString(),
   publicKey = PAYSTACK_PUBLIC_KEY
 }) => {
-  // Convert amount to pesewas (multiply by 100)
-  const amountInPesewas = Math.round(amount * 100);
-
   console.log('PaystackPayment - Amount details:', {
     originalAmount: amount,
-    amountInPesewas,
     reference
   });
 
@@ -25,7 +21,7 @@ const PaystackPayment = ({
     <Modal visible={isVisible} animationType="slide">
       <Paystack
         paystackKey={publicKey}
-        amount={amountInPesewas}
+        amount={amount}
         billingEmail={email}
         activityIndicatorColor="green"
         onCancel={onCancel}
