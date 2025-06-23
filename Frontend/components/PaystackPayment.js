@@ -1,6 +1,7 @@
 import React from 'react';
 import { Modal } from 'react-native';
 import { Paystack } from 'react-native-paystack-webview';
+import { PAYSTACK_PUBLIC_KEY } from '../config/api';
 
 const PaystackPayment = ({ 
   isVisible, 
@@ -9,7 +10,7 @@ const PaystackPayment = ({
   onCancel, 
   onSuccess,
   reference = Math.floor(Math.random() * 1000000000 + 1).toString(),
-  publicKey = 'pk_test_adab0e58f74cc222a31e9e82a291ae8de3952848' // Replace with your Paystack PUBLIC key
+  publicKey = PAYSTACK_PUBLIC_KEY
 }) => {
   // Convert amount to pesewas (multiply by 100)
   const amountInPesewas = Math.round(amount * 100);
