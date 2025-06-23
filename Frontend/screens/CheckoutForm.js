@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -11,23 +11,34 @@ import {
   KeyboardAvoidingView,
   ActivityIndicator,
   Modal,
-  FlatList
+  FlatList,
+  SafeAreaView,
+  StatusBar,
+  Animated,
+  Dimensions
 } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
-import { MaterialIcons, Ionicons } from '@expo/vector-icons';
+import { MaterialIcons, Ionicons, FontAwesome5 } from '@expo/vector-icons';
 import { Picker } from '@react-native-picker/picker';
 import { BlurView } from 'expo-blur';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const { width } = Dimensions.get('window');
 
 const CheckoutForm = ({ navigation, route }) => {
+  const [currentStep, setCurrentStep] = useState(1);
   const [phone, setPhone] = useState('');
   const [alternativePhone, setAlternativePhone] = useState('');
   const [location, setLocation] = useState('');
   const [roomNumber, setRoomNumber] = useState('');
   const [additionalInfo, setAdditionalInfo] = useState('');
-  const [deliveryDate, setDeliveryDate] = useState(new Date(Date.now() + 24 * 60 * 60 * 1000)); // Default to tomorrow
+  const [deliveryDate, setDeliveryDate] = useState(new Date(Date.now() + 24 * 60 * 60 * 1000));
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [formErrors, setFormErrors] = useState({});
+  const [isLoadingSavedData, setIsLoadingSavedData] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Extract data from route params
   const { cartItems, totalAmount, isPayOnDelivery } = route.params || {};
@@ -38,16 +49,148 @@ const CheckoutForm = ({ navigation, route }) => {
     'ATL', 'OGUAA', 'KNH'
   ];
 
+  const steps = [
+    { id: 1, title: 'Contact', icon: 'person' },
+    { id: 2, title: 'Address', icon: 'location' },
+    { id: 3, title: 'Delivery', icon: 'calendar' },
+    { id: 4, title: 'Review', icon: 'checkmark' }
+  ];
+
+  // Load saved checkout data on component mount
+  useEffect(() => {
+    loadSavedCheckoutData();
+  }, []);
+
+  const loadSavedCheckoutData = async () => {
+    try {
+      const savedData = await AsyncStorage.getItem('checkoutFormData');
+      if (savedData) {
+        const parsedData = JSON.parse(savedData);
+        
+        // Load saved data into form fields
+        if (parsedData.phone) setPhone(parsedData.phone);
+        if (parsedData.alternativePhone) setAlternativePhone(parsedData.alternativePhone);
+        if (parsedData.location) setLocation(parsedData.location);
+        if (parsedData.roomNumber) setRoomNumber(parsedData.roomNumber);
+        if (parsedData.additionalInfo) setAdditionalInfo(parsedData.additionalInfo);
+        
+        // Load saved delivery date if it's not in the past
+        if (parsedData.deliveryDate) {
+          const savedDate = new Date(parsedData.deliveryDate);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          
+          if (savedDate >= today) {
+            setDeliveryDate(savedDate);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error loading saved checkout data:', error);
+    } finally {
+      setIsLoadingSavedData(false);
+    }
+  };
+
+  const saveCheckoutData = async () => {
+    try {
+      setIsSaving(true);
+      const formData = {
+        phone,
+        alternativePhone,
+        location,
+        roomNumber,
+        additionalInfo,
+        deliveryDate: deliveryDate.toISOString(),
+        lastUpdated: new Date().toISOString()
+      };
+      
+      await AsyncStorage.setItem('checkoutFormData', JSON.stringify(formData));
+    } catch (error) {
+      console.error('Error saving checkout data:', error);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  // Save data whenever form fields change
+  useEffect(() => {
+    if (!isLoadingSavedData) {
+      saveCheckoutData();
+    }
+  }, [phone, alternativePhone, location, roomNumber, additionalInfo, deliveryDate, isLoadingSavedData]);
+
+  const clearSavedData = async () => {
+    try {
+      await AsyncStorage.removeItem('checkoutFormData');
+      // Reset form fields
+      setPhone('');
+      setAlternativePhone('');
+      setLocation('');
+      setRoomNumber('');
+      setAdditionalInfo('');
+      setDeliveryDate(new Date(Date.now() + 24 * 60 * 60 * 1000));
+      Alert.alert('Success', 'Saved checkout data has been cleared.');
+    } catch (error) {
+      console.error('Error clearing saved data:', error);
+      Alert.alert('Error', 'Failed to clear saved data.');
+    }
+  };
+
+  const validateStep = (step) => {
+    const errors = {};
+    
+    switch (step) {
+      case 1:
+        if (!phone.trim()) {
+          errors.phone = 'Phone number is required';
+        } else if (phone.length < 10) {
+          errors.phone = 'Please enter a valid phone number';
+        }
+        break;
+      case 2:
+        if (!location) {
+          errors.location = 'Please select a location';
+        }
+        break;
+      case 3:
+        if (!deliveryDate) {
+          errors.deliveryDate = 'Please select a delivery date';
+        }
+        break;
+    }
+    
+    setFormErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const nextStep = () => {
+    if (validateStep(currentStep)) {
+      if (currentStep < 4) {
+        setCurrentStep(currentStep + 1);
+      } else {
+        handleSubmit();
+      }
+    }
+  };
+
+  const prevStep = () => {
+    if (currentStep > 1) {
+      setCurrentStep(currentStep - 1);
+    }
+  };
+
   const handleSubmit = () => {
-    if (!phone) {
-      Alert.alert('Error', 'Contact number is required');
+    if (!cartItems || !totalAmount) {
+      Alert.alert(
+        'Error', 
+        'Missing cart information. Please go back to your cart and try again.',
+        [{ text: 'OK', onPress: () => navigation.navigate('Cart') }]
+      );
       return;
     }
 
-    if (!location) {
-      Alert.alert('Error', 'Please select a location');
-      return;
-    }
+    setLoading(true);
 
     const shippingDetails = {
       buyerContact: {
@@ -62,24 +205,10 @@ const CheckoutForm = ({ navigation, route }) => {
       preferredDeliveryDay: deliveryDate
     };
 
-    // Validate that we have route parameters needed for checkout
-    if (!cartItems || !totalAmount) {
-      Alert.alert(
-        'Error', 
-        'Missing cart information. Please go back to your cart and try again.',
-        [{ text: 'OK', onPress: () => navigation.navigate('Cart') }]
-      );
-      return;
-    }
-
-    setLoading(true);
-
     try {
-      // Navigate to Payment screen so user can choose payment method
       navigation.navigate('Payment', {
         amount: totalAmount,
         shippingDetails: shippingDetails
-        // Don't specify paymentMethod so user can choose on the PaymentScreen
       });
     } catch (error) {
       console.error('Navigation error:', error);
@@ -93,7 +222,6 @@ const CheckoutForm = ({ navigation, route }) => {
     setShowDatePicker(Platform.OS === 'ios');
     
     if (selectedDate && event.type !== 'dismissed') {
-      // Ensure date is not in the past
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       
@@ -127,7 +255,7 @@ const CheckoutForm = ({ navigation, route }) => {
         {item}
       </Text>
       {location === item && (
-        <Ionicons name="checkmark-circle" size={24} color="#4CAF50" />
+        <Ionicons name="checkmark-circle" size={24} color="#FF6B35" />
       )}
     </TouchableOpacity>
   ), [location]);
@@ -137,7 +265,7 @@ const CheckoutForm = ({ navigation, route }) => {
       return (
         <>
           <TouchableOpacity 
-            style={styles.locationSelectorButton}
+            style={[styles.locationSelectorButton, formErrors.location && styles.inputError]}
             onPress={() => setShowLocationModal(true)}
           >
             <Text style={location ? styles.locationSelectedText : styles.locationPlaceholderText}>
@@ -145,6 +273,9 @@ const CheckoutForm = ({ navigation, route }) => {
             </Text>
             <MaterialIcons name="arrow-drop-down" size={24} color="#555" />
           </TouchableOpacity>
+          {formErrors.location && (
+            <Text style={styles.errorText}>{formErrors.location}</Text>
+          )}
 
           <Modal
             visible={showLocationModal}
@@ -182,7 +313,7 @@ const CheckoutForm = ({ navigation, route }) => {
       );
     } else {
       return (
-        <View style={styles.pickerContainer}>
+        <View style={[styles.pickerContainer, formErrors.location && styles.inputError]}>
           <Picker
             selectedValue={location}
             onValueChange={(itemValue) => setLocation(itemValue)}
@@ -193,134 +324,303 @@ const CheckoutForm = ({ navigation, route }) => {
               <Picker.Item key={loc} label={loc} value={loc} />
             ))}
           </Picker>
+          {formErrors.location && (
+            <Text style={styles.errorText}>{formErrors.location}</Text>
+          )}
         </View>
       );
     }
   };
 
+  const renderStepContent = () => {
+    switch (currentStep) {
+      case 1:
+        return (
+          <View style={styles.stepContainer}>
+            <View style={styles.stepHeader}>
+              <Ionicons name="person-circle-outline" size={32} color="#FF6B35" />
+              <Text style={styles.stepTitle}>Contact Information</Text>
+              <Text style={styles.stepSubtitle}>How can we reach you?</Text>
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Phone Number <Text style={styles.required}>*</Text></Text>
+              <View style={[styles.inputWrapper, formErrors.phone && styles.inputError]}>
+                <Ionicons name="call-outline" size={20} color="#555" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  value={phone}
+                  onChangeText={(text) => {
+                    setPhone(text);
+                    if (formErrors.phone) {
+                      setFormErrors({...formErrors, phone: null});
+                    }
+                  }}
+                  placeholder="Your contact number"
+                  keyboardType="phone-pad"
+                  placeholderTextColor="#999"
+                />
+              </View>
+              {formErrors.phone && <Text style={styles.errorText}>{formErrors.phone}</Text>}
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Alternative Phone (optional)</Text>
+              <View style={styles.inputWrapper}>
+                <Ionicons name="call-outline" size={20} color="#555" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  value={alternativePhone}
+                  onChangeText={setAlternativePhone}
+                  placeholder="Alternative contact number"
+                  keyboardType="phone-pad"
+                  placeholderTextColor="#999"
+                />
+              </View>
+            </View>
+          </View>
+        );
+      
+      case 2:
+        return (
+          <View style={styles.stepContainer}>
+            <View style={styles.stepHeader}>
+              <Ionicons name="location-outline" size={32} color="#FF6B35" />
+              <Text style={styles.stepTitle}>Delivery Address</Text>
+              <Text style={styles.stepSubtitle}>Where should we deliver your order?</Text>
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Location <Text style={styles.required}>*</Text></Text>
+              <LocationSelector />
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Room Number (optional)</Text>
+              <View style={styles.inputWrapper}>
+                <Ionicons name="home-outline" size={20} color="#555" style={styles.inputIcon} />
+                <TextInput
+                  style={styles.input}
+                  value={roomNumber}
+                  onChangeText={setRoomNumber}
+                  placeholder="Your room number"
+                  placeholderTextColor="#999"
+                />
+              </View>
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Additional Information (optional)</Text>
+              <View style={styles.inputWrapper}>
+                <Ionicons name="information-circle-outline" size={20} color="#555" style={[styles.inputIcon, {alignSelf: 'flex-start', marginTop: 12}]} />
+                <TextInput
+                  style={[styles.input, styles.textArea]}
+                  value={additionalInfo}
+                  onChangeText={setAdditionalInfo}
+                  placeholder="Any other details that might help with delivery (Name of Hostel, etc)"
+                  multiline
+                  numberOfLines={3}
+                  placeholderTextColor="#999"
+                />
+              </View>
+            </View>
+          </View>
+        );
+      
+      case 3:
+        return (
+          <View style={styles.stepContainer}>
+            <View style={styles.stepHeader}>
+              <Ionicons name="calendar-outline" size={32} color="#FF6B35" />
+              <Text style={styles.stepTitle}>Delivery Preferences</Text>
+              <Text style={styles.stepSubtitle}>When would you like your order delivered?</Text>
+            </View>
+            
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>Preferred Delivery Day <Text style={styles.required}>*</Text></Text>
+              <TouchableOpacity 
+                style={[styles.datePickerButton, formErrors.deliveryDate && styles.inputError]}
+                onPress={() => setShowDatePicker(true)}
+              >
+                <Ionicons name="calendar-outline" size={24} color="#555" />
+                <Text style={styles.dateText}>
+                  {formatDate(deliveryDate)}
+                </Text>
+                <Ionicons name="chevron-down-outline" size={20} color="#555" style={{marginLeft: 'auto'}} />
+              </TouchableOpacity>
+              {formErrors.deliveryDate && <Text style={styles.errorText}>{formErrors.deliveryDate}</Text>}
+
+              {showDatePicker && (
+                <DateTimePicker
+                  value={deliveryDate}
+                  mode="date"
+                  display="default"
+                  onChange={onDateChange}
+                  minimumDate={new Date()}
+                />
+              )}
+            </View>
+
+            <View style={styles.deliveryInfo}>
+              <View style={styles.infoCard}>
+                <Ionicons name="time-outline" size={20} color="#FF6B35" />
+                <Text style={styles.infoText}>Delivery time: 9:00 AM - 6:00 PM</Text>
+              </View>
+              <View style={styles.infoCard}>
+                <Ionicons name="shield-checkmark-outline" size={20} color="#FF6B35" />
+                <Text style={styles.infoText}>Free delivery on orders above ₵200</Text>
+              </View>
+            </View>
+          </View>
+        );
+      
+      case 4:
+        return (
+          <View style={styles.stepContainer}>
+            <View style={styles.stepHeader}>
+              <Ionicons name="checkmark-circle-outline" size={32} color="#FF6B35" />
+              <Text style={styles.stepTitle}>Review Order</Text>
+              <Text style={styles.stepSubtitle}>Please review your details before proceeding</Text>
+            </View>
+            
+            <View style={styles.reviewSection}>
+              <View style={styles.reviewCard}>
+                <Text style={styles.reviewTitle}>Contact Information</Text>
+                <Text style={styles.reviewText}>📞 {phone}</Text>
+                {alternativePhone && <Text style={styles.reviewText}>📞 {alternativePhone} (Alternative)</Text>}
+              </View>
+              
+              <View style={styles.reviewCard}>
+                <Text style={styles.reviewTitle}>Delivery Address</Text>
+                <Text style={styles.reviewText}>📍 {location}</Text>
+                {roomNumber && <Text style={styles.reviewText}>🏠 Room {roomNumber}</Text>}
+                {additionalInfo && <Text style={styles.reviewText}>ℹ️ {additionalInfo}</Text>}
+              </View>
+              
+              <View style={styles.reviewCard}>
+                <Text style={styles.reviewTitle}>Delivery Date</Text>
+                <Text style={styles.reviewText}>📅 {formatDate(deliveryDate)}</Text>
+              </View>
+
+              <View style={styles.orderSummary}>
+                <Text style={styles.summaryTitle}>Order Summary</Text>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Items:</Text>
+                  <Text style={styles.summaryValue}>{cartItems?.length || 0}</Text>
+                </View>
+                <View style={styles.summaryRow}>
+                  <Text style={styles.summaryLabel}>Total:</Text>
+                  <Text style={styles.summaryValue}>₵{totalAmount?.toFixed(2) || '0.00'}</Text>
+                </View>
+              </View>
+
+              <TouchableOpacity 
+                style={styles.clearDataButton}
+                onPress={clearSavedData}
+              >
+                <Ionicons name="trash-outline" size={20} color="#e53935" />
+                <Text style={styles.clearDataText}>Clear Saved Data</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        );
+      
+      default:
+        return null;
+    }
+  };
+
   return (
-    <KeyboardAvoidingView 
-      behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-      style={styles.container}
-    >
-      <ScrollView style={styles.formContainer} showsVerticalScrollIndicator={false}>
-        <Text style={styles.title}>Delivery Details</Text>
-        
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Contact Information</Text>
-          
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Phone Number <Text style={styles.required}>*</Text></Text>
-            <View style={styles.inputWrapper}>
-              <Ionicons name="call-outline" size={20} color="#555" style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                value={phone}
-                onChangeText={setPhone}
-                placeholder="Your contact number"
-                keyboardType="phone-pad"
-                placeholderTextColor="#999"
-              />
-            </View>
-          </View>
-          
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Alternative Phone (optional)</Text>
-            <View style={styles.inputWrapper}>
-              <Ionicons name="call-outline" size={20} color="#555" style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                value={alternativePhone}
-                onChangeText={setAlternativePhone}
-                placeholder="Alternative contact number"
-                keyboardType="phone-pad"
-                placeholderTextColor="#999"
-              />
-            </View>
-          </View>
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      
+      {/* Loading Indicator */}
+      {isLoadingSavedData && (
+        <View style={styles.loadingOverlay}>
+          <ActivityIndicator size="large" color="#FF6B35" />
+          <Text style={styles.loadingText}>Loading saved data...</Text>
         </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Delivery Location</Text>
-          
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Location <Text style={styles.required}>*</Text></Text>
-            <LocationSelector />
-          </View>
-          
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Room Number (optional)</Text>
-            <View style={styles.inputWrapper}>
-              <Ionicons name="home-outline" size={20} color="#555" style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                value={roomNumber}
-                onChangeText={setRoomNumber}
-                placeholder="Your room number"
-                placeholderTextColor="#999"
-              />
+      )}
+      
+      {/* Progress Steps */}
+      <View style={styles.progressContainer}>
+        {steps.map((step, index) => (
+          <View key={step.id} style={styles.stepIndicator}>
+            <View style={[
+              styles.stepCircle,
+              currentStep >= step.id && styles.stepCircleActive,
+              currentStep > step.id && styles.stepCircleCompleted
+            ]}>
+              {currentStep > step.id ? (
+                <Ionicons name="checkmark" size={16} color="#fff" />
+              ) : (
+                <Ionicons name={step.icon} size={16} color={currentStep >= step.id ? "#fff" : "#999"} />
+              )}
             </View>
-          </View>
-          
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>Additional Information (optional)</Text>
-            <View style={styles.inputWrapper}>
-              <Ionicons name="information-circle-outline" size={20} color="#555" style={[styles.inputIcon, {alignSelf: 'flex-start', marginTop: 12}]} />
-              <TextInput
-                style={[styles.input, styles.textArea]}
-                value={additionalInfo}
-                onChangeText={setAdditionalInfo}
-                placeholder="Any other details that might help with delivery(Name of Hostel, etc)"
-                multiline
-                numberOfLines={3}
-                placeholderTextColor="#999"
-              />
-            </View>
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>Preferred Delivery Day</Text>
-          
-          <TouchableOpacity 
-            style={styles.datePickerButton}
-            onPress={() => setShowDatePicker(true)}
-          >
-            <Ionicons name="calendar-outline" size={24} color="#555" />
-            <Text style={styles.dateText}>
-              {formatDate(deliveryDate)}
+            <Text style={[
+              styles.stepLabel,
+              currentStep >= step.id && styles.stepLabelActive
+            ]}>
+              {step.title}
             </Text>
-            <Ionicons name="chevron-down-outline" size={20} color="#555" style={{marginLeft: 'auto'}} />
-          </TouchableOpacity>
+            {index < steps.length - 1 && (
+              <View style={[
+                styles.stepLine,
+                currentStep > step.id && styles.stepLineActive
+              ]} />
+            )}
+          </View>
+        ))}
+      </View>
 
-          {showDatePicker && (
-            <DateTimePicker
-              value={deliveryDate}
-              mode="date"
-              display="default"
-              onChange={onDateChange}
-              minimumDate={new Date()}
-            />
-          )}
+      {/* Saving Indicator */}
+      {isSaving && (
+        <View style={styles.savingIndicator}>
+          <ActivityIndicator size="small" color="#FF6B35" />
+          <Text style={styles.savingText}>Saving...</Text>
         </View>
+      )}
 
+      <KeyboardAvoidingView 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.content}
+      >
+        <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+          {renderStepContent()}
+        </ScrollView>
+      </KeyboardAvoidingView>
+
+      {/* Bottom Navigation */}
+      <View style={styles.bottomNav}>
+        {currentStep > 1 && (
+          <TouchableOpacity 
+            style={styles.navButton}
+            onPress={prevStep}
+            disabled={loading}
+          >
+            <Ionicons name="arrow-back" size={20} color="#333" />
+            <Text style={styles.navButtonText}>Back</Text>
+          </TouchableOpacity>
+        )}
+        
         <TouchableOpacity 
-          style={[styles.submitButton, loading && styles.submitButtonDisabled]}
-          onPress={handleSubmit}
+          style={[styles.navButton, styles.navButtonPrimary, loading && styles.navButtonDisabled]}
+          onPress={nextStep}
           disabled={loading}
-          activeOpacity={0.8}
         >
           {loading ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color="#fff" size="small" />
           ) : (
             <>
-              <Text style={styles.submitButtonText}>Proceed to Payment</Text>
-              <Ionicons name="arrow-forward" size={20} color="#fff" style={{marginLeft: 8}} />
+              <Text style={styles.navButtonPrimaryText}>
+                {currentStep === 4 ? 'Proceed ' : 'Continue'}
+              </Text>
+              <Ionicons name="arrow-forward" size={20} color="#fff" />
             </>
           )}
         </TouchableOpacity>
-      </ScrollView>
-    </KeyboardAvoidingView>
+      </View>
+    </SafeAreaView>
   );
 };
 
@@ -329,42 +629,86 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#f8f9fa',
   },
-  formContainer: {
-    padding: 16,
+  progressContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#fff',
+    borderBottomWidth: 1,
+    borderBottomColor: '#f0f0f0',
   },
-  title: {
+  stepIndicator: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  stepCircle: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#f0f0f0',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  stepCircleActive: {
+    backgroundColor: '#FF6B35',
+  },
+  stepCircleCompleted: {
+    backgroundColor: '#4CAF50',
+  },
+  stepLabel: {
+    fontSize: 12,
+    color: '#999',
+    fontWeight: '500',
+  },
+  stepLabelActive: {
+    color: '#333',
+  },
+  stepLine: {
+    position: 'absolute',
+    top: 16,
+    right: -width / 8,
+    width: width / 4,
+    height: 2,
+    backgroundColor: '#f0f0f0',
+  },
+  stepLineActive: {
+    backgroundColor: '#4CAF50',
+  },
+  content: {
+    flex: 1,
+  },
+  scrollView: {
+    flex: 1,
+  },
+  stepContainer: {
+    padding: 20,
+  },
+  stepHeader: {
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  stepTitle: {
     fontSize: 24,
     fontWeight: 'bold',
     color: '#333',
-    marginBottom: 24,
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  stepSubtitle: {
+    fontSize: 16,
+    color: '#666',
     textAlign: 'center',
-    letterSpacing: 0.5,
-  },
-  section: {
-    backgroundColor: 'white',
-    borderRadius: 12,
-    padding: 20,
-    marginBottom: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: '#333',
-    marginBottom: 20,
-    letterSpacing: 0.3,
   },
   inputGroup: {
-    marginBottom: 16,
+    marginBottom: 24,
   },
   inputLabel: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: '#555',
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
     marginBottom: 8,
   },
   required: {
@@ -373,88 +717,58 @@ const styles = StyleSheet.create({
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#e0e0e0',
-    borderRadius: 8,
-    paddingHorizontal: 12,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    minHeight: 56,
+  },
+  inputError: {
+    borderColor: '#e53935',
   },
   inputIcon: {
-    marginRight: 10,
+    marginRight: 12,
   },
   input: {
     flex: 1,
-    padding: 12,
     fontSize: 16,
     color: '#333',
+    paddingVertical: 16,
+  },
+  errorText: {
+    color: '#e53935',
+    fontSize: 14,
+    marginTop: 4,
+    marginLeft: 4,
   },
   pickerContainer: {
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#e0e0e0',
-    borderRadius: 8,
+    borderRadius: 12,
     overflow: 'hidden',
   },
   picker: {
-    height: 50,
+    height: 56,
     width: '100%',
   },
   textArea: {
-    minHeight: 80,
+    minHeight: 100,
     textAlignVertical: 'top',
-    paddingTop: 12,
+    paddingTop: 16,
   },
-  datePickerButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#f8f9fa',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-    padding: 14,
-    borderRadius: 8,
-  },
-  dateText: {
-    marginLeft: 10,
-    fontSize: 16,
-    color: '#333',
-  },
-  submitButton: {
-    flexDirection: 'row',
-    backgroundColor: '#4CAF50',
-    borderRadius: 10,
-    padding: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 24,
-    marginBottom: 40,
-    shadowColor: '#4CAF50',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  submitButtonDisabled: {
-    backgroundColor: '#a5d6a7',
-    shadowOpacity: 0,
-    elevation: 1,
-  },
-  submitButtonText: {
-    color: 'white',
-    fontSize: 16,
-    fontWeight: 'bold',
-    letterSpacing: 0.5,
-  },
-  // Location modal styles for iOS
   locationSelectorButton: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#f8f9fa',
+    backgroundColor: '#fff',
     borderWidth: 1,
     borderColor: '#e0e0e0',
-    borderRadius: 8,
-    paddingVertical: 14,
+    borderRadius: 12,
+    paddingVertical: 16,
     paddingHorizontal: 16,
+    minHeight: 56,
   },
   locationSelectedText: {
     fontSize: 16,
@@ -464,15 +778,138 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#999',
   },
+  datePickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    padding: 16,
+    borderRadius: 12,
+    minHeight: 56,
+  },
+  dateText: {
+    marginLeft: 12,
+    fontSize: 16,
+    color: '#333',
+    flex: 1,
+  },
+  deliveryInfo: {
+    marginTop: 24,
+  },
+  infoCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+  },
+  infoText: {
+    marginLeft: 12,
+    fontSize: 14,
+    color: '#666',
+    flex: 1,
+  },
+  reviewSection: {
+    gap: 16,
+  },
+  reviewCard: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+  },
+  reviewTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 12,
+  },
+  reviewText: {
+    fontSize: 16,
+    color: '#666',
+    marginBottom: 8,
+  },
+  orderSummary: {
+    backgroundColor: '#fff',
+    padding: 20,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#f0f0f0',
+  },
+  summaryTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#333',
+    marginBottom: 16,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  summaryLabel: {
+    fontSize: 16,
+    color: '#666',
+  },
+  summaryValue: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  bottomNav: {
+    flexDirection: 'row',
+    padding: 16,
+    backgroundColor: '#fff',
+    borderTopWidth: 1,
+    borderTopColor: '#f0f0f0',
+    gap: 12,
+  },
+  navButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    backgroundColor: '#fff',
+  },
+  navButtonText: {
+    marginLeft: 8,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#333',
+  },
+  navButtonPrimary: {
+    backgroundColor: '#FF6B35',
+    borderColor: '#FF6B35',
+  },
+  navButtonPrimaryText: {
+    marginRight: 8,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#fff',
+  },
+  navButtonDisabled: {
+    backgroundColor: '#ccc',
+    borderColor: '#ccc',
+  },
+  // Modal styles
   modalOverlay: {
     flex: 1,
     justifyContent: 'flex-end',
   },
   locationModalContainer: {
     backgroundColor: 'white',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    padding: 16,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    padding: 20,
     maxHeight: '70%',
   },
   locationModalHeader: {
@@ -482,9 +919,10 @@ const styles = StyleSheet.create({
     paddingBottom: 16,
     borderBottomWidth: 1,
     borderBottomColor: '#eee',
+    marginBottom: 16,
   },
   locationModalTitle: {
-    fontSize: 18,
+    fontSize: 20,
     fontWeight: 'bold',
     color: '#333',
   },
@@ -495,8 +933,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 8,
+    paddingVertical: 16,
+    paddingHorizontal: 12,
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
@@ -505,9 +943,60 @@ const styles = StyleSheet.create({
     color: '#333',
   },
   selectedLocationText: {
+    fontWeight: '600',
+    color: '#FF6B35',
+  },
+  loadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.8)',
+  },
+  loadingText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 16,
+  },
+  clearDataButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    borderRadius: 12,
+    backgroundColor: '#fff',
+  },
+  clearDataText: {
+    marginLeft: 8,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#e53935',
+  },
+  savingIndicator: {
+    position: 'absolute',
+    top: 20,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+    zIndex: 1000,
+  },
+  savingText: {
+    fontSize: 12,
     fontWeight: '500',
-    color: '#4CAF50',
-  }
+    color: '#666',
+    marginLeft: 6,
+  },
 });
 
 export default CheckoutForm; 

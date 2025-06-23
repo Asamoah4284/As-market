@@ -38,6 +38,7 @@ let url = `${API_BASE_URL}/api/products`;
 
 export const useProducts = () => {
   const [featuredProducts, setFeaturedProducts] = useState([]);
+  const [newArrivals, setNewArrivals] = useState([]);
   const [services, setServices] = useState([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [isLoadingServices, setIsLoadingServices] = useState(true);
@@ -78,7 +79,7 @@ export const useProducts = () => {
         const nonServiceProducts = productsWithDates.filter(product => product.isService !== true);
         console.log('Non-service products count:', nonServiceProducts.length);
         
-        // Sort by creation date (newest first)
+        // Sort by creation date (newest first) for featured products
         const sortedProducts = nonServiceProducts.sort((a, b) => {
           const dateA = new Date(a.createdAt || 0);
           const dateB = new Date(b.createdAt || 0);
@@ -90,7 +91,16 @@ export const useProducts = () => {
           console.log(`Sorted ${index + 1}: ${product.name} - Created: ${product.createdAt}`);
         });
         
+        // Shuffle products randomly for new arrivals
+        const shuffledProducts = [...nonServiceProducts].sort(() => Math.random() - 0.5);
+        
+        console.log('Shuffled products (random order):');
+        shuffledProducts.slice(0, 3).forEach((product, index) => {
+          console.log(`Shuffled ${index + 1}: ${product.name}`);
+        });
+        
         setFeaturedProducts(sortedProducts);
+        setNewArrivals(shuffledProducts);
       } else {
         console.log('Using mock data due to API failure');
         setFeaturedProducts(FEATURED_PRODUCTS);
@@ -191,7 +201,19 @@ export const useProducts = () => {
       if (response.ok) {
         const products = await response.json();
         const nonServiceProducts = products.filter(product => product.isService !== true);
-        setFeaturedProducts(nonServiceProducts);
+        
+        // Sort by creation date (newest first) for featured products
+        const sortedProducts = nonServiceProducts.sort((a, b) => {
+          const dateA = new Date(a.createdAt || a.created_at || 0);
+          const dateB = new Date(b.createdAt || b.created_at || 0);
+          return dateB - dateA;
+        });
+        
+        // Shuffle products randomly for new arrivals
+        const shuffledProducts = [...nonServiceProducts].sort(() => Math.random() - 0.5);
+        
+        setFeaturedProducts(sortedProducts);
+        setNewArrivals(shuffledProducts);
       }
     } catch (error) {
       console.error('Error fetching original products:', error);
@@ -266,10 +288,15 @@ export const useProducts = () => {
   return {
     featuredProducts,
     setFeaturedProducts,
+    newArrivals,
+    setNewArrivals,
     services,
     isLoadingProducts,
+    setIsLoadingProducts,
     isLoadingServices,
+    setIsLoadingServices,
     isLoadingNewArrivals,
+    setIsLoadingNewArrivals,
     searchTimeoutRef,
     fetchProducts,
     fetchServices,

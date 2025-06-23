@@ -11,7 +11,8 @@ import {
   ActivityIndicator,
   Alert,
   Platform,
-  Switch
+  Switch,
+  ScrollView
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useFocusEffect } from '@react-navigation/native';
@@ -24,8 +25,12 @@ import {
   setError 
 } from '../store/slices/cartSlice';
 import PaystackPayment from '../components/PaystackPayment';
+import ProductSection from '../components/ProductSection';
 import { handleAddToCartNotification, sendLocalNotification } from '../services/notificationService';
 import { API_BASE_URL } from '../config/api';
+import { useFavorites } from '../hooks/useFavorites';
+import { useRecentlyViewed } from '../hooks/useRecentlyViewed';
+import { requireAuthentication } from '../utils/authUtils';
 
 const CartScreen = ({ navigation }) => {
   const dispatch = useDispatch();
@@ -42,6 +47,16 @@ const CartScreen = ({ navigation }) => {
   });
   const [isPayOnDelivery, setIsPayOnDelivery] = useState(false);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  
+  // New state for additional sections
+  const [favoriteProducts, setFavoriteProducts] = useState([]);
+  const [otherBuyersViewed, setOtherBuyersViewed] = useState([]);
+  const [loadingFavorites, setLoadingFavorites] = useState(false);
+  const [loadingOtherBuyers, setLoadingOtherBuyers] = useState(false);
+
+  // Custom hooks
+  const { favorites, toggleFavorite, reloadFavorites } = useFavorites(navigation);
+  const { recentlyViewedProducts, fetchRecentlyViewedProducts, loading: loadingRecentlyViewed } = useRecentlyViewed();
 
   // Check authentication status when screen is focused
   useFocusEffect(
@@ -65,6 +80,7 @@ const CartScreen = ({ navigation }) => {
           // Set loading to true immediately when screen is focused
           dispatch(setLoading(true));
           fetchCartItems();
+          fetchAdditionalData();
         }
       };
       
@@ -103,6 +119,74 @@ const CartScreen = ({ navigation }) => {
 
     getUserEmail();
   }, [isAuthenticated]);
+
+  // Refetch favorite products when favorites array is loaded
+  useEffect(() => {
+    console.log('Favorites changed:', favorites);
+    if (isAuthenticated && favorites.length > 0) {
+      console.log('Fetching favorite products for:', favorites.length, 'favorites');
+      fetchFavoriteProducts();
+    }
+  }, [favorites, isAuthenticated]);
+
+  // Fetch additional data for sections
+  const fetchAdditionalData = async () => {
+    await Promise.all([
+      fetchFavoriteProducts(),
+      fetchRecentlyViewedProducts(),
+      fetchOtherBuyersViewed()
+    ]);
+  };
+
+  // Fetch favorite products
+  const fetchFavoriteProducts = async () => {
+    try {
+      setLoadingFavorites(true);
+      
+      if (favorites.length === 0) {
+        console.log('No favorites to fetch');
+        setFavoriteProducts([]);
+        return;
+      }
+
+      console.log('Fetching products for favorites:', favorites);
+      const response = await axios.get(`${API_BASE_URL}/api/products`);
+      const allProducts = response.data;
+      console.log('Total products fetched:', allProducts.length);
+      
+      const favoriteProductsData = allProducts.filter(product => 
+        favorites.includes(product._id)
+      );
+      console.log('Favorite products found:', favoriteProductsData.length);
+      setFavoriteProducts(favoriteProductsData);
+    } catch (error) {
+      console.error('Error fetching favorite products:', error);
+      setFavoriteProducts([]);
+    } finally {
+      setLoadingFavorites(false);
+    }
+  };
+
+  // Fetch other buyers also viewed products
+  const fetchOtherBuyersViewed = async () => {
+    try {
+      setLoadingOtherBuyers(true);
+      const response = await axios.get(`${API_BASE_URL}/api/products`);
+      const allProducts = response.data;
+      
+      // Get products with high view counts (popular products)
+      const popularProducts = allProducts
+        .filter(product => product.views > 10) // Products with more than 10 views
+        .sort((a, b) => (b.views || 0) - (a.views || 0))
+        .slice(0, 8); // Get top 8 popular products
+      
+      setOtherBuyersViewed(popularProducts);
+    } catch (error) {
+      console.error('Error fetching other buyers viewed:', error);
+    } finally {
+      setLoadingOtherBuyers(false);
+    }
+  };
 
   // Modify fetchCartItems to use Redux
   const fetchCartItems = async () => {
@@ -372,6 +456,31 @@ const CartScreen = ({ navigation }) => {
     Alert.alert('Payment Cancelled', 'You have cancelled the payment');
   };
 
+  // Handle product press
+  const handleProductPress = async (product) => {
+    try {
+      // Increment views
+      await axios.post(`${API_BASE_URL}/api/products/${product._id}/views`);
+    } catch (error) {
+      console.error('Error incrementing views:', error);
+    }
+    
+    navigation.navigate('ProductDetails', { 
+      productId: product._id
+    });
+  };
+
+  // Handle service booking
+  const handleBookService = async (service) => {
+    if (!(await requireAuthentication(navigation, 'book a service'))) {
+      return;
+    }
+    
+    navigation.navigate('ServiceBooking', {
+      service: service
+    });
+  };
+
   const renderItem = ({ item }) => (
     <View style={styles.cartItem}>
       <View style={styles.imageContainer}>
@@ -477,19 +586,77 @@ const CartScreen = ({ navigation }) => {
           <View style={styles.placeholder} />
         </View>
         
-        <View style={styles.emptyCartContainer}>
-          <View style={styles.emptyCartIconContainer}>
-            <Ionicons name="cart-outline" size={64} color="#FFF" />
+        <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+          <View style={styles.emptyCartContainer}>
+            <View style={styles.emptyCartIconContainer}>
+              <Ionicons name="cart-outline" size={64} color="#FFF" />
+            </View>
+            <Text style={styles.emptyCartTitle}>Your cart is empty</Text>
+            <Text style={styles.emptyCartSubtitle}>Looks like you haven't added anything to your cart yet</Text>
+            <TouchableOpacity
+              style={styles.continueShoppingButton}
+              onPress={() => navigation.goBack()}
+            >
+              <Text style={styles.continueShoppingText}>Start Shopping</Text>
+            </TouchableOpacity>
           </View>
-          <Text style={styles.emptyCartTitle}>Your cart is empty</Text>
-          <Text style={styles.emptyCartSubtitle}>Looks like you haven't added anything to your cart yet</Text>
-          <TouchableOpacity
-            style={styles.continueShoppingButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.continueShoppingText}>Start Shopping</Text>
-          </TouchableOpacity>
-        </View>
+
+          {/* Additional sections when cart is empty */}
+          {isAuthenticated && (
+            <>
+              {/* Favorites Section */}
+              <ProductSection
+                title="Your Favorites"
+                products={favoriteProducts}
+                loading={loadingFavorites}
+                navigation={navigation}
+                favorites={favorites}
+                onToggleFavorite={toggleFavorite}
+                onProductPress={handleProductPress}
+                onBookService={handleBookService}
+                accentColor="#FF4757"
+                showSeeAll={true}
+                seeAllParams={{ favorites: true }}
+                emptyMessage="No favorites yet"
+                icon="heart-outline"
+              />
+
+              {/* Recently Viewed Section */}
+              <ProductSection
+                title="Recently Viewed"
+                products={recentlyViewedProducts}
+                loading={loadingRecentlyViewed}
+                navigation={navigation}
+                favorites={favorites}
+                onToggleFavorite={toggleFavorite}
+                onProductPress={handleProductPress}
+                onBookService={handleBookService}
+                accentColor="#4ECDC4"
+                showSeeAll={true}
+                seeAllParams={{ recentlyViewed: true }}
+                emptyMessage="No recently viewed items"
+                icon="time-outline"
+              />
+
+              {/* Other Buyers Also Viewed Section */}
+              <ProductSection
+                title="Other Buyers Also Viewed"
+                products={otherBuyersViewed}
+                loading={loadingOtherBuyers}
+                navigation={navigation}
+                favorites={favorites}
+                onToggleFavorite={toggleFavorite}
+                onProductPress={handleProductPress}
+                onBookService={handleBookService}
+                accentColor="#FF6B6B"
+                showSeeAll={true}
+                seeAllParams={{ popular: true }}
+                emptyMessage="No popular items found"
+                icon="trending-up-outline"
+              />
+            </>
+          )}
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -512,13 +679,69 @@ const CartScreen = ({ navigation }) => {
             <Text style={styles.itemCount}>{cartItems.length} {cartItems.length === 1 ? 'item' : 'items'}</Text>
           </View>
 
-          <FlatList
-            data={cartItems}
-            renderItem={renderItem}
-            keyExtractor={(item) => item.productId}
-            contentContainerStyle={styles.listContainer}
-            showsVerticalScrollIndicator={false}
-          />
+          <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
+            <FlatList
+              data={cartItems}
+              renderItem={renderItem}
+              keyExtractor={(item) => item.productId}
+              contentContainerStyle={styles.listContainer}
+              scrollEnabled={false}
+            />
+            
+            {/* Additional sections when cart has items */}
+            <View style={styles.additionalSectionsContainer}>
+              {/* Favorites Section */}
+              <ProductSection
+                title="Your Favorites"
+                products={favoriteProducts}
+                loading={loadingFavorites}
+                navigation={navigation}
+                favorites={favorites}
+                onToggleFavorite={toggleFavorite}
+                onProductPress={handleProductPress}
+                onBookService={handleBookService}
+                accentColor="#FF4757"
+                showSeeAll={true}
+                seeAllParams={{ favorites: true }}
+                emptyMessage="No favorites yet"
+                icon="heart-outline"
+              />
+
+              {/* Recently Viewed Section */}
+              <ProductSection
+                title="Recently Viewed"
+                products={recentlyViewedProducts}
+                loading={loadingRecentlyViewed}
+                navigation={navigation}
+                favorites={favorites}
+                onToggleFavorite={toggleFavorite}
+                onProductPress={handleProductPress}
+                onBookService={handleBookService}
+                accentColor="#4ECDC4"
+                showSeeAll={true}
+                seeAllParams={{ recentlyViewed: true }}
+                emptyMessage="No recently viewed items"
+                icon="time-outline"
+              />
+
+              {/* Other Buyers Also Viewed Section */}
+              <ProductSection
+                title="Other Buyers Also Viewed"
+                products={otherBuyersViewed}
+                loading={loadingOtherBuyers}
+                navigation={navigation}
+                favorites={favorites}
+                onToggleFavorite={toggleFavorite}
+                onProductPress={handleProductPress}
+                onBookService={handleBookService}
+                accentColor="#FF6B6B"
+                showSeeAll={true}
+                seeAllParams={{ popular: true }}
+                emptyMessage="No popular items found"
+                icon="trending-up-outline"
+              />
+            </View>
+          </ScrollView>
           
           <View style={styles.checkoutContainer}>
            
@@ -576,6 +799,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F9F9F9',
   },
+  scrollContainer: {
+    flex: 1,
+  },
   centerContainer: {
     flex: 1,
     justifyContent: 'center',
@@ -599,10 +825,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   emptyCartContainer: {
-    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 24,
+    paddingTop: 40,
   },
   emptyCartIconContainer: {
     width: 120,
@@ -674,12 +900,13 @@ const styles = StyleSheet.create({
   },
   listContainer: {
     padding: 20,
-    // paddingBottom: 24,
+  },
+  additionalSectionsContainer: {
+    paddingTop: 20,
   },
   cartItem: {
     flexDirection: 'row',
     backgroundColor: 'white',
-    // borderRadius: 16,
     marginBottom: 16,
     overflow: 'hidden',
     shadowColor: '#000',
@@ -727,7 +954,6 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '700',
     color: '#5D3FD3',
-    // marginVertical: 8,
   },
   itemFooter: {
     flexDirection: 'row',
@@ -751,7 +977,6 @@ const styles = StyleSheet.create({
   },
   quantityTextContainer: {
     minWidth: 30,
-    // height: 36,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -767,31 +992,13 @@ const styles = StyleSheet.create({
   },
   checkoutContainer: {
     backgroundColor: 'white',
-    // borderTopLeftRadius: 30,
-    // borderTopRightRadius: 30,
     padding: 24,
-    // paddingBottom: 36,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -6 },
     shadowOpacity: 0.1,
     shadowRadius: 10,
     elevation: 10,
   },
-  promoContainer: {
-    flexDirection: 'row',
-    marginBottom: 24,
-  },
-  promoInputContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#F6F6F6',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginRight: 12,
-  },
-
   summaryContainer: {
     marginBottom: 8,
   },

@@ -38,6 +38,7 @@ export const useBanners = () => {
   return {
     banners,
     isLoadingBanners,
+    setIsLoadingBanners,
     reloadBanners,
   };
 }; 

@@ -21,7 +21,13 @@ const Header = ({
         </View>
         <View style={styles.locationContainer}>
           <Ionicons name="location-outline" size={14} color="#fff" />
-          <Text style={styles.locationText}>{location}</Text>
+          <Text 
+            style={styles.locationText}
+            numberOfLines={1}
+            ellipsizeMode="tail"
+          >
+            {location}
+          </Text>
           {location === 'Loading location...' ? (
             <Ionicons name="sync" size={14} color="#fff" style={{marginLeft: 4, opacity: 0.8}} />
           ) : null}
@@ -96,6 +102,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 4,
+    flex: 1,
   },
   locationText: {
     fontSize: 14,
@@ -103,6 +110,7 @@ const styles = StyleSheet.create({
     marginLeft: 4,
     marginRight: 4,
     opacity: 0.9,
+    flex: 1,
   },
   headerIcons: {
     flexDirection: 'row',

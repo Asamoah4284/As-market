@@ -98,10 +98,15 @@ const BuyerHomeScreen = () => {
   const { 
     featuredProducts, 
     setFeaturedProducts, 
+    newArrivals,
+    setNewArrivals,
     services, 
     isLoadingProducts, 
+    setIsLoadingProducts,
     isLoadingServices, 
+    setIsLoadingServices,
     isLoadingNewArrivals,
+    setIsLoadingNewArrivals,
     searchTimeoutRef: productsSearchTimeoutRef,
     fetchProducts,
     fetchServices,
@@ -111,7 +116,7 @@ const BuyerHomeScreen = () => {
   } = useProducts();
   const { favorites, toggleFavorite, reloadFavorites } = useFavorites(navigation);
   const { userName, isSeller, reloadUserData } = useUser();
-  const { banners, isLoadingBanners, reloadBanners } = useBanners();
+  const { banners, isLoadingBanners, setIsLoadingBanners, reloadBanners } = useBanners();
 
   // Shimmer animation
   useEffect(() => {
@@ -800,7 +805,7 @@ const BuyerHomeScreen = () => {
             {/* New Arrivals */}
             <ProductsSection
               title="New Arrivals"
-              products={featuredProducts.slice(0, 3)}
+              products={newArrivals.slice(0, 3)}
               isLoading={isLoadingNewArrivals}
               navigation={navigation}
               favorites={favorites}
