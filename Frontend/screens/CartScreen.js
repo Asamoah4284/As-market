@@ -31,6 +31,8 @@ import { API_BASE_URL } from '../config/api';
 import { useFavorites } from '../hooks/useFavorites';
 import { useRecentlyViewed } from '../hooks/useRecentlyViewed';
 import { requireAuthentication } from '../utils/authUtils';
+import OptimizedImage from '../components/OptimizedImage';
+import { useImagePreloader } from '../hooks/useImagePreloader';
 
 const CartScreen = ({ navigation }) => {
   const dispatch = useDispatch();
@@ -57,6 +59,12 @@ const CartScreen = ({ navigation }) => {
   // Custom hooks
   const { favorites, toggleFavorite, reloadFavorites } = useFavorites(navigation);
   const { recentlyViewedProducts, fetchRecentlyViewedProducts, loading: loadingRecentlyViewed } = useRecentlyViewed();
+
+  // Extract cart item images for preloading
+  const cartImages = cartItems.map(item => item.image).filter(Boolean);
+  
+  // Preload cart images with medium priority
+  useImagePreloader(cartImages, true, 3);
 
   // Check authentication status when screen is focused
   useFocusEffect(
@@ -484,9 +492,12 @@ const CartScreen = ({ navigation }) => {
   const renderItem = ({ item }) => (
     <View style={styles.cartItem}>
       <View style={styles.imageContainer}>
-        <Image 
-          source={{ uri: item.image }} 
+        <OptimizedImage 
+          source={item.image} 
           style={styles.itemImage}
+          resizeMode="cover"
+          placeholderColor="#f0f0f0"
+          showLoadingIndicator={false}
         />
       </View>
       <View style={styles.itemContent}>

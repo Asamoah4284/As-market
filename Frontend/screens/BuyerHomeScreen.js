@@ -213,6 +213,15 @@ const BuyerHomeScreen = () => {
 
   const handleProductPress = async (product) => {
     console.log('Navigating to product details with ID:', product._id);
+    
+    // Check if this is a service and navigate accordingly
+    if (product.isService || product.category === 'service') {
+      navigation.navigate('ServiceDetails', { 
+        serviceId: product._id
+      });
+      return;
+    }
+    
     try {
       // Increment views
       const newViews = await productService.incrementViews(product._id);

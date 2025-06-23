@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -20,7 +20,7 @@ import {
   Animated,
   Share,
 } from "react-native";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import { useNavigation, useRoute, useFocusEffect } from "@react-navigation/native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useDispatch, useSelector } from 'react-redux';
@@ -29,6 +29,9 @@ import * as Location from 'expo-location';
 import { handleAddToCartNotification } from '../services/notificationService';
 import { requireAuthentication } from '../App';
 import { API_BASE_URL } from '../config/api';
+import { LinearGradient } from "expo-linear-gradient";
+import OptimizedImage from "../components/OptimizedImage";
+import { useImagePreloader } from "../hooks/useImagePreloader";
 
 const ProductDetailsScreen = () => {
   const navigation = useNavigation();
@@ -39,6 +42,7 @@ const ProductDetailsScreen = () => {
   const { currentProduct, isLoading, error } = useSelector((state) => state.products);
 
   const [quantity, setQuantity] = useState(1);
+  const [quantityInput, setQuantityInput] = useState("1");
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const windowWidth = Dimensions.get("window").width;
   const flatListRef = React.useRef(null);
@@ -73,6 +77,20 @@ const ProductDetailsScreen = () => {
   const [isSlideshowActive, setIsSlideshowActive] = useState(true);
   const [slideshowInterval, setSlideshowInterval] = useState(null);
   const slideshowDuration = 3000; // 3 seconds per image
+
+  // Extract all product images for preloading
+  const productImages = currentProduct ? [
+    currentProduct.image,
+    ...(currentProduct.additionalImages || [])
+  ].filter(Boolean) : [];
+
+  // Preload product images with high priority and banner quality for main images
+  useImagePreloader(productImages, true, 5, {
+    width: 1200,
+    quality: '80',
+    format: 'auto',
+    maintainQuality: true
+  });
 
   // Add useFocusEffect to refresh product data when screen is focused
   useFocusEffect(
@@ -408,15 +426,54 @@ const ProductDetailsScreen = () => {
 
   const decreaseQuantity = () => {
     if (quantity > 1) {
-      setQuantity(quantity - 1);
+      const newQuantity = quantity - 1;
+      setQuantity(newQuantity);
+      setQuantityInput(newQuantity.toString());
     }
   };
 
   const increaseQuantity = () => {
     if (currentProduct && currentProduct.stock && quantity < currentProduct.stock) {
-      setQuantity(quantity + 1);
+      const newQuantity = quantity + 1;
+      setQuantity(newQuantity);
+      setQuantityInput(newQuantity.toString());
     } else {
       Alert.alert("Stock Limit", `Only ${currentProduct?.stock || 0} units available.`);
+    }
+  };
+
+  // Add function to handle quantity input change
+  const handleQuantityChange = (text) => {
+    // Allow empty string for typing
+    if (text === "") {
+      setQuantityInput("");
+      return;
+    }
+    
+    const newQuantity = parseInt(text);
+    
+    // Only update if it's a valid number
+    if (!isNaN(newQuantity)) {
+      setQuantityInput(text);
+      
+      // Validate the input
+      if (newQuantity < 1) {
+        setQuantity(1);
+      } else if (currentProduct && currentProduct.stock && newQuantity > currentProduct.stock) {
+        setQuantity(currentProduct.stock);
+        setQuantityInput(currentProduct.stock.toString());
+        Alert.alert("Stock Limit", `Only ${currentProduct.stock} units available.`);
+      } else {
+        setQuantity(newQuantity);
+      }
+    }
+  };
+
+  // Add function to handle quantity input blur (when user finishes typing)
+  const handleQuantityBlur = () => {
+    if (quantityInput === "" || parseInt(quantityInput) < 1) {
+      setQuantity(1);
+      setQuantityInput("1");
     }
   };
 
@@ -759,10 +816,16 @@ const ProductDetailsScreen = () => {
                 style={styles.fullscreenImageContainer}
                 onPress={() => setIsFullscreen(false)}
               >
-                <Image
-                  source={{ uri: item }}
+                <OptimizedImage
+                  source={item}
                   style={styles.fullscreenImage}
                   resizeMode="contain"
+                  placeholderColor="#000"
+                  showLoadingIndicator={true}
+                  imageType="banner"
+                  onError={(e) => {
+                    console.log('Image loading error:', item);
+                  }}
                 />
               </Pressable>
             )}
@@ -884,10 +947,13 @@ const ProductDetailsScreen = () => {
                     onPress={() => handleImagePress(index)}
                     activeOpacity={0.9}
                   >
-                    <Image
-                      source={{ uri: item }}
+                    <OptimizedImage
+                      source={item}
                       style={styles.productImage}
                       resizeMode="cover"
+                      placeholderColor="#f0f0f0"
+                      showLoadingIndicator={true}
+                      imageType="banner"
                       onError={(e) => {
                         console.log('Image loading error:', item);
                       }}
@@ -930,12 +996,13 @@ const ProductDetailsScreen = () => {
             </>
           ) : (
             // Fallback to single image
-            <Image
-              source={{
-                uri: currentProduct?.image || "https://via.placeholder.com/400",
-              }}
+            <OptimizedImage
+              source={currentProduct?.image || "https://via.placeholder.com/400"}
               style={styles.productImage}
               resizeMode="cover"
+              placeholderColor="#f0f0f0"
+              showLoadingIndicator={true}
+              imageType="banner"
               onError={(e) => {
                 console.log("Image loading error:", e.nativeEvent.error);
               }}
@@ -990,7 +1057,15 @@ const ProductDetailsScreen = () => {
                 >
                   <Ionicons name="remove" size={20} color="#5D3FD3" />
                 </TouchableOpacity>
-                <Text style={styles.quantityValue}>{quantity}</Text>
+                <TextInput
+                  style={styles.quantityInput}
+                  value={quantityInput}
+                  onChangeText={handleQuantityChange}
+                  onBlur={handleQuantityBlur}
+                  keyboardType="numeric"
+                  textAlign="center"
+                  maxLength={3}
+                />
                 <TouchableOpacity
                   style={styles.quantityButton}
                   onPress={increaseQuantity}
@@ -1614,11 +1689,13 @@ const styles = StyleSheet.create({
     alignItems: "center",
     backgroundColor: "#f0f0f0",
   },
-  quantityValue: {
+  quantityInput: {
     width: 40,
     textAlign: "center",
     fontSize: 16,
     fontWeight: "bold",
+    paddingVertical: 8,
+    color: "#333",
   },
   descriptionContainer: {
     marginVertical: 16,

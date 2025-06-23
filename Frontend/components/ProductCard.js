@@ -1,7 +1,8 @@
 import React, { memo } from 'react';
-import { View, Text, TouchableOpacity, Image, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { API_BASE_URL } from '../config/api';
+import OptimizedImage from './OptimizedImage';
 
 const ProductCard = memo(({ 
   item, 
@@ -21,9 +22,12 @@ const ProductCard = memo(({
       onPress={onPress}
     >
       <View style={styles.productImageContainer}>
-        <Image 
-          source={{ uri: item.image }} 
+        <OptimizedImage 
+          source={imageUri}
           style={styles.productImage}
+          resizeMode="cover"
+          placeholderColor="#f0f0f0"
+          showLoadingIndicator={false}
           onError={(error) => console.error('Image loading error:', error.nativeEvent.error)}
           onLoad={() => console.log('Image loaded successfully:', imageUri)}
         />

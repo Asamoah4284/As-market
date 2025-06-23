@@ -1,5 +1,6 @@
 import React, { memo, useRef, useEffect } from 'react';
-import { View, Text, TouchableOpacity, Image, ScrollView, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, ScrollView, StyleSheet } from 'react-native';
+import OptimizedImage from './OptimizedImage';
 
 const BannerCarousel = memo(({ 
   banners, 
@@ -63,7 +64,15 @@ const BannerCarousel = memo(({
             }
           }}
         >
-          <Image source={{ uri: banner.image }} style={styles.offerBackgroundImage} />
+          <OptimizedImage 
+            source={banner.image} 
+            style={styles.offerBackgroundImage}
+            resizeMode="cover"
+            placeholderColor="#f0f0f0"
+            showLoadingIndicator={true}
+            preload={true}
+            imageType="banner"
+          />
           <View style={styles.offerContentWrapper}>
             <View style={styles.offerContent}>
               <Text style={styles.offerHeading}>{banner.title}</Text>

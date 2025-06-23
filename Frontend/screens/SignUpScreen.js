@@ -14,7 +14,8 @@ import {
   ActivityIndicator,
   Image,
   Alert,
-  Modal
+  Modal,
+  Linking
 } from 'react-native';
 import { API_BASE_URL } from '../config/api';
 import { Ionicons } from '@expo/vector-icons';
@@ -34,7 +35,20 @@ function SignUpScreen({ navigation }) {
   const [isLoading, setIsLoading] = useState(false);
   const [hidePassword, setHidePassword] = useState(true);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
-  const [termsModalVisible, setTermsModalVisible] = useState(false);
+
+  const openPrivacyPolicy = async () => {
+    const url = 'https://asarion-marketplace-privacy.vercel.app/';
+    try {
+      const supported = await Linking.canOpenURL(url);
+      if (supported) {
+        await Linking.openURL(url);
+      } else {
+        Alert.alert('Error', 'Cannot open the privacy policy link');
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to open privacy policy');
+    }
+  };
 
   const handleSignUp = async () => {
     try {
@@ -286,7 +300,7 @@ function SignUpScreen({ navigation }) {
                     I agree to the{' '}
                     <Text
                       style={styles.termsLink}
-                      onPress={() => setTermsModalVisible(true)}
+                      onPress={openPrivacyPolicy}
                     >
                       Terms and Conditions
                     </Text>
@@ -352,32 +366,6 @@ function SignUpScreen({ navigation }) {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-      <Modal
-        visible={termsModalVisible}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setTermsModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Terms and Conditions</Text>
-            <ScrollView style={{maxHeight: 350}}>
-              <Text style={styles.modalText}>
-                {/* Replace this with your actual legal document */}
-                By using this app as a seller, you agree that an additional 5% will be added to your original price and posted as the final price on the marketplace. 
-                {"\n\n"}
-               
-              </Text>
-            </ScrollView>
-            <TouchableOpacity
-              style={styles.closeModalButton}
-              onPress={() => setTermsModalVisible(false)}
-            >
-              <Text style={styles.closeModalButtonText}>Close</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }
@@ -615,44 +603,6 @@ const styles = StyleSheet.create({
     color: '#5D3FD3',
     fontWeight: 'bold',
     marginLeft: 5,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  modalContent: {
-    backgroundColor: '#fff',
-    borderRadius: 12,
-    padding: 20,
-    width: '85%',
-    maxWidth: 400,
-    alignItems: 'center',
-  },
-  modalTitle: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    marginBottom: 10,
-    color: '#5D3FD3',
-  },
-  modalText: {
-    fontSize: 14,
-    color: '#333',
-    marginBottom: 20,
-  },
-  closeModalButton: {
-    backgroundColor: '#5D3FD3',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 30,
-    alignItems: 'center',
-    marginTop: 10,
-  },
-  closeModalButtonText: {
-    color: '#fff',
-    fontWeight: 'bold',
-    fontSize: 15,
   },
 });
 
