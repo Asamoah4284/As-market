@@ -68,7 +68,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
     paddingHorizontal: 16,
-    paddingVertical: Platform.OS === 'android' ? 28 : 20,
+    paddingVertical: Platform.OS === 'android' ? 24 : 20,
     backgroundColor: '#5D3FD3',
     borderBottomLeftRadius: 0,
     borderBottomRightRadius: 0,

@@ -1,4 +1,4 @@
-import React, { memo, useRef, useEffect, useState } from 'react';
+import React, { memo, useRef, useEffect, useState, useCallback } from 'react';
 import { 
   View, 
   Text, 
@@ -83,15 +83,17 @@ const BannerCarousel = memo(({
     { useNativeDriver: false }
   );
 
-  const handleViewableItemsChanged = useRef(({ viewableItems }) => {
+  // Stable viewabilityConfig using useRef to prevent any changes on re-renders
+  const viewabilityConfigRef = useRef({
+    itemVisiblePercentThreshold: 50,
+  });
+
+  // Stable callback for onViewableItemsChanged using useCallback to prevent re-creation
+  const handleViewableItemsChanged = useCallback(({ viewableItems }) => {
     if (viewableItems.length > 0) {
       setCurrentIndex(viewableItems[0].index);
     }
-  }).current;
-
-  const viewabilityConfig = useRef({
-    itemVisiblePercentThreshold: 50,
-  }).current;
+  }, []);
 
   const renderBanner = ({ item, index }) => {
     // Safety check for required properties
@@ -158,18 +160,6 @@ const BannerCarousel = memo(({
             extrapolate: 'clamp',
           });
 
-          const borderRadius = scrollX.interpolate({
-            inputRange,
-            outputRange: [4, 2, 4], // Circle to rectangle to circle
-            extrapolate: 'clamp',
-          });
-
-          const width = scrollX.interpolate({
-            inputRange,
-            outputRange: [8, 20, 8], // Normal width to wider for active
-            extrapolate: 'clamp',
-          });
-
           return (
             <Animated.View
               key={index}
@@ -178,8 +168,6 @@ const BannerCarousel = memo(({
                 {
                   transform: [{ scale }],
                   opacity,
-                  borderRadius,
-                  width,
                 },
               ]}
             />
@@ -204,7 +192,7 @@ const BannerCarousel = memo(({
           keyExtractor={(_, index) => index.toString()}
           contentContainerStyle={styles.flatListContent}
           onViewableItemsChanged={handleViewableItemsChanged}
-          viewabilityConfig={viewabilityConfig}
+          viewabilityConfig={viewabilityConfigRef.current}
         />
       </View>
     );
@@ -227,7 +215,7 @@ const BannerCarousel = memo(({
         onScroll={handleScroll}
         onScrollBeginDrag={handleUserScroll}
         onViewableItemsChanged={handleViewableItemsChanged}
-        viewabilityConfig={viewabilityConfig}
+        viewabilityConfig={viewabilityConfigRef.current}
         snapToInterval={BANNER_TOTAL_WIDTH}
         decelerationRate="fast"
         getItemLayout={(data, index) => ({
@@ -308,7 +296,9 @@ const styles = StyleSheet.create({
     // Removed paddingHorizontal to align with parent container
   },
   paginationDot: {
+    width: 8,
     height: 8,
+    borderRadius: 4,
     backgroundColor: '#5D3FD3',
     marginHorizontal: 4,
   },

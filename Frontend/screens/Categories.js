@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -41,6 +41,17 @@ const Categories = () => {
   const [selectedCategory, setSelectedCategory] = useState(categoryId || 'all');
   const [showingProductCategories, setShowingProductCategories] = useState(true); // Default to product categories
   const [buttonAnimations] = useState(() => new Map());
+  
+  // Stable callback for onViewableItemsChanged using useCallback to prevent re-creation
+  const onViewableItemsChanged = useCallback(({ viewableItems }) => {
+    // Optional: Handle viewable items changes if needed
+    // console.log('Viewable items:', viewableItems);
+  }, []);
+  
+  // Stable viewabilityConfig using useRef to prevent any changes on re-renders
+  const viewabilityConfigRef = useRef({
+    itemVisiblePercentThreshold: 50,
+  });
   
   // Using the same category structure as in SellerDashboardScreen
   const categories = {
@@ -650,15 +661,16 @@ const Categories = () => {
         </View>
       ) : (
         <FlatList
+          key={`${showingProductCategories}-${selectedCategory}`}
           data={filteredProducts}
           renderItem={renderProduct}
           keyExtractor={(item) => item._id.toString()}
           numColumns={2}
           contentContainerStyle={styles.productList}
           showsVerticalScrollIndicator={false}
-          initialNumToRender={6}
-          maxToRenderPerBatch={10}
-          windowSize={10}
+          removeClippedSubviews={true}
+          onViewableItemsChanged={onViewableItemsChanged}
+          viewabilityConfig={viewabilityConfigRef.current}
         />
       )}
     </SafeAreaView>
@@ -744,7 +756,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f5f5f5',
     borderRadius: 8,
     marginHorizontal: 16,
-    marginVertical: 12,
+    marginVertical: 8,
     paddingHorizontal: 12,
     paddingVertical: 8,
   },
@@ -753,7 +765,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    height: 36,
+    height: 40,
     fontSize: 16,
     color: '#333',
   },
