@@ -295,8 +295,6 @@ const BuyerHomeScreen = () => {
         setIsLoadingDeals(false);
         setIsLoadingBrands(false);
         setRefreshing(false);
-        
-        Alert.alert('Success', 'Content refreshed successfully!', [{ text: 'OK' }]);
       }, 1000);
 
     } catch (error) {
@@ -737,7 +735,7 @@ const BuyerHomeScreen = () => {
 
   return (
     <SafeAreaView style={styles.safeArea}>
-      <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+      <StatusBar barStyle="light-content" backgroundColor="#5D3FD3" />
       <View style={styles.container}>
         {/* Header */}
         <Header
@@ -919,8 +917,7 @@ const BuyerHomeScreen = () => {
 const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
-    backgroundColor: '#fff',
-    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight : 0,
+    backgroundColor: '#5D3FD3',
   },
   container: {
     flex: 1,

@@ -40,7 +40,32 @@ const OnboardingScreen = ({ navigation }) => {
         useNativeDriver: true,
       }),
     ]).start();
-  }, []);
+
+    // Hide navigation header and configure screen
+    navigation.setOptions({
+      headerShown: false,
+      gestureEnabled: false,
+      cardStyle: { backgroundColor: onboardingData[currentIndex]?.backgroundColor || '#FF6B6B' },
+    });
+
+    // Add focus listener to ensure background is reset
+    const unsubscribe = navigation.addListener('focus', () => {
+      navigation.setOptions({
+        headerShown: false,
+        gestureEnabled: false,
+        cardStyle: { backgroundColor: onboardingData[currentIndex]?.backgroundColor || '#FF6B6B' },
+      });
+    });
+
+    return unsubscribe;
+  }, [navigation, currentIndex]);
+
+  // Separate useEffect to immediately update navigation options when currentIndex changes
+  useEffect(() => {
+    navigation.setOptions({
+      cardStyle: { backgroundColor: onboardingData[currentIndex]?.backgroundColor || '#FF6B6B' },
+    });
+  }, [currentIndex, navigation]);
 
   const onboardingData = [
     {
@@ -68,9 +93,11 @@ const OnboardingScreen = ({ navigation }) => {
 
   const handleNext = () => {
     if (currentIndex < onboardingData.length - 1) {
+      const newIndex = currentIndex + 1;
+      setCurrentIndex(newIndex);
       flatListRef.current.scrollToIndex({
         animated: true,
-        index: currentIndex + 1,
+        index: newIndex,
       });
     } else {
       navigation.replace('Welcome');
@@ -253,6 +280,7 @@ const OnboardingScreen = ({ navigation }) => {
     
     return (
       <View style={[styles.slide, { backgroundColor: item.backgroundColor }]}>
+        <View style={[styles.slideBackground, { backgroundColor: item.backgroundColor }]} />
         <View style={styles.contentContainer}>
           {renderPhoneMockup(item)}
           <View style={styles.textContainer}>
@@ -296,7 +324,12 @@ const OnboardingScreen = ({ navigation }) => {
 
   return (
     <View style={styles.container}>
-      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+      <StatusBar 
+        translucent={false}
+        backgroundColor={onboardingData[currentIndex]?.backgroundColor || '#FF6B6B'}
+        barStyle="light-content"
+        hidden={false}
+      />
       <FlatList
         ref={flatListRef}
         data={onboardingData}
@@ -309,6 +342,18 @@ const OnboardingScreen = ({ navigation }) => {
           [{ nativeEvent: { contentOffset: { x: scrollX } } }],
           { useNativeDriver: false }
         )}
+        onScrollBeginDrag={(event) => {
+          const newIndex = Math.round(
+            event.nativeEvent.contentOffset.x / width
+          );
+          setCurrentIndex(newIndex);
+        }}
+        onScrollEndDrag={(event) => {
+          const newIndex = Math.round(
+            event.nativeEvent.contentOffset.x / width
+          );
+          setCurrentIndex(newIndex);
+        }}
         onMomentumScrollEnd={(event) => {
           const newIndex = Math.round(
             event.nativeEvent.contentOffset.x / width
@@ -316,9 +361,11 @@ const OnboardingScreen = ({ navigation }) => {
           setCurrentIndex(newIndex);
         }}
         scrollEventThrottle={16}
+        style={styles.flatList}
+        contentContainerStyle={styles.flatListContent}
       />
 
-      <SafeAreaView style={styles.footer}>
+      <View style={styles.footer}>
         <Pagination />
         {currentIndex !== onboardingData.length - 1 ? (
           <TouchableOpacity style={styles.skipButton} onPress={handleNext}>
@@ -334,7 +381,7 @@ const OnboardingScreen = ({ navigation }) => {
             {/* <Ionicons name="arrow-forward" size={20} color="#fff" /> */}
           </TouchableOpacity>
         )}
-      </SafeAreaView>
+      </View>
     </View>
   );
 };
@@ -342,19 +389,44 @@ const OnboardingScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+  },
+  flatList: {
+    flex: 1,
+    backgroundColor: 'transparent',
+  },
+  flatListContent: {
+    flexGrow: 1,
+    backgroundColor: 'transparent',
   },
   slide: {
     width,
     height,
     justifyContent: 'flex-start',
     alignItems: 'center',
-    paddingTop: 60,
+    paddingTop: 0,
+    position: 'relative',
+    flex: 1,
+  },
+  slideBackground: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: -1,
   },
   contentContainer: {
     alignItems: 'center',
     width: '100%',
-    justifyContent: 'space-around',
+    justifyContent: 'space-between',
     flex: 1,
+    paddingTop: 60,
+    paddingBottom: 120,
   },
   welcomeText: {
     fontSize: 22,
@@ -694,12 +766,17 @@ const styles = StyleSheet.create({
   },
   footer: {
     position: 'absolute',
-    bottom: 15,
-    left: 20,
-    right: 20,
+    bottom: 0,
+    left: 0,
+    right: 0,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingBottom: 40,
+    paddingTop: 20,
+    backgroundColor: 'transparent',
+    zIndex: 1000,
   },
   paginationContainer: {
     flexDirection: 'row',
