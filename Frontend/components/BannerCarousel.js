@@ -160,6 +160,18 @@ const BannerCarousel = memo(({
             extrapolate: 'clamp',
           });
 
+          const width = scrollX.interpolate({
+            inputRange,
+            outputRange: [8, 24, 8],
+            extrapolate: 'clamp',
+          });
+
+          const borderRadius = scrollX.interpolate({
+            inputRange,
+            outputRange: [4, 4, 4],
+            extrapolate: 'clamp',
+          });
+
           return (
             <Animated.View
               key={index}
@@ -168,6 +180,8 @@ const BannerCarousel = memo(({
                 {
                   transform: [{ scale }],
                   opacity,
+                  width,
+                  borderRadius,
                 },
               ]}
             />
@@ -296,9 +310,7 @@ const styles = StyleSheet.create({
     // Removed paddingHorizontal to align with parent container
   },
   paginationDot: {
-    width: 8,
     height: 8,
-    borderRadius: 4,
     backgroundColor: '#5D3FD3',
     marginHorizontal: 4,
   },

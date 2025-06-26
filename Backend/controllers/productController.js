@@ -1,5 +1,6 @@
 const Product = require('../models/productModel');
 const User = require('../models/User');
+const Notification = require('../models/notification');
 const asyncHandler = require('express-async-handler');
 const sharp = require('sharp');
 const cloudinary = require('../config/cloudinary');
@@ -7,6 +8,7 @@ const ProductViewModel = require('../models/productViewModel');
 const bcrypt = require('bcrypt');
 const rateLimit = require('express-rate-limit');
 const helmet = require('helmet');
+const { sendPushNotification } = require('../utils/pushNotifications');
 
 // Remove top-level await and move to a function
 const generateSalt = async () => {
@@ -347,7 +349,7 @@ const adminUpdateProduct = asyncHandler(async (req, res) => {
   }
 
   // First check if product exists
-  const existingProduct = await Product.findById(req.params.id);
+  const existingProduct = await Product.findById(req.params.id).populate('seller', 'name');
   if (!existingProduct) {
     res.status(404);
     throw new Error('Product not found');
@@ -404,7 +406,82 @@ const adminUpdateProduct = asyncHandler(async (req, res) => {
       new: true, // Return the updated document
       runValidators: true // Run schema validators
     }
-  );
+  ).populate('seller', 'name');
+
+  // Send notification to all users when product is approved
+  if (status === 'approved') {
+    console.log('Product approved, starting notification process...');
+    try {
+      // Get all users with push tokens (excluding the seller)
+      const allUsers = await User.find({ 
+        pushToken: { $exists: true, $ne: null },
+        _id: { $ne: existingProduct.seller._id } // Exclude the seller
+      });
+
+      console.log(`Found ${allUsers.length} users with push tokens`);
+
+      if (allUsers.length > 0) {
+        const pushTokens = allUsers.map(user => user.pushToken);
+        const sellerName = existingProduct.seller.name || 'A seller';
+        const productName = existingProduct.name;
+        
+        console.log('Sending notifications with data:', {
+          sellerName,
+          productName,
+          pushTokensCount: pushTokens.length,
+          productId: existingProduct._id
+        });
+        
+        const notificationTitle = 'New Product Available';
+        const notificationBody = `${sellerName} just added a new product: ${productName}`;
+        
+        // Send push notifications to all users
+        const tickets = await sendPushNotification(
+          pushTokens,
+          notificationTitle,
+          notificationBody,
+          {
+            type: 'NEW_PRODUCT',
+            productId: existingProduct._id,
+            sellerName,
+            productName
+          }
+        );
+
+        console.log('Push notification tickets:', tickets);
+
+        // Create notification records for all users
+        const notificationPromises = allUsers.map(user => 
+          Notification.create({
+            recipient: 'user',
+            recipientId: user._id,
+            title: notificationTitle,
+            body: notificationBody,
+            type: 'NEW_PRODUCT',
+            data: {
+              productId: existingProduct._id,
+              sellerName,
+              productName
+            },
+            pushTokens: [user.pushToken],
+            delivered: true
+          })
+        );
+
+        await Promise.all(notificationPromises);
+        
+        console.log(`Successfully sent new product notification to ${allUsers.length} users`);
+      } else {
+        console.log('No users found with push tokens to send notifications to');
+      }
+    } catch (error) {
+      console.error('Error sending new product notifications:', error);
+      console.error('Error details:', error.stack);
+      // Don't fail the product approval if notification fails
+    }
+  } else {
+    console.log(`Product status changed to: ${status} (not approved, no notifications sent)`);
+  }
   
   res.json(updatedProduct);
 });

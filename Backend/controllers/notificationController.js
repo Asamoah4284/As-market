@@ -138,10 +138,114 @@ const savePushToken = asyncHandler(async (req, res) => {
   res.json({ success: true, message: 'Push token saved' });
 });
 
+// Debug endpoint to test notifications
+const debugNotifications = asyncHandler(async (req, res) => {
+  try {
+    // Get all users with push tokens
+    const usersWithTokens = await User.find({ 
+      pushToken: { $exists: true, $ne: null } 
+    }).select('name email role pushToken');
+
+    // Get all users without push tokens
+    const usersWithoutTokens = await User.find({ 
+      $or: [
+        { pushToken: { $exists: false } },
+        { pushToken: null }
+      ]
+    }).select('name email role');
+
+    // Get total notification count
+    const totalNotifications = await Notification.countDocuments();
+
+    // Get recent notifications
+    const recentNotifications = await Notification.find()
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .populate('recipientId', 'name email');
+
+    res.json({
+      debug: {
+        usersWithTokens: usersWithTokens.length,
+        usersWithoutTokens: usersWithoutTokens.length,
+        totalUsers: usersWithTokens.length + usersWithoutTokens.length,
+        totalNotifications,
+        usersWithTokensList: usersWithTokens,
+        usersWithoutTokensList: usersWithoutTokens,
+        recentNotifications
+      }
+    });
+  } catch (error) {
+    console.error('Debug error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Test notification endpoint
+const testNotification = asyncHandler(async (req, res) => {
+  try {
+    const { userId } = req.body;
+    
+    if (!userId) {
+      res.status(400);
+      throw new Error('User ID is required');
+    }
+
+    const user = await User.findById(userId);
+    
+    if (!user) {
+      res.status(404);
+      throw new Error('User not found');
+    }
+
+    if (!user.pushToken) {
+      res.status(400);
+      throw new Error('User has no push token');
+    }
+
+    const testTitle = 'Test Notification';
+    const testBody = 'This is a test notification from the server';
+    
+    // Send test push notification
+    const tickets = await sendPushNotification(
+      [user.pushToken],
+      testTitle,
+      testBody,
+      {
+        type: 'TEST',
+        test: true
+      }
+    );
+
+    // Create notification record
+    const notification = await Notification.create({
+      recipient: 'user',
+      recipientId: user._id,
+      title: testTitle,
+      body: testBody,
+      type: 'TEST',
+      data: { test: true },
+      pushTokens: [user.pushToken],
+      delivered: true
+    });
+
+    res.json({
+      success: true,
+      message: 'Test notification sent',
+      tickets,
+      notification
+    });
+  } catch (error) {
+    console.error('Test notification error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 module.exports = {
   createNotification,
   getNotifications,
   markAsRead,
   markAllAsRead,
   savePushToken,
+  debugNotifications,
+  testNotification,
 }; 

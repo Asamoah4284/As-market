@@ -15,6 +15,8 @@ import {
   Alert,
   Animated,
   Easing,
+  Platform,
+  StatusBar,
 } from 'react-native';
 import { MaterialIcons, FontAwesome, Ionicons } from '@expo/vector-icons';
 import { useNavigation } from '@react-navigation/native';
@@ -24,7 +26,6 @@ import { Picker } from '@react-native-picker/picker';
 
 import * as FileSystem from 'expo-file-system';
 import { LinearGradient } from 'expo-linear-gradient';
-import { handleNewProductNotification } from '../services/notificationService';
 import { API_BASE_URL } from '../config/api';
 
 const SellerDashboardScreen = () => {
@@ -597,13 +598,8 @@ const SellerDashboardScreen = () => {
       
       const savedProduct = await response.json();
       
-      // Send notification for new product (not for edits)
+      // Add new product to the top of the list (notifications are now handled in backend when approved)
       if (!isEditing) {
-        // Get seller name from profile data, fallback to 'A seller' if name is not available
-        const sellerName = profileData.name || 'A seller';
-        handleNewProductNotification(productData.name, sellerName);
-
-        // Add new product to the top of the list
         setProducts(prevProducts => [
           {
             ...savedProduct,
@@ -869,8 +865,8 @@ const SellerDashboardScreen = () => {
     switch (status.toLowerCase()) {
       case 'pending':
         return {
-          color: '#FF9F1C',
-          bg: 'rgba(255, 159, 28, 0.1)',
+          color: '',
+          bg: '',
           text: 'Awaiting Confirmation'
         };
       case 'processing':
@@ -2101,47 +2097,56 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   headerGradient: {
-    elevation: 4,
+    elevation: Platform.OS === 'android' ? 8 : 4,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
+    paddingTop: Platform.OS === 'android' ? StatusBar.currentHeight || 0 : 0,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingVertical: Platform.OS === 'android' ? 8 : 16,
+    minHeight: Platform.OS === 'android' ? 16 : 20,
   },
   headerTitle: {
-    fontSize: 24,
+    fontSize: Platform.OS === 'android' ? 22 : 24,
     fontWeight: 'bold',
     color: 'white',
     textShadowColor: 'rgba(0, 0, 0, 0.2)',
     textShadowOffset: { width: 1, height: 1 },
     textShadowRadius: 2,
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   headerIcons: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: Platform.OS === 'android' ? 4 : 0,
   },
   headerButton: {
-    padding: 8,
-    marginLeft: 8,
+    padding: Platform.OS === 'android' ? 12 : 8,
+    marginLeft: Platform.OS === 'android' ? 4 : 8,
     position: 'relative',
     overflow: 'visible',
+    minWidth: Platform.OS === 'android' ? 48 : 40,
+    minHeight: Platform.OS === 'android' ? 48 : 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   promoteTooltip: {
     position: 'absolute',
     bottom: -30,
     left: -20,
-    backgroundColor: 'rgba(0, 0, 0, 0.8)',
+ 
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 4,
     opacity: 0,
-    transform: [{ translateY: 10 }],
+    // transform: [{ translateY: 10 }],
   },
   promoteTooltipText: {
     color: 'white',
@@ -2376,13 +2381,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
-    height: 24,
+    height: 28,
     backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 1,
-    elevation: 1,
+   
     justifyContent: 'center',
     alignItems: 'center',
   },

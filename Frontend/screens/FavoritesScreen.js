@@ -244,7 +244,6 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: '#f8f8f8',
   },
   header: {
     flexDirection: 'row',
@@ -258,7 +257,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 3,
-    marginTop: Platform.OS === 'android' ? 25 : 0,
+    // marginTop: Platform.OS === 'android' ? 25 : 0,
 
   },
   backButton: {

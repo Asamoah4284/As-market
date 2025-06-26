@@ -8,6 +8,8 @@ const {
   markAsRead,
   markAllAsRead,
   savePushToken,
+  debugNotifications,
+  testNotification,
 } = require('../controllers/notificationController');
 
 // Create a new notification (admin only)
@@ -77,5 +79,9 @@ router.put('/:recipient/read-all', protect, markAllAsRead);
 
 // Save push token for a user
 router.post('/token', protect, savePushToken);
+
+// Debug endpoints (remove in production)
+router.get('/debug/status', debugNotifications);
+router.post('/debug/test', protect, testNotification);
 
 module.exports = router; 
