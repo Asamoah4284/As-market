@@ -6,7 +6,8 @@ import {
   StyleSheet, 
   FlatList, 
   Dimensions,
-  Animated 
+  Animated,
+  Platform
 } from 'react-native';
 import OptimizedImage from './OptimizedImage';
 
@@ -26,35 +27,34 @@ const BannerCarousel = memo(({
   const scrollX = useRef(new Animated.Value(0)).current;
   const [isUserScrolling, setIsUserScrolling] = useState(false);
   const userScrollTimeoutRef = useRef(null);
+  const autoScrollIntervalRef = useRef(null);
 
-  // Auto-scroll banners
+  // Optimized auto-scroll with better performance
   useEffect(() => {
-    let interval;
     if (banners.length > 1 && !isUserScrolling) {
-      interval = setInterval(() => {
+      autoScrollIntervalRef.current = setInterval(() => {
         if (flatListRef.current) {
           const nextIndex = (currentIndex + 1) % banners.length;
-          try {
-            flatListRef.current.scrollToIndex({
-              index: nextIndex,
-              animated: true,
-            });
-          } catch (error) {
-            // Fallback to scrollTo if scrollToIndex fails
-            const offset = nextIndex * BANNER_TOTAL_WIDTH;
-            flatListRef.current.scrollTo({
-              x: offset,
-              animated: true,
-            });
-          }
+          const offset = nextIndex * BANNER_TOTAL_WIDTH;
+          
+          // Use scrollTo with optimized settings
+          flatListRef.current.scrollTo({
+            x: offset,
+            animated: true,
+          });
         }
-      }, 3000);
+      }, 4000); // Increased interval for better UX
     }
-    return () => interval && clearInterval(interval);
+    
+    return () => {
+      if (autoScrollIntervalRef.current) {
+        clearInterval(autoScrollIntervalRef.current);
+      }
+    };
   }, [currentIndex, banners.length, isUserScrolling]);
 
-  // Handle user scroll interaction
-  const handleUserScroll = () => {
+  // Optimized user scroll interaction
+  const handleUserScroll = useCallback(() => {
     setIsUserScrolling(true);
     
     // Clear existing timeout
@@ -62,40 +62,53 @@ const BannerCarousel = memo(({
       clearTimeout(userScrollTimeoutRef.current);
     }
     
-    // Resume auto-scroll after 5 seconds of no user interaction
+    // Resume auto-scroll after 3 seconds of no user interaction (reduced from 5s)
     userScrollTimeoutRef.current = setTimeout(() => {
       setIsUserScrolling(false);
-    }, 5000);
-  };
+    }, 3000);
+  }, []);
 
-  // Cleanup timeout on unmount
+  // Cleanup timeouts on unmount
   useEffect(() => {
     return () => {
       if (userScrollTimeoutRef.current) {
         clearTimeout(userScrollTimeoutRef.current);
       }
+      if (autoScrollIntervalRef.current) {
+        clearInterval(autoScrollIntervalRef.current);
+      }
     };
   }, []);
 
-  // Handle scroll events
-  const handleScroll = Animated.event(
-    [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-    { useNativeDriver: false }
+  // Optimized scroll event handler with native driver
+  const handleScroll = useCallback(
+    Animated.event(
+      [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+      { 
+        useNativeDriver: true,
+        listener: (event) => {
+          // Optional: Add any additional scroll handling here
+        }
+      }
+    ),
+    []
   );
 
-  // Stable viewabilityConfig using useRef to prevent any changes on re-renders
+  // Stable viewabilityConfig using useRef
   const viewabilityConfigRef = useRef({
     itemVisiblePercentThreshold: 50,
+    minimumViewTime: 100,
   });
 
-  // Stable callback for onViewableItemsChanged using useCallback to prevent re-creation
+  // Optimized callback for onViewableItemsChanged
   const handleViewableItemsChanged = useCallback(({ viewableItems }) => {
     if (viewableItems.length > 0) {
       setCurrentIndex(viewableItems[0].index);
     }
   }, []);
 
-  const renderBanner = ({ item, index }) => {
+  // Memoized render function for better performance
+  const renderBanner = useCallback(({ item, index }) => {
     // Safety check for required properties
     if (!item || !item.image) {
       return null;
@@ -111,6 +124,7 @@ const BannerCarousel = memo(({
             navigation.navigate('ProductDetails', { productId: item.linkId });
           }
         }}
+        activeOpacity={0.8}
       >
         <OptimizedImage 
           source={item.image} 
@@ -134,9 +148,10 @@ const BannerCarousel = memo(({
         </View>
       </TouchableOpacity>
     );
-  };
+  }, [navigation]);
 
-  const renderPaginationDots = () => {
+  // Memoized pagination dots with optimized animations
+  const renderPaginationDots = useCallback(() => {
     if (banners.length <= 1) return null;
 
     return (
@@ -166,12 +181,6 @@ const BannerCarousel = memo(({
             extrapolate: 'clamp',
           });
 
-          const borderRadius = scrollX.interpolate({
-            inputRange,
-            outputRange: [4, 4, 4],
-            extrapolate: 'clamp',
-          });
-
           return (
             <Animated.View
               key={index}
@@ -181,7 +190,6 @@ const BannerCarousel = memo(({
                   transform: [{ scale }],
                   opacity,
                   width,
-                  borderRadius,
                 },
               ]}
             />
@@ -189,7 +197,19 @@ const BannerCarousel = memo(({
         })}
       </View>
     );
-  };
+  }, [banners.length, scrollX]);
+
+  // Memoized key extractor
+  const keyExtractor = useCallback((item, index) => {
+    return item._id || `banner-${index}`;
+  }, []);
+
+  // Memoized getItemLayout for better performance
+  const getItemLayout = useCallback((data, index) => ({
+    length: BANNER_TOTAL_WIDTH,
+    offset: BANNER_TOTAL_WIDTH * index,
+    index,
+  }), []);
 
   if (isLoading) {
     return (
@@ -207,6 +227,22 @@ const BannerCarousel = memo(({
           contentContainerStyle={styles.flatListContent}
           onViewableItemsChanged={handleViewableItemsChanged}
           viewabilityConfig={viewabilityConfigRef.current}
+          snapToInterval={BANNER_TOTAL_WIDTH}
+          decelerationRate="fast"
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={2}
+          windowSize={3}
+          initialNumToRender={2}
+          updateCellsBatchingPeriod={16}
+          disableIntervalMomentum={true}
+          pagingEnabled={false}
+          scrollEventThrottle={16}
+          directionalLockEnabled={true}
+          alwaysBounceHorizontal={false}
+          bounces={false}
+          overScrollMode="never"
+          showsVerticalScrollIndicator={false}
+          fadingEdgeLength={0}
         />
       </View>
     );
@@ -224,7 +260,7 @@ const BannerCarousel = memo(({
         horizontal
         showsHorizontalScrollIndicator={false}
         renderItem={renderBanner}
-        keyExtractor={(item, index) => item._id || `banner-${index}`}
+        keyExtractor={keyExtractor}
         contentContainerStyle={styles.flatListContent}
         onScroll={handleScroll}
         onScrollBeginDrag={handleUserScroll}
@@ -232,11 +268,25 @@ const BannerCarousel = memo(({
         viewabilityConfig={viewabilityConfigRef.current}
         snapToInterval={BANNER_TOTAL_WIDTH}
         decelerationRate="fast"
-        getItemLayout={(data, index) => ({
-          length: BANNER_TOTAL_WIDTH,
-          offset: BANNER_TOTAL_WIDTH * index,
-          index,
-        })}
+        getItemLayout={getItemLayout}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={2}
+        windowSize={3}
+        initialNumToRender={2}
+        updateCellsBatchingPeriod={16}
+        disableIntervalMomentum={true}
+        pagingEnabled={false}
+        scrollEventThrottle={16}
+        directionalLockEnabled={true}
+        alwaysBounceHorizontal={false}
+        bounces={false}
+        overScrollMode="never"
+        showsVerticalScrollIndicator={false}
+        fadingEdgeLength={0}
+        maintainVisibleContentPosition={{
+          minIndexForVisible: 0,
+          autoscrollToTopThreshold: 10,
+        }}
       />
       {renderPaginationDots()}
     </View>
@@ -260,13 +310,19 @@ const styles = StyleSheet.create({
     marginRight: BANNER_SPACING,
     overflow: 'hidden',
     position: 'relative',
- 
+    backgroundColor: '#f0f0f0', // Fallback color
+    // Performance optimizations
+    backfaceVisibility: 'hidden',
+    transform: [{ translateZ: 0 }],
   },
   offerBackgroundImage: {
     position: 'absolute',
     width: '100%',
     height: '100%',
     opacity: 0.85,
+    // Performance optimizations
+    backfaceVisibility: 'hidden',
+    transform: [{ translateZ: 0 }],
   },
   offerContentWrapper: {
     flex: 1,
@@ -313,6 +369,7 @@ const styles = StyleSheet.create({
     height: 8,
     backgroundColor: '#5D3FD3',
     marginHorizontal: 4,
+    borderRadius: 4,
   },
 });
 
