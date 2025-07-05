@@ -165,6 +165,11 @@ const BannerCarousel = memo(({
     banners.map((_, index) => ({ index, key: `dot-${index}` }))
   , [banners.length]);
 
+  // Memoized keyExtractor for banner items
+  const keyExtractor = useCallback((item, index) => {
+    return item._id || item.id || index.toString();
+  }, []);
+
   // Optimized pagination dots with memoized data
   const renderPaginationDots = useCallback(() => {
     if (banners.length <= 1) return null;
@@ -286,7 +291,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#f0f0f0', // Fallback color
     // Performance optimizations
     backfaceVisibility: 'hidden',
-    transform: [{ translateZ: 0 }],
   },
   offerBackgroundImage: {
     position: 'absolute',
@@ -295,7 +299,6 @@ const styles = StyleSheet.create({
     opacity: 0.85,
     // Performance optimizations
     backfaceVisibility: 'hidden',
-    transform: [{ translateZ: 0 }],
   },
   offerContentWrapper: {
     flex: 1,
