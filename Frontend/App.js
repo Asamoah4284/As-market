@@ -407,7 +407,7 @@ function AppContent() {
           <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
           <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
         </Stack.Navigator>
-        <StatusBar style="auto" />
+        <StatusBar style="light" backgroundColor="#5D3FD3" translucent={false} />
       </NavigationContainer>
     </SafeAreaProvider>
   );

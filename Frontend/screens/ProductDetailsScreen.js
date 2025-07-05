@@ -1389,22 +1389,27 @@ const ProductDetailsScreen = () => {
         
         </View>
 
-        {/* Comments Section */}
+                {/* Comments Section */}
         <View style={styles.commentsSection}>
-          <Text style={styles.sectionTitle}>Comments & Reviews</Text>
+          <Text style={styles.sectionTitle}>Reviews ({comments.length})</Text>
           
           {loadingComments ? (
-            <ActivityIndicator size="small" color="#5D3FD3" />
+            <ActivityIndicator size="small" color="#5D3FD3" style={styles.loader} />
           ) : commentError ? (
             <Text style={styles.errorText}>{commentError}</Text>
           ) : comments.length === 0 ? (
-            <Text style={styles.noCommentsText}>No comments yet. Be the first to review!</Text>
+            <Text style={styles.noCommentsText}>No reviews yet. Be the first to review!</Text>
           ) : (
             <View style={styles.commentsList}>
               {comments.map((item) => (
                 <View key={item._id} style={styles.commentCard}>
                   <View style={styles.commentHeader}>
-                    <Text style={styles.commentAuthor}>{item.user.name}</Text>
+                    <View style={styles.commentUserInfo}>
+                      <Text style={styles.commentAuthor}>{item.user.name}</Text>
+                      <Text style={styles.commentDate}>
+                        {new Date(item.createdAt).toLocaleDateString()}
+                      </Text>
+                    </View>
                     {item.rating && (
                       <View style={styles.commentRating}>
                         {[1, 2, 3, 4, 5].map((star) => (
@@ -1419,23 +1424,16 @@ const ProductDetailsScreen = () => {
                     )}
                   </View>
                   <Text style={styles.commentText}>{item.text}</Text>
-                  <Text style={styles.commentDate}>
-                    {new Date(item.createdAt).toLocaleDateString()}
-                  </Text>
                 </View>
               ))}
             </View>
           )}
           
           {/* Comment Input */}
-          <View style={styles.commentInputContainer}>
-            <TextInput
-              style={styles.commentInput}
-              placeholder="Write a review..."
-              value={commentText}
-              onChangeText={setCommentText}
-              multiline
-            />
+          <View style={styles.commentInputSection}>
+            <Text style={styles.commentInputTitle}>Write a Review</Text>
+            
+            {/* Rating Selection */}
             <View style={styles.ratingSelector}>
               {[1, 2, 3, 4, 5].map((star) => (
                 <TouchableOpacity
@@ -1450,6 +1448,18 @@ const ProductDetailsScreen = () => {
                 </TouchableOpacity>
               ))}
             </View>
+            
+            {/* Comment Input */}
+            <TextInput
+              style={styles.commentInput}
+              placeholder="Share your experience..."
+              value={commentText}
+              onChangeText={setCommentText}
+              multiline
+              numberOfLines={3}
+            />
+            
+            {/* Submit Button */}
             <TouchableOpacity
               style={[
                 styles.submitCommentButton,
@@ -1817,49 +1827,80 @@ const styles = StyleSheet.create({
     marginTop: 16,
     borderRadius: 12,
   },
+  loader: {
+    marginVertical: 16,
+  },
+  errorText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    marginVertical: 20,
+  },
+  noCommentsText: {
+    textAlign: 'center',
+    color: '#666',
+    fontStyle: 'italic',
+    marginVertical: 16,
+  },
+  commentsList: {
+    marginBottom: 16,
+  },
   commentCard: {
     backgroundColor: '#f8f9fa',
-    padding: 12,
+    padding: 16,
     borderRadius: 8,
-    marginBottom: 8,
+    marginBottom: 12,
   },
   commentHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 8,
+  },
+  commentUserInfo: {
+    flex: 1,
   },
   commentAuthor: {
     fontWeight: 'bold',
     color: '#333',
+  },
+  commentDate: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
   },
   commentRating: {
     flexDirection: 'row',
   },
   commentText: {
     color: '#666',
-    marginBottom: 4,
+    lineHeight: 20,
   },
-  commentDate: {
-    fontSize: 12,
-    color: '#999',
-  },
-  commentInputContainer: {
+  commentInputSection: {
     marginTop: 16,
+    padding: 16,
+    backgroundColor: '#f8f9fa',
+    borderRadius: 12,
+  },
+  commentInputTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+    marginBottom: 12,
+  },
+  ratingSelector: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 12,
   },
   commentInput: {
     borderWidth: 1,
     borderColor: '#ddd',
     borderRadius: 8,
     padding: 12,
-    marginBottom: 8,
+    marginBottom: 12,
     minHeight: 80,
     textAlignVertical: 'top',
-  },
-  ratingSelector: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginBottom: 12,
   },
   submitCommentButton: {
     backgroundColor: '#5D3FD3',
@@ -1873,12 +1914,6 @@ const styles = StyleSheet.create({
   submitCommentButtonText: {
     color: '#fff',
     fontWeight: 'bold',
-  },
-  noCommentsText: {
-    textAlign: 'center',
-    color: '#666',
-    fontStyle: 'italic',
-    marginVertical: 16,
   },
   fullscreenModal: {
     flex: 1,
@@ -1962,6 +1997,60 @@ const styles = StyleSheet.create({
     fontSize: 16,
     marginLeft: 15,
     color: '#333',
+  },
+  ratingSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  shareButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: '#f0f0f0',
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  shareButtonText: {
+    fontSize: 14,
+    color: '#5D3FD3',
+    fontWeight: '500',
+    marginLeft: 4,
+  },
+  slideshowControlButton: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    zIndex: 10,
+    width: 40,
+    height: 40,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  slideshowIndicator: {
+    position: 'absolute',
+    top: 10,
+    left: 10,
+    zIndex: 10,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  slideshowIndicatorText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: 'bold',
+    marginLeft: 4,
   },
   imageSlide: {
     height: 300,
@@ -2277,63 +2366,6 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontWeight: '500',
     fontSize: 13,
-  },
-  commentsList: {
-    marginBottom: 16,
-  },
-  slideshowControlButton: {
-    position: 'absolute',
-    top: 10,
-    right: 10,
-    zIndex: 10,
-    width: 40,
-    height: 40,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  slideshowIndicator: {
-    position: 'absolute',
-    top: 10,
-    left: 10,
-    zIndex: 10,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  slideshowIndicatorText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: 'bold',
-    marginLeft: 4,
-  },
-  ratingSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  shareButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 20,
-    backgroundColor: '#f0f0f0',
-    borderWidth: 1,
-    borderColor: '#e0e0e0',
-  },
-  shareButtonText: {
-    fontSize: 14,
-    color: '#5D3FD3',
-    fontWeight: '500',
-    marginLeft: 4,
   },
 });
 

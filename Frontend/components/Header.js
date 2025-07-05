@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, TouchableOpacity, StyleSheet, Platform, StatusBar, SafeAreaView } from 'react-native';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import NotificationBadge from './NotificationBadge';
 
 const Header = ({ 
@@ -12,8 +13,10 @@ const Header = ({
   onSellerDashboardPress,
   navigation 
 }) => {
+  const insets = useSafeAreaInsets();
+
   return (
-    <SafeAreaView style={styles.safeArea}>
+    <View style={[styles.container, { paddingTop: insets.top }]}>
       <View style={styles.header}>
         <View style={styles.headerContent}>
           <View style={styles.brandNameContainer}>
@@ -55,12 +58,12 @@ const Header = ({
           </TouchableOpacity>
         </View>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
-  safeArea: {
+  container: {
     backgroundColor: '#5D3FD3',
   },
   header: {
