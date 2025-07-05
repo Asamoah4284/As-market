@@ -6,7 +6,8 @@ import {
   StyleSheet, 
   FlatList, 
   Dimensions,
-  Animated 
+  Animated,
+  Platform
 } from 'react-native';
 import OptimizedImage from './OptimizedImage';
 
@@ -243,7 +244,7 @@ const BannerCarousel = memo(({
         horizontal
         showsHorizontalScrollIndicator={false}
         renderItem={renderBanner}
-        keyExtractor={(item, index) => item._id || `banner-${index}`}
+        keyExtractor={keyExtractor}
         contentContainerStyle={styles.flatListContent}
         onScroll={handleScroll}
         onScrollBeginDrag={handleUserScroll}
@@ -282,13 +283,19 @@ const styles = StyleSheet.create({
     marginRight: BANNER_SPACING,
     overflow: 'hidden',
     position: 'relative',
- 
+    backgroundColor: '#f0f0f0', // Fallback color
+    // Performance optimizations
+    backfaceVisibility: 'hidden',
+    transform: [{ translateZ: 0 }],
   },
   offerBackgroundImage: {
     position: 'absolute',
     width: '100%',
     height: '100%',
     opacity: 0.85,
+    // Performance optimizations
+    backfaceVisibility: 'hidden',
+    transform: [{ translateZ: 0 }],
   },
   offerContentWrapper: {
     flex: 1,
