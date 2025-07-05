@@ -87,6 +87,8 @@ const BuyerHomeScreen = () => {
   const [isLoadingDeals, setIsLoadingDeals] = useState(true);
   const [isLoadingBrands, setIsLoadingBrands] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [foodAndDrinks, setFoodAndDrinks] = useState([]);
+  const [isLoadingFoodAndDrinks, setIsLoadingFoodAndDrinks] = useState(true);
   const shimmerValue = useRef(new Animated.Value(0)).current;
   const searchTimeoutRef = useRef(null);
   
@@ -190,6 +192,31 @@ const BuyerHomeScreen = () => {
     };
   }, []);
 
+  // Fetch food and drinks
+  const fetchFoodAndDrinks = async () => {
+    try {
+      setIsLoadingFoodAndDrinks(true);
+      const res = await fetch('https://unimarket-ikin.onrender.com/api/products');
+      const allProducts = await res.json();
+
+      const foodAndDrinks = allProducts.filter(
+        product => product.mainCategory === 'Food & Drinks'
+      );
+
+      console.log('Food & Drinks Products:', foodAndDrinks);
+      setFoodAndDrinks(foodAndDrinks);
+    } catch (error) {
+      console.error('Error fetching products:', error);
+    } finally {
+      setIsLoadingFoodAndDrinks(false);
+    }
+  };
+
+  // Fetch food and drinks on component mount
+  useEffect(() => {
+    fetchFoodAndDrinks();
+  }, []);
+
   // Event handlers
   const handleSearchTextChange = (text) => {
     setSearchQuery(text);
@@ -275,11 +302,13 @@ const BuyerHomeScreen = () => {
       setIsLoadingNewArrivals(true);
       setIsLoadingDeals(true);
       setIsLoadingBrands(true);
+      setIsLoadingFoodAndDrinks(true);
 
       // Fetch all data
       await Promise.all([
         fetchProducts(),
         fetchServices(),
+        fetchFoodAndDrinks(),
         reloadBanners(),
         reloadUserData(),
         reloadFavorites()
@@ -294,6 +323,7 @@ const BuyerHomeScreen = () => {
         setIsLoadingNewArrivals(false);
         setIsLoadingDeals(false);
         setIsLoadingBrands(false);
+        setIsLoadingFoodAndDrinks(false);
         setRefreshing(false);
       }, 1000);
 
@@ -307,6 +337,7 @@ const BuyerHomeScreen = () => {
         setIsLoadingNewArrivals(false);
         setIsLoadingDeals(false);
         setIsLoadingBrands(false);
+        setIsLoadingFoodAndDrinks(false);
         setRefreshing(false);
       }, 1000);
     }
@@ -388,6 +419,17 @@ const BuyerHomeScreen = () => {
       seeAllParams: { services: true }
     });
     
+    // Food and drinks section
+    sections.push({
+      type: 'products',
+      id: 'food-and-drinks',
+      title: 'Food & Drinks',
+      data: foodAndDrinks,
+      isLoading: isLoadingFoodAndDrinks,
+      accentColor: '#FF6B35',
+      seeAllParams: { categoryName: 'Food & Drinks', filter: { category: 'food-and-drinks' } }
+    });
+    
     // Trending categories
     sections.push({
       type: 'trending-categories',
@@ -423,6 +465,7 @@ const BuyerHomeScreen = () => {
     featuredProducts, isLoadingProducts,
     newArrivals, isLoadingNewArrivals,
     services, isLoadingServices,
+    foodAndDrinks, isLoadingFoodAndDrinks,
     isLoadingDeals, isLoadingBrands,
     memoizedSortedProducts
   ]);
