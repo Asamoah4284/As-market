@@ -23,6 +23,12 @@ export async function registerForPushNotificationsAsync() {
   try {
     console.log('Starting push notification registration');
     
+    // Only run on real devices, not in Expo Go
+    if (!Device.isDevice) {
+      console.log('Push notifications only work on physical devices, not in Expo Go');
+      return null;
+    }
+    
     if (Platform.OS === 'android') {
       console.log('Setting up Android notification channel');
       await Notifications.setNotificationChannelAsync('default', {
@@ -30,84 +36,152 @@ export async function registerForPushNotificationsAsync() {
         importance: Notifications.AndroidImportance.MAX,
         vibrationPattern: [0, 250, 250, 250],
         lightColor: '#5D3FD3',
+        sound: true,
+        enableLights: true,
+        enableVibrate: true,
       });
       console.log('Android notification channel set up');
     }
 
-    if (Device.isDevice) {
-      console.log('Checking existing notification permissions');
-      const { status: existingStatus } = await Notifications.getPermissionsAsync();
-      console.log('Existing permission status:', existingStatus);
+    console.log('Checking existing notification permissions');
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    console.log('Existing permission status:', existingStatus);
+    
+    let finalStatus = existingStatus;
+    
+    if (existingStatus !== 'granted') {
+      console.log('Permission not granted, requesting permissions');
+      const { status } = await Notifications.requestPermissionsAsync({
+        ios: {
+          allowAlert: true,
+          allowBadge: true,
+          allowSound: true,
+          allowDisplayInCarPlay: false,
+          allowCriticalAlerts: false,
+          provideAppNotificationSettings: true,
+          allowProvisional: true,
+          allowAnnouncements: false,
+        },
+      });
+      finalStatus = status;
+      console.log('New permission status after request:', finalStatus);
+    }
+    
+    if (finalStatus !== 'granted') {
+      console.log('Failed to get push token: Permission denied');
+      return null;
+    }
+    
+    console.log('Getting Expo push token');
+    
+    try {
+      const projectId = Constants.expoConfig?.extra?.eas?.projectId || Constants.easConfig?.projectId;
       
-      let finalStatus = existingStatus;
-      
-      if (existingStatus !== 'granted') {
-        console.log('Permission not granted, requesting permissions');
-        const { status } = await Notifications.requestPermissionsAsync({
-          ios: {
-            allowAlert: true,
-            allowBadge: true,
-            allowSound: true,
-            allowDisplayInCarPlay: false,
-            allowCriticalAlerts: false,
-            provideAppNotificationSettings: true,
-            allowProvisional: true,
-            allowAnnouncements: false,
-          },
-        });
-        finalStatus = status;
-        console.log('New permission status after request:', finalStatus);
-      }
-      
-      if (finalStatus !== 'granted') {
-        console.log('Failed to get push token: Permission denied');
+      if (!projectId) {
+        console.error('Project ID not found');
         return null;
       }
       
-      console.log('Getting Expo push token');
+      token = await Notifications.getExpoPushTokenAsync({
+        projectId,
+      });
       
-      try {
-        token = await Notifications.getExpoPushTokenAsync({
-          projectId: Constants.expoConfig?.extra?.eas?.projectId,
-        });
+      console.log('Received token:', token?.data ? (token.data.substring(0, 10) + '...') : 'null');
+      
+      // Save token to AsyncStorage for future use
+      if (token) {
+        await AsyncStorage.setItem('pushToken', token.data);
+        console.log('Token saved to AsyncStorage');
         
-        console.log('Received token:', token?.data ? (token.data.substring(0, 10) + '...') : 'null');
+        // Send token to backend if user is logged in
+        const authToken = await AsyncStorage.getItem('userToken');
+        const userDataString = await AsyncStorage.getItem('userData');
         
-        // Save token to AsyncStorage for future use
-        if (token) {
-          await AsyncStorage.setItem('pushToken', token.data);
-          console.log('Token saved to AsyncStorage');
-          
-          // Send token to backend if user is logged in
-          const authToken = await AsyncStorage.getItem('userToken');
-          if (authToken) {
-            try {
+        if (authToken && userDataString) {
+          try {
+            const userData = JSON.parse(userDataString);
+            const userId = userData._id;
+            
+            if (userId) {
               await axios.post(
-                `${API_BASE_URL}/api/notifications/token`,
-                { pushToken: token.data },
+                `${API_BASE_URL}/api/users/push-token`,
+                { 
+                  userId, 
+                  pushToken: token.data 
+                },
                 {
                   headers: {
                     Authorization: `Bearer ${authToken}`,
                   },
                 }
               );
-              console.log('Push token saved to backend');
-            } catch (error) {
-              console.error('Error saving push token to backend:', error);
+              console.log('Push token saved to backend successfully');
+            } else {
+              console.error('User ID not found in userData');
             }
+          } catch (error) {
+            console.error('Error saving push token to backend:', error.response?.data || error.message);
           }
+        } else {
+          console.log('User not logged in, push token will be sent after login');
         }
-      } catch (tokenError) {
-        console.error('Error getting push token:', tokenError);
       }
-    } else {
-      console.log('Must use physical device for Push Notifications');
+    } catch (tokenError) {
+      console.error('Error getting push token:', tokenError);
     }
 
     return token?.data;
   } catch (error) {
     console.error('Error in registerForPushNotificationsAsync:', error);
     return null;
+  }
+}
+
+// Register push token for logged-in user
+export async function registerPushTokenForUser(userId, authToken) {
+  try {
+    if (!Device.isDevice) {
+      console.log('Push notifications only work on physical devices, not in Expo Go');
+      return false;
+    }
+
+    // Get the stored push token
+    const pushToken = await AsyncStorage.getItem('pushToken');
+    
+    if (!pushToken) {
+      console.log('No push token found, registering for notifications first');
+      const newToken = await registerForPushNotificationsAsync();
+      if (!newToken) {
+        console.log('Failed to get push token');
+        return false;
+      }
+      // The registerForPushNotificationsAsync function will handle sending to backend
+      return true;
+    }
+
+    // Send existing token to backend
+    try {
+      await axios.post(
+        `${API_BASE_URL}/api/users/push-token`,
+        { 
+          userId, 
+          pushToken 
+        },
+        {
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        }
+      );
+      console.log('Existing push token registered for user');
+      return true;
+    } catch (error) {
+      console.error('Error registering push token for user:', error.response?.data || error.message);
+      return false;
+    }
+  } catch (error) {
+    console.error('Error in registerPushTokenForUser:', error);
+    return false;
   }
 }
 

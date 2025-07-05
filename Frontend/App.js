@@ -12,6 +12,7 @@ import Constants from 'expo-constants';
 import { setPushToken, addNotification } from './store/slices/notificationSlice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Linking from 'expo-linking';
+import { registerForPushNotificationsAsync, registerPushTokenForUser } from './services/notificationService';
 // Import screens
 import WelcomeScreen from './screens/WelcomeScreen';
 import SignUpScreen from './screens/SignUpScreen';
@@ -131,51 +132,7 @@ function handleRegistrationError(errorMessage) {
   Alert.alert('Notification Error', errorMessage);
 }
 
-// Updated registration function for push notifications
-async function registerForPushNotificationsAsync() {
-  if (Platform.OS === 'android') {
-    Notifications.setNotificationChannelAsync('default', {
-      name: 'default',
-      importance: Notifications.AndroidImportance.MAX,
-      vibrationPattern: [0, 250, 250, 250],
-      lightColor: '#FF231F7C',
-    });
-  }
-
-  if (Device.isDevice) {
-    const { status: existingStatus } = await Notifications.getPermissionsAsync();
-    let finalStatus = existingStatus;
-    if (existingStatus !== 'granted') {
-      const { status } = await Notifications.requestPermissionsAsync();
-      finalStatus = status;
-    }
-    if (finalStatus !== 'granted') {
-      console.log('Permission not granted to get push token for push notification!');
-      return;
-    }
-    const projectId =
-      Constants?.expoConfig?.extra?.eas?.projectId ?? Constants?.easConfig?.projectId;
-    if (!projectId) {
-      console.log('Project ID not found');
-      return;
-    }
-    try {
-      const pushTokenString = (
-        await Notifications.getExpoPushTokenAsync({
-          projectId,
-        })
-      ).data;
-      console.log('Push token:', pushTokenString);
-      return pushTokenString;
-    } catch (e) {
-      console.error(`Error getting push token: ${e}`);
-      return;
-    }
-  } else {
-    console.log('Must use physical device for push notifications');
-    return;
-  }
-}
+// Push notification registration is now handled by the notification service
 
 function AppContent() {
   const [expoPushToken, setExpoPushToken] = useState('');
@@ -246,14 +203,46 @@ function AppContent() {
     });
 
     // Register for push notifications
-    registerForPushNotificationsAsync()
-      .then(token => {
-        if (token) {
-          setExpoPushToken(token);
-          dispatch(setPushToken(token));
+    const initializePushNotifications = async () => {
+      try {
+        // Check for authentication and register push notifications
+        const authToken = await AsyncStorage.getItem('userToken');
+        const userDataString = await AsyncStorage.getItem('userData');
+        
+        if (authToken && userDataString) {
+          try {
+            const userData = JSON.parse(userDataString);
+            const userId = userData._id;
+            
+            if (userId) {
+              // Register push token for logged-in user
+              await registerPushTokenForUser(userId, authToken);
+              
+              // Get the token for local state
+              const token = await AsyncStorage.getItem('pushToken');
+              if (token) {
+                setExpoPushToken(token);
+                dispatch(setPushToken(token));
+              }
+            }
+          } catch (error) {
+            console.error('Error parsing user data:', error);
+          }
+        } else {
+          // Still register for push notifications even if user is not logged in
+          // Token will be sent to backend after login
+          const token = await registerForPushNotificationsAsync();
+          if (token) {
+            setExpoPushToken(token);
+            dispatch(setPushToken(token));
+          }
         }
-      })
-      .catch(error => console.error('Error registering for push notifications:', error));
+      } catch (error) {
+        console.error('Error initializing push notifications:', error);
+      }
+    };
+
+    initializePushNotifications();
 
     // This listener is fired whenever a notification is received while the app is foregrounded
     notificationListener.current = Notifications.addNotificationReceivedListener(notification => {

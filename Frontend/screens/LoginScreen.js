@@ -110,32 +110,13 @@ function LoginScreen({ navigation, route }) {
       await AsyncStorage.setItem('userToken', token);
       await AsyncStorage.setItem('userData', JSON.stringify(userData));
       
-      // Register push notification token if role is admin
-      if (userData.role === 'admin') {
-        try {
-          const { registerForPushNotificationsAsync } = require('../services/notificationService');
-          const pushToken = await registerForPushNotificationsAsync();
-          
-          if (pushToken) {
-            // Send admin token to backend
-            await fetch(`${API_BASE_URL}/api/notifications/admin-token`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}` // Add token to headers
-              },
-              body: JSON.stringify({
-                pushToken,
-                adminKey: 'asarion_admin_key'
-              }),
-            });
-            console.log('Admin push token registered during login');
-          } else {
-            console.error('Failed to get push token for admin');
-          }
-        } catch (err) {
-          console.error('Error registering admin push token:', err);
-        }
+      // Register push notification token for all users (including admins)
+      try {
+        const { registerPushTokenAfterLogin } = require('../utils/authUtils');
+        await registerPushTokenAfterLogin(userData.id, token);
+        console.log('Push token registered during login');
+      } catch (err) {
+        console.error('Error registering push token:', err);
       }
       
       // Check if we need to redirect somewhere specific

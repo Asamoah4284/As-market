@@ -262,13 +262,139 @@ const resetPassword = async (req, res) => {
   }
 };
 
+// Update Push Token
+const updatePushToken = async (req, res) => {
+  try {
+    const { userId, pushToken } = req.body;
+
+    // Validate input
+    if (!userId || !pushToken) {
+      return res.status(400).json({ 
+        message: 'userId and pushToken are required' 
+      });
+    }
+
+    // Find and update the user
+    const user = await User.findByIdAndUpdate(
+      userId,
+      { pushToken },
+      { new: true, runValidators: true }
+    );
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    console.log(`Push token updated for user ${userId}: ${pushToken.substring(0, 20)}...`);
+    
+    res.status(200).json({
+      success: true,
+      message: 'Push token updated successfully',
+      userId: user._id
+    });
+  } catch (error) {
+    console.error('Error updating push token:', error);
+    res.status(500).json({ 
+      message: 'Server error', 
+      error: error.message 
+    });
+  }
+};
+
+// Broadcast notification to all users
+const broadcastNotification = async (req, res) => {
+  try {
+    const { title, body, data = {} } = req.body;
+
+    if (!title || !body) {
+      return res.status(400).json({ 
+        message: 'title and body are required' 
+      });
+    }
+
+    // Get all users with valid push tokens
+    const users = await User.find({ 
+      pushToken: { $ne: null, $exists: true } 
+    });
+
+    if (users.length === 0) {
+      return res.status(404).json({ 
+        message: 'No users with push tokens found' 
+      });
+    }
+
+    // Prepare push notifications
+    const messages = users.map(user => ({
+      to: user.pushToken,
+      sound: 'default',
+      title,
+      body,
+      data: {
+        ...data,
+        userId: user._id.toString()
+      }
+    }));
+
+    // Send notifications in batches (Expo recommends max 100 at a time)
+    const batchSize = 100;
+    const results = [];
+    
+    for (let i = 0; i < messages.length; i += batchSize) {
+      const batch = messages.slice(i, i + batchSize);
+      
+      try {
+        const response = await fetch('https://exp.host/--/api/v2/push/send', {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Accept-encoding': 'gzip, deflate',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(batch),
+        });
+
+        const result = await response.json();
+        results.push(result);
+        
+        // Log any errors
+        if (result.data) {
+          result.data.forEach((receipt, index) => {
+            if (receipt.status === 'error') {
+              console.error(`Push notification error for user ${batch[index].data.userId}:`, receipt.message);
+            }
+          });
+        }
+      } catch (error) {
+        console.error(`Error sending batch ${i / batchSize + 1}:`, error);
+      }
+    }
+
+    console.log(`Broadcast notification sent to ${users.length} users`);
+    
+    res.status(200).json({
+      success: true,
+      message: `Notification sent to ${users.length} users`,
+      totalUsers: users.length,
+      batches: results.length
+    });
+  } catch (error) {
+    console.error('Error broadcasting notification:', error);
+    res.status(500).json({ 
+      message: 'Server error', 
+      error: error.message 
+    });
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
   getUserProfile,
   getAllUsers,
   deleteUser,
+  admin,
   forgotPassword,
   resetPassword,
-  admin
+  updatePushToken,
+  broadcastNotification
 }; 

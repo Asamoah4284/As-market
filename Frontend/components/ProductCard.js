@@ -172,10 +172,12 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
     overflow: 'hidden',
     marginBottom: 8,
+    
   },
   productImageContainer: {
     position: 'relative',
     height: 100,
+    
   },
   productImage: {
     width: '95%',

@@ -9,7 +9,9 @@ const {
   getAllUsers,
   deleteUser,
   forgotPassword,
-  resetPassword
+  resetPassword,
+  updatePushToken,
+  broadcastNotification
 } = require('../controllers/userController');
 const { authLimiter, sensitiveOperationLimiter } = require('../middleware/rateLimiter');
 
@@ -24,8 +26,14 @@ router.post('/reset-password', authLimiter, resetPassword);
 // Protected routes
 router.get('/profile', protect, getUserProfile);
 
+// Push token routes
+router.post('/push-token', protect, updatePushToken);
+
 // Admin routes with sensitive operation limiter
 router.get('/', protect, admin, sensitiveOperationLimiter, getAllUsers);
 router.delete('/:id', protect, admin, sensitiveOperationLimiter, deleteUser);
+
+// Broadcast notification (admin only)
+router.post('/broadcast-notification', protect, admin, broadcastNotification);
 
 module.exports = router; 
