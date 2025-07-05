@@ -397,13 +397,15 @@ const BuyerHomeScreen = () => {
     // Special offers
     sections.push({
       type: 'special-offers',
-      id: 'special-offers'
+      id: 'special-offers',
+      isLoading: isLoadingDeals
     });
     
     // Featured brands
     sections.push({
       type: 'featured-brands',
-      id: 'featured-brands'
+      id: 'featured-brands',
+      isLoading: isLoadingBrands
     });
     
     // Recommended section
@@ -421,6 +423,7 @@ const BuyerHomeScreen = () => {
     featuredProducts, isLoadingProducts,
     newArrivals, isLoadingNewArrivals,
     services, isLoadingServices,
+    isLoadingDeals, isLoadingBrands,
     memoizedSortedProducts
   ]);
 
@@ -479,7 +482,7 @@ const BuyerHomeScreen = () => {
     renderTrendingCategoriesGrid()
   ), []);
 
-  const renderSpecialOffersSection = useCallback(() => (
+  const renderSpecialOffersSection = useCallback((item) => (
     <View style={[styles.sectionContainer, { marginBottom: 20 }]}>
       <View style={styles.sectionHeader}>
         <View style={styles.sectionTitleContainer}>
@@ -487,11 +490,11 @@ const BuyerHomeScreen = () => {
           <Text style={styles.sectionTitle}>Special Offers & Deals</Text>
         </View>
       </View>
-      {renderDealsSection()}
+      {renderDealsSection(item.isLoading)}
     </View>
   ), []);
 
-  const renderFeaturedBrandsSection = useCallback(() => (
+  const renderFeaturedBrandsSection = useCallback((item) => (
     <View style={[styles.sectionContainer, { marginBottom: 20 }]}>
       <View style={styles.sectionHeader}>
         <View style={styles.sectionTitleContainer}>
@@ -500,7 +503,7 @@ const BuyerHomeScreen = () => {
         </View>
       </View>
       <View style={styles.brandContainer}>
-        {renderBrandsSection()}
+        {renderBrandsSection(item.isLoading)}
       </View>
     </View>
   ), []);
@@ -576,9 +579,9 @@ const BuyerHomeScreen = () => {
       case 'trending-categories':
         return renderTrendingCategoriesSection();
       case 'special-offers':
-        return renderSpecialOffersSection();
+        return renderSpecialOffersSection(item);
       case 'featured-brands':
-        return renderFeaturedBrandsSection();
+        return renderFeaturedBrandsSection(item);
       case 'recommended':
         return renderRecommendedProducts(item);
       default:
@@ -645,8 +648,8 @@ const BuyerHomeScreen = () => {
     );
   };
 
-  const renderDealsSection = () => {
-    if (isLoadingDeals) {
+  const renderDealsSection = (isLoading) => {
+    if (isLoading) {
       return (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.dealsContainer}>
           {[1, 2, 3].map((item) => (
@@ -706,8 +709,8 @@ const BuyerHomeScreen = () => {
     );
   };
 
-  const renderBrandsSection = () => {
-    if (isLoadingBrands) {
+  const renderBrandsSection = (isLoading) => {
+    if (isLoading) {
       return (
         <ScrollView horizontal showsHorizontalScrollIndicator={false}>
           {[1, 2, 3, 4].map((item) => (
