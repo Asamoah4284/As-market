@@ -1,9 +1,14 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
+import React, { memo, useCallback, useMemo } from 'react';
+import { View, Text, TouchableOpacity, FlatList, StyleSheet, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ProductCard from './ProductCard';
 
-const ProductSection = ({ 
+const { width: screenWidth } = Dimensions.get('window');
+const PRODUCT_CARD_WIDTH = 180;
+const PRODUCT_CARD_SPACING = 12;
+const PRODUCT_TOTAL_WIDTH = PRODUCT_CARD_WIDTH + PRODUCT_CARD_SPACING;
+
+const ProductSection = memo(({ 
   title, 
   products, 
   loading, 
@@ -20,7 +25,20 @@ const ProductSection = ({
 }) => {
   console.log(`ProductSection ${title}:`, { loading, productsLength: products?.length, products });
   
-  const renderProduct = ({ item }) => (
+  // Memoized getItemLayout for FlatList optimization
+  const getItemLayout = useCallback((data, index) => ({
+    length: PRODUCT_TOTAL_WIDTH,
+    offset: PRODUCT_TOTAL_WIDTH * index,
+    index,
+  }), []);
+
+  // Memoized keyExtractor for better performance
+  const keyExtractor = useCallback((item, index) => 
+    item?._id ? item._id.toString() : `product-${index}`
+  , []);
+
+  // Optimized renderProduct with useCallback
+  const renderProduct = useCallback(({ item }) => (
     <ProductCard
       item={item}
       isFavorite={favorites.includes(item._id)}
@@ -28,7 +46,7 @@ const ProductSection = ({
       onToggleFavorite={onToggleFavorite}
       onBookService={onBookService}
     />
-  );
+  ), [favorites, onProductPress, onToggleFavorite, onBookService]);
 
   // Don't render anything if loading or no products
   if (loading || products.length === 0) {
@@ -57,14 +75,22 @@ const ProductSection = ({
       <FlatList
         data={products.slice(0, 4)} // Show only first 4 items
         renderItem={renderProduct}
-        keyExtractor={(item) => item._id.toString()}
+        keyExtractor={keyExtractor}
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.productsList}
+        getItemLayout={getItemLayout}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={2}
+        windowSize={3}
+        initialNumToRender={2}
+        updateCellsBatchingPeriod={50}
+        bounces={false}
+        scrollEventThrottle={16}
       />
     </View>
   );
-};
+});
 
 const styles = StyleSheet.create({
   sectionContainer: {

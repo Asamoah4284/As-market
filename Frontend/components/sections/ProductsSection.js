@@ -1,8 +1,13 @@
-import React, { memo } from 'react';
-import { View, Text, TouchableOpacity, FlatList, StyleSheet } from 'react-native';
+import React, { memo, useCallback, useMemo } from 'react';
+import { View, Text, TouchableOpacity, FlatList, StyleSheet, Dimensions } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import ProductCard from '../ProductCard';
 import { ProductSkeleton } from '../SkeletonComponents';
+
+const { width: screenWidth } = Dimensions.get('window');
+const PRODUCT_CARD_WIDTH = 180;
+const PRODUCT_CARD_SPACING = 12;
+const PRODUCT_TOTAL_WIDTH = PRODUCT_CARD_WIDTH + PRODUCT_CARD_SPACING;
 
 const ProductsSection = memo(({ 
   title, 
@@ -18,7 +23,25 @@ const ProductsSection = memo(({
   seeAllParams = {},
   shimmerValue
 }) => {
-  const renderProduct = ({ item }) => (
+  // Memoized getItemLayout for FlatList optimization
+  const getItemLayout = useCallback((data, index) => ({
+    length: PRODUCT_TOTAL_WIDTH,
+    offset: PRODUCT_TOTAL_WIDTH * index,
+    index,
+  }), []);
+
+  // Memoized keyExtractor for better performance
+  const keyExtractor = useCallback((item, index) => 
+    item?._id ? item._id.toString() : `product-${index}`
+  , []);
+
+  // Memoized skeleton keyExtractor
+  const skeletonKeyExtractor = useCallback((item, index) => 
+    `skeleton-${index}`
+  , []);
+
+  // Optimized renderProduct with useCallback
+  const renderProduct = useCallback(({ item }) => (
     <ProductCard
       item={item}
       isFavorite={favorites.includes(item._id)}
@@ -26,7 +49,22 @@ const ProductsSection = memo(({
       onToggleFavorite={onToggleFavorite}
       onBookService={onBookService}
     />
-  );
+  ), [favorites, onProductPress, onToggleFavorite, onBookService]);
+
+  // Optimized renderSkeleton with useCallback
+  const renderSkeleton = useCallback(({ item, index }) => (
+    <ProductSkeleton shimmerValue={shimmerValue} />
+  ), [shimmerValue]);
+
+  // Memoized skeleton data
+  const skeletonData = useMemo(() => [1, 2, 3, 4], []);
+
+  // Memoized empty component
+  const ListEmptyComponent = useCallback(() => (
+    <View style={styles.emptyStateContainer}>
+      <Text style={styles.emptyStateText}>No products available</Text>
+    </View>
+  ), []);
 
   if (isLoading) {
     return (
@@ -47,12 +85,20 @@ const ProductsSection = memo(({
           )}
         </View>
         <FlatList
-          data={[1, 2, 3, 4]}
-          renderItem={() => <ProductSkeleton shimmerValue={shimmerValue} />}
-          keyExtractor={(item) => item.toString()}
+          data={skeletonData}
+          renderItem={renderSkeleton}
+          keyExtractor={skeletonKeyExtractor}
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.productsList}
+          getItemLayout={getItemLayout}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={2}
+          windowSize={3}
+          initialNumToRender={2}
+          updateCellsBatchingPeriod={50}
+          bounces={false}
+          scrollEventThrottle={16}
         />
       </View>
     );
@@ -78,15 +124,19 @@ const ProductsSection = memo(({
       <FlatList
         data={products}
         renderItem={renderProduct}
-        keyExtractor={(item) => item._id.toString()}
+        keyExtractor={keyExtractor}
         horizontal
         showsHorizontalScrollIndicator={false}
         contentContainerStyle={styles.productsList}
-        ListEmptyComponent={() => (
-          <View style={styles.emptyStateContainer}>
-            <Text style={styles.emptyStateText}>No products available</Text>
-          </View>
-        )}
+        ListEmptyComponent={ListEmptyComponent}
+        getItemLayout={getItemLayout}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={3}
+        windowSize={5}
+        initialNumToRender={3}
+        updateCellsBatchingPeriod={50}
+        bounces={false}
+        scrollEventThrottle={16}
       />
     </View>
   );

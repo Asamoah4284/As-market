@@ -1,4 +1,4 @@
-import React, { memo, useRef, useEffect, useState, useCallback } from 'react';
+import React, { memo, useRef, useEffect, useState, useCallback, useMemo } from 'react';
 import { 
   View, 
   Text, 
@@ -15,6 +15,9 @@ const BANNER_WIDTH = 280;
 const BANNER_SPACING = 15;
 const BANNER_TOTAL_WIDTH = BANNER_WIDTH + BANNER_SPACING;
 
+// Create AnimatedFlatList for native scroll events
+const AnimatedFlatList = Animated.createAnimatedComponent(FlatList);
+
 const BannerCarousel = memo(({ 
   banners, 
   isLoading, 
@@ -26,107 +29,127 @@ const BannerCarousel = memo(({
   const scrollX = useRef(new Animated.Value(0)).current;
   const [isUserScrolling, setIsUserScrolling] = useState(false);
   const userScrollTimeoutRef = useRef(null);
+  const autoScrollIntervalRef = useRef(null);
 
-  // Auto-scroll banners
+  // Memoized viewability config for better performance
+  const viewabilityConfig = useMemo(() => ({
+    itemVisiblePercentThreshold: 50,
+    minimumViewTime: 100,
+  }), []);
+
+  // Memoized getItemLayout for FlatList optimization
+  const getItemLayout = useCallback((data, index) => ({
+    length: BANNER_TOTAL_WIDTH,
+    offset: BANNER_TOTAL_WIDTH * index,
+    index,
+  }), []);
+
+  // Optimized auto-scroll with scrollToOffset for better performance
   useEffect(() => {
-    let interval;
     if (banners.length > 1 && !isUserScrolling) {
-      interval = setInterval(() => {
+      autoScrollIntervalRef.current = setInterval(() => {
         if (flatListRef.current) {
           const nextIndex = (currentIndex + 1) % banners.length;
-          try {
-            flatListRef.current.scrollToIndex({
-              index: nextIndex,
-              animated: true,
-            });
-          } catch (error) {
-            // Fallback to scrollTo if scrollToIndex fails
-            const offset = nextIndex * BANNER_TOTAL_WIDTH;
-            flatListRef.current.scrollTo({
-              x: offset,
-              animated: true,
-            });
-          }
+          const offset = nextIndex * BANNER_TOTAL_WIDTH;
+          
+          flatListRef.current.scrollToOffset({
+            offset,
+            animated: true,
+          });
         }
-      }, 3000);
+      }, 4000);
     }
-    return () => interval && clearInterval(interval);
+    
+    return () => {
+      if (autoScrollIntervalRef.current) {
+        clearInterval(autoScrollIntervalRef.current);
+      }
+    };
   }, [currentIndex, banners.length, isUserScrolling]);
 
-  // Handle user scroll interaction
-  const handleUserScroll = () => {
+  // Handle user scroll interaction with debouncing
+  const handleUserScroll = useCallback(() => {
     setIsUserScrolling(true);
     
-    // Clear existing timeout
     if (userScrollTimeoutRef.current) {
       clearTimeout(userScrollTimeoutRef.current);
     }
     
-    // Resume auto-scroll after 5 seconds of no user interaction
     userScrollTimeoutRef.current = setTimeout(() => {
       setIsUserScrolling(false);
-    }, 5000);
-  };
+    }, 2500);
+  }, []);
 
-  // Cleanup timeout on unmount
+  // Cleanup timeouts on unmount
   useEffect(() => {
     return () => {
       if (userScrollTimeoutRef.current) {
         clearTimeout(userScrollTimeoutRef.current);
       }
+      if (autoScrollIntervalRef.current) {
+        clearInterval(autoScrollIntervalRef.current);
+      }
     };
   }, []);
 
-  // Handle scroll events
-  const handleScroll = Animated.event(
-    [{ nativeEvent: { contentOffset: { x: scrollX } } }],
-    { useNativeDriver: false }
+  // Optimized scroll handler with native driver
+  const handleScroll = useCallback(
+    Animated.event(
+      [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+      { 
+        useNativeDriver: true,
+        listener: handleUserScroll,
+      }
+    ),
+    [handleUserScroll]
   );
 
-  // Stable viewabilityConfig using useRef to prevent any changes on re-renders
-  const viewabilityConfigRef = useRef({
-    itemVisiblePercentThreshold: 50,
-  });
-
-  // Stable callback for onViewableItemsChanged using useCallback to prevent re-creation
+  // Optimized viewable items callback
   const handleViewableItemsChanged = useCallback(({ viewableItems }) => {
     if (viewableItems.length > 0) {
       setCurrentIndex(viewableItems[0].index);
     }
   }, []);
 
-  const renderBanner = ({ item, index }) => {
+  const renderBanner = useCallback(({ item, index }) => {
     // Safety check for required properties
     if (!item || !item.image) {
       return null;
     }
 
+    const handlePress = () => {
+      if (item.linkType === 'seller') {
+        navigation.navigate('CategoriesScreen', { sellerId: item.linkId });
+      } else if (item.linkType === 'product') {
+        navigation.navigate('ProductDetails', { productId: item.linkId });
+      }
+    };
+
     return (
       <TouchableOpacity
         style={styles.specialOfferCard}
-        onPress={() => {
-          if (item.linkType === 'seller') {
-            navigation.navigate('CategoriesScreen', { sellerId: item.linkId });
-          } else if (item.linkType === 'product') {
-            navigation.navigate('ProductDetails', { productId: item.linkId });
-          }
-        }}
+        onPress={handlePress}
+        activeOpacity={0.8}
       >
         <OptimizedImage 
           source={item.image} 
           style={styles.offerBackgroundImage}
           resizeMode="cover"
           placeholderColor="#f0f0f0"
-          showLoadingIndicator={true}
+          showLoadingIndicator={false}
           preload={true}
           imageType="banner"
         />
         <View style={styles.offerContentWrapper}>
           <View style={styles.offerContent}>
-            <Text style={styles.offerHeading}>{item.title || 'Special Offer'}</Text>
-            <Text style={styles.offerDetails}>{item.description || 'Discover amazing deals'}</Text>
+            <Text style={styles.offerHeading} numberOfLines={2}>
+              {item.title || 'Special Offer'}
+            </Text>
+            <Text style={styles.offerDetails} numberOfLines={2}>
+              {item.description || 'Discover amazing deals'}
+            </Text>
             {item.buttonText ? (
-              <TouchableOpacity style={styles.offerButton}>
+              <TouchableOpacity style={styles.offerButton} activeOpacity={0.7}>
                 <Text style={styles.offerButtonText}>{item.buttonText}</Text>
               </TouchableOpacity>
             ) : null}
@@ -134,41 +157,35 @@ const BannerCarousel = memo(({
         </View>
       </TouchableOpacity>
     );
-  };
+  }, [navigation]);
 
-  const renderPaginationDots = () => {
+  // Memoized pagination dots data to prevent unnecessary re-renders
+  const paginationDotsData = useMemo(() => 
+    banners.map((_, index) => ({ index, key: `dot-${index}` }))
+  , [banners.length]);
+
+  // Optimized pagination dots with memoized data
+  const renderPaginationDots = useCallback(() => {
     if (banners.length <= 1) return null;
 
     return (
       <View style={styles.paginationContainer}>
-        {banners.map((_, index) => {
+        {paginationDotsData.map(({ index }) => {
           const inputRange = [
             (index - 1) * BANNER_TOTAL_WIDTH,
             index * BANNER_TOTAL_WIDTH,
             (index + 1) * BANNER_TOTAL_WIDTH,
           ];
 
+          const opacity = scrollX.interpolate({
+            inputRange,
+            outputRange: [0.3, 1, 0.3],
+            extrapolate: 'clamp',
+          });
+
           const scale = scrollX.interpolate({
             inputRange,
             outputRange: [0.8, 1.2, 0.8],
-            extrapolate: 'clamp',
-          });
-
-          const opacity = scrollX.interpolate({
-            inputRange,
-            outputRange: [0.4, 1, 0.4],
-            extrapolate: 'clamp',
-          });
-
-          const width = scrollX.interpolate({
-            inputRange,
-            outputRange: [8, 24, 8],
-            extrapolate: 'clamp',
-          });
-
-          const borderRadius = scrollX.interpolate({
-            inputRange,
-            outputRange: [4, 4, 4],
             extrapolate: 'clamp',
           });
 
@@ -178,10 +195,8 @@ const BannerCarousel = memo(({
               style={[
                 styles.paginationDot,
                 {
-                  transform: [{ scale }],
                   opacity,
-                  width,
-                  borderRadius,
+                  transform: [{ scale }],
                 },
               ]}
             />
@@ -189,7 +204,7 @@ const BannerCarousel = memo(({
         })}
       </View>
     );
-  };
+  }, [paginationDotsData, scrollX]);
 
   if (isLoading) {
     return (
@@ -205,8 +220,12 @@ const BannerCarousel = memo(({
           )}
           keyExtractor={(_, index) => index.toString()}
           contentContainerStyle={styles.flatListContent}
-          onViewableItemsChanged={handleViewableItemsChanged}
-          viewabilityConfig={viewabilityConfigRef.current}
+          removeClippedSubviews={true}
+          maxToRenderPerBatch={2}
+          windowSize={3}
+          initialNumToRender={2}
+          updateCellsBatchingPeriod={50}
+          getItemLayout={getItemLayout}
         />
       </View>
     );
@@ -218,7 +237,7 @@ const BannerCarousel = memo(({
 
   return (
     <View style={styles.container}>
-      <FlatList
+      <AnimatedFlatList
         ref={flatListRef}
         data={banners}
         horizontal
@@ -229,14 +248,17 @@ const BannerCarousel = memo(({
         onScroll={handleScroll}
         onScrollBeginDrag={handleUserScroll}
         onViewableItemsChanged={handleViewableItemsChanged}
-        viewabilityConfig={viewabilityConfigRef.current}
+        viewabilityConfig={viewabilityConfig}
         snapToInterval={BANNER_TOTAL_WIDTH}
-        decelerationRate="fast"
-        getItemLayout={(data, index) => ({
-          length: BANNER_TOTAL_WIDTH,
-          offset: BANNER_TOTAL_WIDTH * index,
-          index,
-        })}
+        decelerationRate={0.8}
+        getItemLayout={getItemLayout}
+        removeClippedSubviews={true}
+        maxToRenderPerBatch={2}
+        windowSize={3}
+        initialNumToRender={2}
+        updateCellsBatchingPeriod={50}
+        bounces={false}
+        scrollEventThrottle={16}
       />
       {renderPaginationDots()}
     </View>
@@ -311,8 +333,10 @@ const styles = StyleSheet.create({
   },
   paginationDot: {
     height: 8,
+    width: 8,
     backgroundColor: '#5D3FD3',
     marginHorizontal: 4,
+    borderRadius: 4,
   },
 });
 
