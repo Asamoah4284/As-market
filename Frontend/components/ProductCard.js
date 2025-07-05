@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useMemo, useCallback } from 'react';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { API_BASE_URL } from '../config/api';
@@ -12,14 +12,76 @@ const ProductCard = memo(({
   onAddToCart,
   onBookService 
 }) => {
-  const imageUri = item.image && (item.image.startsWith('http') 
-    ? item.image 
-    : `${API_BASE_URL}${item.image}`);
+  // Memoize image URI calculation
+  const imageUri = useMemo(() => {
+    if (!item.image) return null;
+    return item.image.startsWith('http') 
+      ? item.image 
+      : `${API_BASE_URL}${item.image}`;
+  }, [item.image]);
+
+  // Memoize favorite toggle handler
+  const handleToggleFavorite = useCallback((e) => {
+    e.stopPropagation();
+    onToggleFavorite(item._id);
+  }, [onToggleFavorite, item._id]);
+
+  // Memoize book service handler
+  const handleBookService = useCallback(() => {
+    onBookService(item);
+  }, [onBookService, item]);
+
+  // Memoize press handler
+  const handlePress = useCallback(() => {
+    onPress(item);
+  }, [onPress, item]);
+
+  // Memoize price display
+  const priceDisplay = useMemo(() => {
+    if (!item.price) return null;
+    return `GH¢${item.price.toFixed(2)}`;
+  }, [item.price]);
+
+  // Memoize original price display
+  const originalPriceDisplay = useMemo(() => {
+    if (!item.originalPrice) return null;
+    return `GH¢${item.originalPrice.toFixed(2)}`;
+  }, [item.originalPrice]);
+
+  // Memoize badge rendering
+  const badgeContent = useMemo(() => {
+    if (item.isNew === true) {
+      return (
+        <View style={[styles.productBadge, { backgroundColor: '#FF6B6B' }]}>
+          <Text style={styles.productBadgeText}>New</Text>
+        </View>
+      );
+    }
+    
+    if (!item.isNew && !item.isService && item.countInStock === 0) {
+      return (
+        <View style={[styles.productBadge, { backgroundColor: '#FF4757' }]}>
+          <Text style={styles.productBadgeText}>Out of Stock</Text>
+        </View>
+      );
+    }
+    
+    if (item.isService) {
+      return (
+        <View style={[styles.productBadge, { backgroundColor: '#4ECDC4' }]}>
+          <Text style={styles.productBadgeText}>Service</Text>
+        </View>
+      );
+    }
+    
+    return null;
+  }, [item.isNew, item.isService, item.countInStock]);
 
   return (
     <TouchableOpacity 
       style={styles.productCard}
-      onPress={onPress}
+      onPress={handlePress}
+      activeOpacity={0.8}
     >
       <View style={styles.productImageContainer}>
         <OptimizedImage 
@@ -28,33 +90,14 @@ const ProductCard = memo(({
           resizeMode="cover"
           placeholderColor="#f0f0f0"
           showLoadingIndicator={false}
-          onError={(error) => console.error('Image loading error:', error.nativeEvent.error)}
-          onLoad={() => console.log('Image loaded successfully:', imageUri)}
+          imageType="thumbnail"
+          preload={false}
         />
-        {/* Show New badge only for new products */}
-        {item.isNew === true && (
-          <View style={[styles.productBadge, { backgroundColor: '#FF6B6B' }]}>
-            <Text style={styles.productBadgeText}>New</Text>
-          </View>
-        )}
-        {/* Show Out of Stock badge only for non-service products with zero stock and not new */}
-        {!item.isNew && !item.isService && item.countInStock === 0 && (
-          <View style={[styles.productBadge, { backgroundColor: '#FF4757' }]}>
-            <Text style={styles.productBadgeText}>Out of Stock</Text>
-          </View>
-        )}
-        {/* Show Service badge for services */}
-        {item.isService && (
-          <View style={[styles.productBadge, { backgroundColor: '#4ECDC4' }]}>
-            <Text style={styles.productBadgeText}>Service</Text>
-          </View>
-        )}
+        {badgeContent}
         <TouchableOpacity 
           style={styles.favoriteButton}
-          onPress={(e) => {
-            e.stopPropagation();
-            onToggleFavorite(item._id);
-          }}
+          onPress={handleToggleFavorite}
+          activeOpacity={0.7}
         >
           <Ionicons 
             name={isFavorite ? "heart" : "heart-outline"} 
@@ -67,9 +110,9 @@ const ProductCard = memo(({
         <Text style={styles.productName} numberOfLines={1}>{item.name}</Text>
         <View style={styles.productDetails}>
           <View style={styles.priceContainer}>
-            <Text style={styles.productPrice}>GH¢{item.price.toFixed(2)}</Text>
-            {item.originalPrice && (
-              <Text style={styles.originalPrice}>GH¢{item.originalPrice.toFixed(2)}</Text>
+            <Text style={styles.productPrice}>{priceDisplay}</Text>
+            {originalPriceDisplay && (
+              <Text style={styles.originalPrice}>{originalPriceDisplay}</Text>
             )}
           </View>
           {/* number of views */}
@@ -95,7 +138,8 @@ const ProductCard = memo(({
           {item.isService && (
             <TouchableOpacity 
               style={styles.bookServiceButton}
-              onPress={() => onBookService(item)}
+              onPress={handleBookService}
+              activeOpacity={0.7}
             >
               <Ionicons name="calendar" size={20} color="#4ECDC4" />
             </TouchableOpacity>
@@ -104,7 +148,22 @@ const ProductCard = memo(({
       </View>
     </TouchableOpacity>
   );
+}, (prevProps, nextProps) => {
+  // Custom comparison function for better memoization
+  return (
+    prevProps.item._id === nextProps.item._id &&
+    prevProps.isFavorite === nextProps.isFavorite &&
+    prevProps.item.name === nextProps.item.name &&
+    prevProps.item.price === nextProps.item.price &&
+    prevProps.item.image === nextProps.item.image &&
+    prevProps.item.views === nextProps.item.views &&
+    prevProps.item.countInStock === nextProps.item.countInStock &&
+    prevProps.item.isService === nextProps.item.isService &&
+    prevProps.item.isNew === nextProps.item.isNew
+  );
 });
+
+ProductCard.displayName = 'ProductCard';
 
 const styles = StyleSheet.create({
   productCard: {

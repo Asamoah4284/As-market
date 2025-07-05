@@ -232,6 +232,9 @@ const BannerCarousel = memo(({
           initialNumToRender={2}
           updateCellsBatchingPeriod={50}
           getItemLayout={getItemLayout}
+          scrollEventThrottle={16}
+          disableIntervalMomentum={true}
+          decelerationRate="fast"
         />
       </View>
     );
@@ -265,6 +268,9 @@ const BannerCarousel = memo(({
         updateCellsBatchingPeriod={50}
         bounces={false}
         scrollEventThrottle={16}
+        disableIntervalMomentum={true}
+        pagingEnabled={false}
+        nestedScrollEnabled={false}
       />
       {renderPaginationDots()}
     </View>

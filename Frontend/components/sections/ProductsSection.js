@@ -66,6 +66,11 @@ const ProductsSection = memo(({
     </View>
   ), []);
 
+  // Memoized see all handler
+  const handleSeeAll = useCallback(() => {
+    navigation.navigate('CategoriesScreen', seeAllParams);
+  }, [navigation, seeAllParams]);
+
   if (isLoading) {
     return (
       <View style={styles.sectionContainer}>
@@ -77,7 +82,7 @@ const ProductsSection = memo(({
           {showSeeAll && (
             <TouchableOpacity 
               style={styles.seeAllButton} 
-              onPress={() => navigation.navigate('CategoriesScreen', seeAllParams)}
+              onPress={handleSeeAll}
             >
               <Text style={styles.seeAllText}>See All</Text>
               <Ionicons name="chevron-forward" size={16} color="#5D3FD3" />
@@ -99,6 +104,9 @@ const ProductsSection = memo(({
           updateCellsBatchingPeriod={50}
           bounces={false}
           scrollEventThrottle={16}
+          disableIntervalMomentum={true}
+          snapToInterval={PRODUCT_TOTAL_WIDTH}
+          decelerationRate="fast"
         />
       </View>
     );
@@ -114,7 +122,7 @@ const ProductsSection = memo(({
         {showSeeAll && (
           <TouchableOpacity 
             style={styles.seeAllButton} 
-            onPress={() => navigation.navigate('CategoriesScreen', seeAllParams)}
+            onPress={handleSeeAll}
           >
             <Text style={styles.seeAllText}>See All</Text>
             <Ionicons name="chevron-forward" size={16} color="#5D3FD3" />
@@ -137,10 +145,26 @@ const ProductsSection = memo(({
         updateCellsBatchingPeriod={50}
         bounces={false}
         scrollEventThrottle={16}
+        disableIntervalMomentum={true}
+        snapToInterval={PRODUCT_TOTAL_WIDTH}
+        decelerationRate="fast"
       />
     </View>
   );
+}, (prevProps, nextProps) => {
+  // Custom comparison for better memoization
+  return (
+    prevProps.title === nextProps.title &&
+    prevProps.isLoading === nextProps.isLoading &&
+    prevProps.products === nextProps.products &&
+    prevProps.favorites === nextProps.favorites &&
+    prevProps.accentColor === nextProps.accentColor &&
+    prevProps.showSeeAll === nextProps.showSeeAll &&
+    JSON.stringify(prevProps.seeAllParams) === JSON.stringify(nextProps.seeAllParams)
+  );
 });
+
+ProductsSection.displayName = 'ProductsSection';
 
 const styles = StyleSheet.create({
   sectionContainer: {

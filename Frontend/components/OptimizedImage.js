@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, memo } from 'react';
 import { View, Image, ActivityIndicator, StyleSheet } from 'react-native';
 import { 
   optimizeCloudinaryUrl, 
@@ -8,7 +8,10 @@ import {
   preloadImage 
 } from '../utils/imageUtils';
 
-const OptimizedImage = ({
+// Image cache to prevent re-rendering with the same images
+const imageCache = new Map();
+
+const OptimizedImage = memo(({
   source,
   style,
   resizeMode = 'cover',
@@ -26,27 +29,10 @@ const OptimizedImage = ({
   const [hasError, setHasError] = useState(false);
   const [imageUri, setImageUri] = useState(null);
 
-  useEffect(() => {
-    if (source?.uri) {
-      const optimizedUri = getOptimizedUrl(source.uri);
-      setImageUri(optimizedUri);
-      
-      // Preload image if requested
-      if (preload) {
-        preloadImage(source.uri, getOptimizationOptions());
-      }
-    } else if (typeof source === 'string') {
-      const optimizedUri = getOptimizedUrl(source);
-      setImageUri(optimizedUri);
-      
-      // Preload image if requested
-      if (preload) {
-        preloadImage(source, getOptimizationOptions());
-      }
-    }
-  }, [source, preload, imageType, optimizationOptions]);
+  // Debounced image loading to prevent excessive re-renders
+  const [loadingTimeout, setLoadingTimeout] = useState(null);
 
-  const getOptimizationOptions = () => {
+  const getOptimizationOptions = useCallback(() => {
     switch (imageType) {
       case 'banner':
         return {
@@ -58,7 +44,7 @@ const OptimizedImage = ({
       case 'thumbnail':
         return {
           width: 300,
-          quality: 'auto',
+          quality: '70',
           format: 'auto',
           maintainQuality: false
         };
@@ -68,48 +54,123 @@ const OptimizedImage = ({
       default:
         return {
           width: 600,
-          quality: 'auto',
+          quality: '75',
           format: 'auto',
           maintainQuality: false
         };
     }
-  };
+  }, [imageType, optimizationOptions]);
 
-  const getOptimizedUrl = (url) => {
+  const getOptimizedUrl = useCallback((url) => {
+    // Check cache first
+    const cacheKey = `${url}-${imageType}`;
+    if (imageCache.has(cacheKey)) {
+      return imageCache.get(cacheKey);
+    }
+
+    let optimizedUrl;
     switch (imageType) {
       case 'banner':
-        return optimizeBannerUrl(url);
+        optimizedUrl = optimizeBannerUrl(url);
+        break;
       case 'thumbnail':
-        return optimizeThumbnailUrl(url);
+        optimizedUrl = optimizeThumbnailUrl(url);
+        break;
       case 'custom':
-        return optimizeCloudinaryUrl(url, optimizationOptions);
+        optimizedUrl = optimizeCloudinaryUrl(url, optimizationOptions);
+        break;
       case 'product':
       default:
-        return optimizeProductUrl(url);
+        optimizedUrl = optimizeProductUrl(url);
+        break;
     }
-  };
 
-  const handleLoadStart = () => {
+    // Cache the optimized URL
+    imageCache.set(cacheKey, optimizedUrl);
+    return optimizedUrl;
+  }, [imageType, optimizationOptions]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    const processImage = async () => {
+      if (source?.uri) {
+        const optimizedUri = getOptimizedUrl(source.uri);
+        if (isMounted) {
+          setImageUri(optimizedUri);
+        }
+        
+        // Preload image if requested
+        if (preload) {
+          try {
+            await preloadImage(source.uri, getOptimizationOptions());
+          } catch (error) {
+            console.warn('Preload failed:', error);
+          }
+        }
+      } else if (typeof source === 'string') {
+        const optimizedUri = getOptimizedUrl(source);
+        if (isMounted) {
+          setImageUri(optimizedUri);
+        }
+        
+        // Preload image if requested
+        if (preload) {
+          try {
+            await preloadImage(source, getOptimizationOptions());
+          } catch (error) {
+            console.warn('Preload failed:', error);
+          }
+        }
+      }
+    };
+
+    processImage();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [source, preload, getOptimizedUrl, getOptimizationOptions]);
+
+  const handleLoadStart = useCallback(() => {
     setIsLoading(true);
     setHasError(false);
-  };
+  }, []);
 
-  const handleLoad = (event) => {
-    setIsLoading(false);
-    setHasError(false);
+  const handleLoad = useCallback((event) => {
+    // Debounce loading state to prevent flicker
+    if (loadingTimeout) {
+      clearTimeout(loadingTimeout);
+    }
+    
+    const timeout = setTimeout(() => {
+      setIsLoading(false);
+      setHasError(false);
+    }, 100);
+    
+    setLoadingTimeout(timeout);
     onLoad?.(event);
-  };
+  }, [onLoad, loadingTimeout]);
 
-  const handleError = (event) => {
+  const handleError = useCallback((event) => {
     setIsLoading(false);
     setHasError(true);
     onError?.(event);
-  };
+  }, [onError]);
 
-  const handleLoadEnd = (event) => {
+  const handleLoadEnd = useCallback((event) => {
     setIsLoading(false);
     onLoadEnd?.(event);
-  };
+  }, [onLoadEnd]);
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (loadingTimeout) {
+        clearTimeout(loadingTimeout);
+      }
+    };
+  }, [loadingTimeout]);
 
   if (!imageUri) {
     return (
@@ -151,7 +212,20 @@ const OptimizedImage = ({
       )}
     </View>
   );
-};
+}, (prevProps, nextProps) => {
+  // Custom comparison for better memoization
+  return (
+    prevProps.source === nextProps.source &&
+    prevProps.imageType === nextProps.imageType &&
+    prevProps.style === nextProps.style &&
+    prevProps.resizeMode === nextProps.resizeMode &&
+    prevProps.placeholderColor === nextProps.placeholderColor &&
+    prevProps.showLoadingIndicator === nextProps.showLoadingIndicator &&
+    prevProps.preload === nextProps.preload
+  );
+});
+
+OptimizedImage.displayName = 'OptimizedImage';
 
 const styles = StyleSheet.create({
   container: {

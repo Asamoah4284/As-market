@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   View,
   StyleSheet,
@@ -326,6 +326,273 @@ const BuyerHomeScreen = () => {
       clearTimeout(searchTimeoutRef.current);
     }
   };
+
+  // Memoize expensive computations
+  const memoizedSortedProducts = useMemo(() => {
+    return [...featuredProducts].sort((a, b) => {
+      const dateA = new Date(a.createdAt || 0);
+      const dateB = new Date(b.createdAt || 0);
+      return dateB - dateA;
+    });
+  }, [featuredProducts]);
+
+  // Create sections data for FlatList
+  const sectionsData = useMemo(() => {
+    const sections = [];
+    
+    // Banner section
+    sections.push({
+      type: 'banner',
+      id: 'banner-section',
+      data: banners,
+      isLoading: isLoadingBanners
+    });
+    
+    // Categories section
+    sections.push({
+      type: 'categories',
+      id: 'categories-section',
+      isLoading: isLoadingCategories
+    });
+    
+    // Featured products section
+    sections.push({
+      type: 'products',
+      id: 'featured-products',
+      title: 'Featured Products',
+      data: featuredProducts,
+      isLoading: isLoadingProducts,
+      accentColor: '#5D3FD3',
+      seeAllParams: { featuredOnly: true }
+    });
+    
+    // New arrivals section
+    sections.push({
+      type: 'products',
+      id: 'new-arrivals',
+      title: 'New Arrivals',
+      data: newArrivals.slice(0, 3),
+      isLoading: isLoadingNewArrivals,
+      accentColor: '#5D3FD3',
+      seeAllParams: { newArrivals: true }
+    });
+    
+    // Services section
+    sections.push({
+      type: 'products',
+      id: 'services',
+      title: 'Services',
+      data: services,
+      isLoading: isLoadingServices,
+      accentColor: '#4ECDC4',
+      seeAllParams: { services: true }
+    });
+    
+    // Trending categories
+    sections.push({
+      type: 'trending-categories',
+      id: 'trending-categories'
+    });
+    
+    // Special offers
+    sections.push({
+      type: 'special-offers',
+      id: 'special-offers'
+    });
+    
+    // Featured brands
+    sections.push({
+      type: 'featured-brands',
+      id: 'featured-brands'
+    });
+    
+    // Recommended section
+    sections.push({
+      type: 'recommended',
+      id: 'recommended',
+      data: memoizedSortedProducts,
+      isLoading: isLoadingProducts
+    });
+    
+    return sections;
+  }, [
+    banners, isLoadingBanners,
+    isLoadingCategories,
+    featuredProducts, isLoadingProducts,
+    newArrivals, isLoadingNewArrivals,
+    services, isLoadingServices,
+    memoizedSortedProducts
+  ]);
+
+  // Memoized keyExtractor
+  const keyExtractor = useCallback((item) => item.id, []);
+
+  // Memoized getItemLayout for better performance
+  const getItemLayout = useCallback((data, index) => {
+    const ESTIMATED_ITEM_SIZE = 300; // Estimate based on your sections
+    return {
+      length: ESTIMATED_ITEM_SIZE,
+      offset: ESTIMATED_ITEM_SIZE * index,
+      index,
+    };
+  }, []);
+
+  // Optimized render functions with useCallback
+  const renderBannerSection = useCallback((item) => (
+    <View style={styles.specialOffersContainer}>
+      <View style={styles.specialOffersHeader}>
+        <Text style={styles.specialOffersTitle}>#SpecialForYou</Text>
+      </View>
+      <BannerCarousel
+        banners={item.data}
+        isLoading={item.isLoading}
+        navigation={navigation}
+        BannerSkeleton={BannerSkeleton}
+      />
+    </View>
+  ), [navigation]);
+
+  const renderCategoriesSection = useCallback((item) => (
+    <CategoriesSection
+      isLoading={item.isLoading}
+      navigation={navigation}
+    />
+  ), [navigation]);
+
+  const renderProductsSection = useCallback((item) => (
+    <ProductsSection
+      title={item.title}
+      products={item.data}
+      isLoading={item.isLoading}
+      navigation={navigation}
+      favorites={favorites}
+      onToggleFavorite={toggleFavorite}
+      onProductPress={handleProductPress}
+      onBookService={handleBookService}
+      accentColor={item.accentColor}
+      seeAllParams={item.seeAllParams}
+      shimmerValue={shimmerValue}
+    />
+  ), [favorites, toggleFavorite, handleProductPress, handleBookService, shimmerValue]);
+
+  const renderTrendingCategoriesSection = useCallback(() => (
+    renderTrendingCategoriesGrid()
+  ), []);
+
+  const renderSpecialOffersSection = useCallback(() => (
+    <View style={[styles.sectionContainer, { marginBottom: 20 }]}>
+      <View style={styles.sectionHeader}>
+        <View style={styles.sectionTitleContainer}>
+          <View style={[styles.sectionTitleAccent, {backgroundColor: '#5D3FD3'}]}></View>
+          <Text style={styles.sectionTitle}>Special Offers & Deals</Text>
+        </View>
+      </View>
+      {renderDealsSection()}
+    </View>
+  ), []);
+
+  const renderFeaturedBrandsSection = useCallback(() => (
+    <View style={[styles.sectionContainer, { marginBottom: 20 }]}>
+      <View style={styles.sectionHeader}>
+        <View style={styles.sectionTitleContainer}>
+          <View style={[styles.sectionTitleAccent, {backgroundColor: '#6c5ce7'}]}></View>
+          <Text style={styles.sectionTitle}>Featured Brands</Text>
+        </View>
+      </View>
+      <View style={styles.brandContainer}>
+        {renderBrandsSection()}
+      </View>
+    </View>
+  ), []);
+
+  const renderRecommendedProducts = useCallback((item) => (
+    <View style={[styles.sectionContainer, { marginBottom: 20 }]}>
+      <View style={styles.sectionHeader}>
+        <View style={styles.sectionTitleContainer}>
+          <View style={[styles.sectionTitleAccent, {backgroundColor: '#FF6B6B'}]}></View>
+          <Text style={styles.sectionTitle}>Recommended for You</Text>
+        </View>
+        <TouchableOpacity 
+          style={styles.seeAllButton} 
+          onPress={() => navigation.navigate('CategoriesScreen', { recommended: true })}
+        >
+          <Text style={styles.seeAllText}>See All</Text>
+          <Ionicons name="chevron-forward" size={16} color="#5D3FD3" />
+        </TouchableOpacity>
+      </View>
+
+      {item.isLoading ? (
+        <View style={styles.recommendedGridContainer}>
+          <View style={styles.recommendedRow}>
+            {[1, 2].map((item) => (
+              <View key={item} style={styles.recommendedGridItem}>
+                <ProductSkeleton shimmerValue={shimmerValue} />
+              </View>
+            ))}
+          </View>
+          <View style={styles.recommendedRow}>
+            {[3, 4].map((item) => (
+              <View key={item} style={styles.recommendedGridItem}>
+                <ProductSkeleton shimmerValue={shimmerValue} />
+              </View>
+            ))}
+          </View>
+        </View>
+      ) : (
+        <View style={styles.recommendedGridContainer}>
+          {Array.from({ length: Math.ceil(item.data.length / 2) }).map((_, rowIndex) => (
+            <View key={rowIndex} style={styles.recommendedRow}>
+              {item.data.slice(rowIndex * 2, rowIndex * 2 + 2).map((product) => (
+                <TouchableOpacity 
+                  key={product._id}
+                  style={styles.recommendedGridItem}
+                  onPress={() => handleProductPress(product)}
+                >
+                  <ProductCard
+                    item={product}
+                    isFavorite={favorites.includes(product._id)}
+                    onPress={() => handleProductPress(product)}
+                    onToggleFavorite={toggleFavorite}
+                    onBookService={handleBookService}
+                  />
+                </TouchableOpacity>
+              ))}
+            </View>
+          ))}
+        </View>
+      )}
+    </View>
+  ), [navigation, handleProductPress, favorites, toggleFavorite, handleBookService, shimmerValue]);
+
+  // Main render function for FlatList items
+  const renderSection = useCallback(({ item }) => {
+    switch (item.type) {
+      case 'banner':
+        return renderBannerSection(item);
+      case 'categories':
+        return renderCategoriesSection(item);
+      case 'products':
+        return renderProductsSection(item);
+      case 'trending-categories':
+        return renderTrendingCategoriesSection();
+      case 'special-offers':
+        return renderSpecialOffersSection();
+      case 'featured-brands':
+        return renderFeaturedBrandsSection();
+      case 'recommended':
+        return renderRecommendedProducts(item);
+      default:
+        return null;
+    }
+  }, [
+    renderBannerSection,
+    renderCategoriesSection,
+    renderProductsSection,
+    renderTrendingCategoriesSection,
+    renderSpecialOffersSection,
+    renderFeaturedBrandsSection,
+    renderRecommendedProducts
+  ]);
 
   // Render functions for sections
   const renderSearchResults = () => {
@@ -665,74 +932,6 @@ const BuyerHomeScreen = () => {
     </View>
   );
 
-  const renderRecommendedSection = () => {
-    // Sort products by createdAt date in descending order (newest first)
-    const sortedProducts = [...featuredProducts].sort((a, b) => {
-      const dateA = new Date(a.createdAt || 0);
-      const dateB = new Date(b.createdAt || 0);
-      return dateB - dateA;
-    });
-
-    return (
-      <View style={[styles.sectionContainer, { marginBottom: 20 }]}>
-        <View style={styles.sectionHeader}>
-          <View style={styles.sectionTitleContainer}>
-            <View style={[styles.sectionTitleAccent, {backgroundColor: '#FF6B6B'}]}></View>
-            <Text style={styles.sectionTitle}>Recommended for You</Text>
-          </View>
-          <TouchableOpacity 
-            style={styles.seeAllButton} 
-            onPress={() => navigation.navigate('CategoriesScreen', { recommended: true })}
-          >
-            <Text style={styles.seeAllText}>See All</Text>
-            <Ionicons name="chevron-forward" size={16} color="#5D3FD3" />
-          </TouchableOpacity>
-        </View>
-
-        {isLoadingProducts ? (
-          <View style={styles.recommendedGridContainer}>
-            <View style={styles.recommendedRow}>
-              {[1, 2].map((item) => (
-                <View key={item} style={styles.recommendedGridItem}>
-                  <ProductSkeleton shimmerValue={shimmerValue} />
-                </View>
-              ))}
-            </View>
-            <View style={styles.recommendedRow}>
-              {[3, 4].map((item) => (
-                <View key={item} style={styles.recommendedGridItem}>
-                  <ProductSkeleton shimmerValue={shimmerValue} />
-                </View>
-              ))}
-            </View>
-          </View>
-        ) : (
-          <View style={styles.recommendedGridContainer}>
-            {Array.from({ length: Math.ceil(sortedProducts.length / 2) }).map((_, rowIndex) => (
-              <View key={rowIndex} style={styles.recommendedRow}>
-                {sortedProducts.slice(rowIndex * 2, rowIndex * 2 + 2).map((item) => (
-                  <TouchableOpacity 
-                    key={item._id}
-                    style={styles.recommendedGridItem}
-                    onPress={() => handleProductPress(item)}
-                  >
-                    <ProductCard
-                      item={item}
-                      isFavorite={favorites.includes(item._id)}
-                      onPress={() => handleProductPress(item)}
-                      onToggleFavorite={toggleFavorite}
-                      onBookService={handleBookService}
-                    />
-                  </TouchableOpacity>
-                ))}
-              </View>
-            ))}
-          </View>
-        )}
-      </View>
-    );
-  };
-
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#5D3FD3" />
@@ -761,114 +960,32 @@ const BuyerHomeScreen = () => {
         {searchQuery.trim() ? (
           renderSearchResults()
         ) : (
-          <ScrollView 
-            showsVerticalScrollIndicator={false} 
-            style={styles.scrollContent}
-            refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={handleRefresh}
-                colors={['#5D3FD3']}
-                tintColor="#5D3FD3"
-                title="Pull to refresh"
-                titleColor="#5D3FD3"
-              />
-            }
-          >
-            {/* Banner Carousel Section */}
-            <View style={styles.specialOffersContainer}>
-              <View style={styles.specialOffersHeader}>
-                <Text style={styles.specialOffersTitle}>#SpecialForYou</Text>
-              </View>
-              <BannerCarousel
-                banners={banners}
-                isLoading={isLoadingBanners}
-                navigation={navigation}
-                BannerSkeleton={BannerSkeleton}
-              />
-            </View>
-            
-            {/* Categories */}
-            <CategoriesSection
-              isLoading={isLoadingCategories}
-              navigation={navigation}
-            />
-            
-            {/* Featured Products */}
-            <ProductsSection
-              title="Featured Products"
-              products={featuredProducts}
-              isLoading={isLoadingProducts}
-              navigation={navigation}
-              favorites={favorites}
-              onToggleFavorite={toggleFavorite}
-              onProductPress={handleProductPress}
-              onBookService={handleBookService}
-              accentColor="#5D3FD3"
-              seeAllParams={{ featuredOnly: true }}
-              shimmerValue={shimmerValue}
-            />
-            
-            {/* New Arrivals */}
-            <ProductsSection
-              title="New Arrivals"
-              products={newArrivals.slice(0, 3)}
-              isLoading={isLoadingNewArrivals}
-              navigation={navigation}
-              favorites={favorites}
-              onToggleFavorite={toggleFavorite}
-              onProductPress={handleProductPress}
-              onBookService={handleBookService}
-              accentColor="#5D3FD3"
-              seeAllParams={{ newArrivals: true }}
-              shimmerValue={shimmerValue}
-            />
-
-            {/* Services */}
-            <ProductsSection
-              title="Services"
-              products={services}
-              isLoading={isLoadingServices}
-              navigation={navigation}
-              favorites={favorites}
-              onToggleFavorite={toggleFavorite}
-              onProductPress={handleProductPress}
-              onBookService={handleBookService}
-              accentColor="#4ECDC4"
-              seeAllParams={{ services: true }}
-              shimmerValue={shimmerValue}
-            />
-
-            {/* Trending Categories Grid */}
-            {renderTrendingCategoriesGrid()}
-
-            {/* Special Offers & Deals */}
-            <View style={[styles.sectionContainer, { marginBottom: 20 }]}>
-              <View style={styles.sectionHeader}>
-                <View style={styles.sectionTitleContainer}>
-                  <View style={[styles.sectionTitleAccent, {backgroundColor: '#5D3FD3'}]}></View>
-                  <Text style={styles.sectionTitle}>Special Offers & Deals</Text>
-                </View>
-              </View>
-              {renderDealsSection()}
-            </View>
-
-            {/* Featured Brands */}
-            <View style={[styles.sectionContainer, { marginBottom: 20 }]}>
-              <View style={styles.sectionHeader}>
-                <View style={styles.sectionTitleContainer}>
-                  <View style={[styles.sectionTitleAccent, {backgroundColor: '#6c5ce7'}]}></View>
-                  <Text style={styles.sectionTitle}>Featured Brands</Text>
-                </View>
-              </View>
-              <View style={styles.brandContainer}>
-                {renderBrandsSection()}
-              </View>
-            </View>
-
-            {/* Recommended for You Section */}
-            {renderRecommendedSection()}
-          </ScrollView>
+                     <FlatList
+             data={sectionsData}
+             keyExtractor={keyExtractor}
+             getItemLayout={getItemLayout}
+             renderItem={renderSection}
+             showsVerticalScrollIndicator={false}
+             style={styles.scrollContent}
+             refreshControl={
+               <RefreshControl
+                 refreshing={refreshing}
+                 onRefresh={handleRefresh}
+                 colors={['#5D3FD3']}
+                 tintColor="#5D3FD3"
+                 title="Pull to refresh"
+                 titleColor="#5D3FD3"
+               />
+             }
+             removeClippedSubviews={true}
+             maxToRenderPerBatch={3}
+             windowSize={7}
+             initialNumToRender={4}
+             updateCellsBatchingPeriod={100}
+             scrollEventThrottle={16}
+             bounces={true}
+             contentContainerStyle={styles.flatListContent}
+           />
         )}
 
         {/* Bottom Navigation */}
@@ -926,6 +1043,9 @@ const styles = StyleSheet.create({
   scrollContent: {
     flex: 1,
     marginBottom: 60,
+  },
+  flatListContent: {
+    paddingBottom: 20,
   },
   specialOffersContainer: {
     marginTop: 10,
