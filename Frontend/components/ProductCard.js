@@ -178,10 +178,10 @@ const styles = StyleSheet.create({
     height: 100,
   },
   productImage: {
-    width: '100%',
-    height: '100%',
+    width: '95%',
+    height: '90%',
     backgroundColor: '#f0f0f0',
-    resizeMode: 'cover',
+    resizeMode: 'contain',
   },
   productBadge: {
     position: 'absolute',

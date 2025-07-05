@@ -772,7 +772,7 @@ const styles = StyleSheet.create({
   },
   locationSelectedText: {
     fontSize: 16,
-    color: '#333',
+    color: 'black',
   },
   locationPlaceholderText: {
     fontSize: 16,
