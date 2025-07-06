@@ -12,7 +12,6 @@ import Constants from 'expo-constants';
 import { setPushToken, addNotification } from './store/slices/notificationSlice';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Linking from 'expo-linking';
-import { registerForPushNotificationsAsync, registerPushTokenForUser } from './services/notificationService';
 // Import screens
 import WelcomeScreen from './screens/WelcomeScreen';
 import SignUpScreen from './screens/SignUpScreen';
@@ -205,38 +204,19 @@ function AppContent() {
     // Register for push notifications
     const initializePushNotifications = async () => {
       try {
-        // Check for authentication and register push notifications
-        const authToken = await AsyncStorage.getItem('userToken');
-        const userDataString = await AsyncStorage.getItem('userData');
+        console.log('🔔 Initializing push notification system...');
         
-        if (authToken && userDataString) {
-          try {
-            const userData = JSON.parse(userDataString);
-            const userId = userData.id;
-            
-            if (userId) {
-              // Register push token for logged-in user
-              await registerPushTokenForUser(userId, authToken);
-              
-              // Get the token for local state
-              const token = await AsyncStorage.getItem('pushToken');
-              if (token) {
-                setExpoPushToken(token);
-                dispatch(setPushToken(token));
-              }
-            }
-          } catch (error) {
-            console.error('Error parsing user data:', error);
-          }
-        } else {
-          // Still register for push notifications even if user is not logged in
-          // Token will be sent to backend after login
-          const token = await registerForPushNotificationsAsync();
-          if (token) {
-            setExpoPushToken(token);
-            dispatch(setPushToken(token));
-          }
+        // Set up notification handlers and listeners only
+        // Push token registration is now handled during user signup
+        
+        // Try to get any existing token for local state (optional)
+        const existingToken = await AsyncStorage.getItem('pushToken');
+        if (existingToken) {
+          setExpoPushToken(existingToken);
+          dispatch(setPushToken(existingToken));
+          console.log('📱 Found existing push token in storage');
         }
+        
       } catch (error) {
         console.error('Error initializing push notifications:', error);
       }

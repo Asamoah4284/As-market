@@ -20,6 +20,9 @@ import {
 import { API_BASE_URL } from '../config/api';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { registerForPushNotificationsAsync } from '../services/notificationService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
 
 const { width, height } = Dimensions.get('window');
 
@@ -47,6 +50,43 @@ function SignUpScreen({ navigation }) {
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to open privacy policy');
+    }
+  };
+
+  const registerPushTokenForNewUser = async (userId, token) => {
+    try {
+      console.log('🔔 Registering push token for new user:', userId);
+      
+      // Get push token
+      const pushToken = await registerForPushNotificationsAsync();
+      
+      if (pushToken) {
+        console.log('📤 Sending push token to backend for new user');
+        
+        // Send push token to backend
+        await axios.post(
+          `${API_BASE_URL}/api/users/push-token`,
+          { 
+            userId, 
+            pushToken 
+          },
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+        
+        console.log('✅ Push token registered successfully for new user');
+        return true;
+      } else {
+        console.log('⚠️ No push token received, but continuing with signup');
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Error registering push token for new user:', error);
+      // Don't fail the signup if push token registration fails
+      return false;
     }
   };
 
@@ -103,10 +143,20 @@ function SignUpScreen({ navigation }) {
       const data = await response.json();
 
       if (response.ok) {
+        console.log('✅ User account created successfully');
+        console.log('🔔 Attempting to register push token for new user...');
+        
+        // Register push token for the new user
+        try {
+          await registerPushTokenForNewUser(data._id, data.token);
+        } catch (pushError) {
+          console.error('Push token registration failed, but continuing:', pushError);
+        }
+        
         // Show success message and navigate to login
         Alert.alert(
           "Account Created Successfully",
-          "You can now log in with your credentials",
+          "Your account has been created and you're ready to receive notifications!",
           [{ text: "OK", onPress: () => navigation.navigate('Login') }]
         );
       } else {
