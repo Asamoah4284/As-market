@@ -100,7 +100,7 @@ export async function registerForPushNotificationsAsync() {
         if (authToken && userDataString) {
           try {
             const userData = JSON.parse(userDataString);
-            const userId = userData._id;
+            const userId = userData.id;
             
             if (userId) {
               await axios.post(
