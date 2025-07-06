@@ -29,6 +29,22 @@ export async function registerForPushNotificationsAsync() {
       return null;
     }
     
+    // Additional check for Expo Go
+    if (Constants.appOwnership === 'expo') {
+      console.log('Push notifications disabled in Expo Go. Please use your published app.');
+      return null;
+    }
+    
+    // Check if we're in development mode with Expo Go
+    if (__DEV__ && Constants.appOwnership === 'expo') {
+      console.log('Development mode with Expo Go detected. Push notifications will not work.');
+      return null;
+    }
+    
+    console.log('App ownership:', Constants.appOwnership);
+    console.log('Is device:', Device.isDevice);
+    console.log('Platform:', Platform.OS);
+    
     if (Platform.OS === 'android') {
       console.log('Setting up Android notification channel');
       await Notifications.setNotificationChannelAsync('default', {
@@ -145,6 +161,16 @@ export async function registerPushTokenForUser(userId, authToken) {
       return false;
     }
 
+    // Additional check for Expo Go
+    if (Constants.appOwnership === 'expo') {
+      console.log('Push notifications disabled in Expo Go. Please use your published app.');
+      return false;
+    }
+    
+    console.log('🔔 Registering push token for user:', userId);
+    console.log('📱 App ownership:', Constants.appOwnership);
+    console.log('🏗️ App name:', Constants.expoConfig?.name || 'Unknown');
+
     // Get the stored push token
     const pushToken = await AsyncStorage.getItem('pushToken');
     
@@ -161,6 +187,9 @@ export async function registerPushTokenForUser(userId, authToken) {
 
     // Send existing token to backend
     try {
+      console.log('📤 Sending push token to backend for user:', userId);
+      console.log('🔑 Push token preview:', pushToken.substring(0, 20) + '...');
+      
       await axios.post(
         `${API_BASE_URL}/api/users/push-token`,
         { 
@@ -173,10 +202,10 @@ export async function registerPushTokenForUser(userId, authToken) {
           },
         }
       );
-      console.log('Existing push token registered for user');
+      console.log('✅ Push token registered successfully for user:', userId);
       return true;
     } catch (error) {
-      console.error('Error registering push token for user:', error.response?.data || error.message);
+      console.error('❌ Error registering push token for user:', error.response?.data || error.message);
       return false;
     }
   } catch (error) {
