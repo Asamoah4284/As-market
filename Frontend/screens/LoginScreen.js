@@ -110,13 +110,20 @@ function LoginScreen({ navigation, route }) {
       await AsyncStorage.setItem('userToken', token);
       await AsyncStorage.setItem('userData', JSON.stringify(userData));
       
+      // DEBUG: Check what we're about to send for push token registration
+      console.log('🔍 DEBUG: About to register push token');
+      console.log('🔍 DEBUG: userData:', JSON.stringify(userData, null, 2));
+      console.log('🔍 DEBUG: userId:', userData.id);
+      console.log('🔍 DEBUG: token:', token.substring(0, 20) + '...');
+      
       // Register push notification token for all users (including admins)
       try {
         const { registerPushTokenAfterLogin } = require('../utils/authUtils');
+        console.log('🔍 DEBUG: Calling registerPushTokenAfterLogin');
         await registerPushTokenAfterLogin(userData.id, token);
-        console.log('Push token registered during login');
+        console.log('✅ Push token registered during login');
       } catch (err) {
-        console.error('Error registering push token:', err);
+        console.error('❌ Error registering push token:', err);
       }
       
       // Check if we need to redirect somewhere specific
