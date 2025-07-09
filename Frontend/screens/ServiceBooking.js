@@ -30,7 +30,9 @@ const ServiceBooking = ({ route }) => {
   const [loading, setLoading] = useState(false);
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
-  
+  const [sellerPhone, setSellerPhone] = useState('');
+  const [sellerName, setSellerName] = useState('');
+
   // Get customer info when component mounts
   useEffect(() => {
     const getUserInfo = async () => {
@@ -45,10 +47,38 @@ const ServiceBooking = ({ route }) => {
         console.error('Error fetching user info:', error);
       }
     };
-    
     getUserInfo();
   }, []);
-  
+
+  // Fetch seller info on mount
+  useEffect(() => {
+    const fetchSeller = async () => {
+      try {
+        setLoading(true);
+        const sellerId = service.seller?._id || service.sellerId;
+        if (!sellerId) {
+          setLoading(false);
+          Alert.alert('Error', 'No seller ID found for this service.');
+          return;
+        }
+        const response = await fetch(`${API_BASE_URL}/api/users/${sellerId}`);
+        if (!response.ok) {
+          setLoading(false);
+          Alert.alert('Error', 'Could not fetch provider info.');
+          return;
+        }
+        const data = await response.json();
+        setSellerPhone(data.phone);
+        setSellerName(data.name);
+        setLoading(false);
+      } catch (error) {
+        setLoading(false);
+        Alert.alert('Error', 'Could not fetch provider info.');
+      }
+    };
+    fetchSeller();
+  }, [service]);
+
   // Format date and time for display
   const formattedDate = date.toLocaleDateString('en-US', {
     weekday: 'long',
@@ -56,215 +86,48 @@ const ServiceBooking = ({ route }) => {
     month: 'long',
     day: 'numeric',
   });
-  
   const formattedTime = time.toLocaleTimeString('en-US', {
     hour: '2-digit',
     minute: '2-digit',
   });
-  
+
   const onDateChange = (event, selectedDate) => {
     const currentDate = selectedDate || date;
     setShowDatePicker(Platform.OS === 'ios');
     setDate(currentDate);
   };
-  
   const onTimeChange = (event, selectedTime) => {
     const currentTime = selectedTime || time;
     setShowTimePicker(Platform.OS === 'ios');
     setTime(currentTime);
   };
 
-  // WhatsApp integration
+  // WhatsApp integration (no booking, just open chat)
   const openWhatsApp = async () => {
+    if (!sellerPhone) {
+      Alert.alert('Error', 'Provider phone number not available.');
+      return;
+    }
+    // Remove any non-digit characters and leading +
+    let formattedNumber = sellerPhone.replace(/[^\d]/g, '');
+    if (formattedNumber.startsWith('0')) {
+      // If number starts with 0, replace with country code (assume Ghana +233 as before)
+      formattedNumber = '233' + formattedNumber.slice(1);
+    }
+    // Open WhatsApp chat
+    const whatsappUrl = `https://wa.me/${formattedNumber}`;
     try {
-      console.log("Service data:", JSON.stringify(service, null, 2));
-      
-      // Get the seller ID from the service object
-      const sellerId = service.seller?._id || service.sellerId;
-      
-      if (!sellerId) {
-        console.log("No seller ID found in service:", service);
-        Alert.alert(
-          'Seller Information Missing',
-          'Could not identify the service provider. Please try booking through the app instead.',
-          [{ text: 'OK', onPress: () => handleBookService() }]
-        );
-        return;
-      }
-      
-      console.log("Looking for seller with ID:", sellerId);
-      
-      // Fetch the seller's phone number directly from the users endpoint
-      let providerPhone = '';
-      
-      try {
-        // Get all users from the direct URL as shown in the search results
-        console.log("Fetching all users from users endpoint");
-        const response = await fetch('https://unimarket-ikin.onrender.com/api/users');
-        
-        if (!response.ok) {
-          throw new Error(`Failed to fetch users: ${response.status}`);
-        }
-        
-        const users = await response.json();
-        console.log(`Found ${users.length} users`);
-        
-        // Find the seller with matching ID
-        const seller = users.find(user => user._id === sellerId && user.role === 'seller');
-        
-        if (seller) {
-          console.log("Found matching seller:", seller.name);
-          providerPhone = seller.phone;
-          console.log("Seller phone number:", providerPhone);
-        } else {
-          console.log("No matching seller found with ID:", sellerId);
-          console.log("Available seller IDs:", users.filter(u => u.role === 'seller').map(u => u._id));
-          
-          // Try again but just match by ID without requiring role=seller
-          const userByIdOnly = users.find(user => user._id === sellerId);
-          if (userByIdOnly) {
-            console.log("Found user by ID (without role check):", userByIdOnly.name, "role:", userByIdOnly.role);
-            providerPhone = userByIdOnly.phone;
-          }
-        }
-      } catch (error) {
-        console.error("Error fetching users:", error);
-      }
-      
-      if (!providerPhone) {
-        Alert.alert(
-          'Provider Contact Missing',
-          'The service provider\'s contact information is not available. Please try booking through the app instead.',
-          [{ text: 'OK', onPress: () => handleBookService() }]
-        );
-        return;
-      }
-      
-      // Format the phone number (remove spaces, dashes, etc.)
-      let formattedNumber = providerPhone.replace(/[^\d+]/g, '');
-      console.log("Formatted number before country code check:", formattedNumber);
-      
-      // Add country code if not present
-      if (!formattedNumber.startsWith('+')) {
-        formattedNumber = '+233' + formattedNumber.replace(/^0+/, '');
-      }
-      
-      console.log("Final formatted number for WhatsApp:", formattedNumber);
-      
-      // Create a message with all booking details
-      const message = `Hello, I would like to book the following service:
-      
-*Service*: ${service.name}
-*Date*: ${formattedDate}
-*Time*: ${formattedTime}
-*Price*: GH¢${service.price?.toFixed(2)}
-${notes ? `*Special Instructions*: ${notes}` : ''}
-
-*Customer Name*: ${customerName}
-*Contact*: ${customerPhone}
-
-Please confirm this booking. Thank you!`;
-      
-      // Encode the message for URL
-      const encodedMessage = encodeURIComponent(message);
-      
-      // Create WhatsApp URL
-      const whatsappUrl = `whatsapp://send?phone=${formattedNumber}&text=${encodedMessage}`;
-      
-      // Check if WhatsApp is installed
       const canOpen = await Linking.canOpenURL(whatsappUrl);
-      
       if (canOpen) {
         await Linking.openURL(whatsappUrl);
-        
-        // Record the booking in the system after opening WhatsApp
-        await handleBookService(false); // Pass false to skip the alert
       } else {
-        // Fallback for web or when WhatsApp isn't installed
-        const webWhatsapp = `https://wa.me/${formattedNumber}?text=${encodedMessage}`;
-        await Linking.openURL(webWhatsapp);
-        
-        // Record the booking in the system after opening WhatsApp web
-        await handleBookService(false); // Pass false to skip the alert
+        Alert.alert('Error', 'Could not open WhatsApp.');
       }
     } catch (error) {
-      console.error('Error opening WhatsApp:', error);
-      Alert.alert(
-        'Error',
-        'Could not open WhatsApp. Please try booking through the app.',
-        [{ text: 'OK', onPress: () => handleBookService() }]
-      );
+      Alert.alert('Error', 'Could not open WhatsApp.');
     }
   };
   
-  // const handleBookService = async (showAlert = true) => {
-  //   try {
-  //     setLoading(true);
-      
-  //     // Get the user token for authentication
-  //     const token = await AsyncStorage.getItem('userToken');
-  //     if (!token) {
-  //       Alert.alert('Error', 'You need to be logged in to book a service');
-  //       navigation.navigate('Login');
-  //       return;
-  //     }
-      
-  //     // Combine date and time
-  //     const bookingDateTime = new Date(date);
-  //     bookingDateTime.setHours(time.getHours());
-  //     bookingDateTime.setMinutes(time.getMinutes());
-      
-  //     // Create the booking data
-  //     const bookingData = {
-  //       serviceId: service._id,
-  //       bookingDate: bookingDateTime.toISOString(),
-  //       notes: notes,
-  //     };
-      
-  //     // Make API call to book service
-  //     const response = await fetch(`${API_BASE_URL}/api/bookings`, {
-  //       method: 'POST',
-  //       headers: {
-  //         'Content-Type': 'application/json',
-  //         'Authorization': `Bearer ${token}`
-  //       },
-  //       body: JSON.stringify(bookingData)
-  //     });
-      
-  //     setLoading(false);
-      
-  //     if (response.ok) {
-  //       const result = await response.json();
-        
-  //       // Only show alert if needed (not when called from WhatsApp function)
-  //       if (showAlert) {
-  //         Alert.alert(
-  //           'Booking Confirmed!',
-  //           'Your service has been booked successfully.',
-  //           [
-  //             { 
-  //               text: 'View My Bookings', 
-  //               onPress: () => navigation.navigate('Bookings')
-  //             },
-  //             {
-  //               text: 'Continue Shopping',
-  //               onPress: () => navigation.navigate('BuyerHome'),
-  //               style: 'cancel'
-  //             }
-  //           ]
-  //         );
-  //       }
-  //     } else {
-  //       const errorData = await response.json();
-  //       Alert.alert('Booking Failed', errorData.message || 'Failed to book service');
-  //     }
-  //   } catch (error) {
-  //     console.error('Error booking service:', error);
-  //     setLoading(false);
-  //     Alert.alert('Error', 'Failed to book service. Please try again.');
-  //   }
-  // };
-
   return (
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="light-content" backgroundColor="#5D3FD3" />
@@ -430,6 +293,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#5D3FD3',
   },
   headerTitle: {
+    marginTop: 16,
     fontSize: 18,
     fontWeight: 'bold',
     color: '#fff',
@@ -493,7 +357,6 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     padding: 12,
     fontSize: 16,
-    backgroundColor: '#f9f9f9',
   },
   notesInput: {
     borderWidth: 1,
@@ -524,11 +387,11 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: 16,
-    color: '#666',
+    color: 'black',
   },
   summaryValue: {
     fontSize: 16,
-    color: '#333',
+    color: 'black',
     fontWeight: '500',
   },
   divider: {

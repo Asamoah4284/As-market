@@ -386,6 +386,19 @@ const broadcastNotification = async (req, res) => {
   }
 };
 
+// Get user by ID (for public use, only returns name and phone)
+const getUserById = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    res.json({ name: user.name, phone: user.phone });
+  } catch (error) {
+    res.status(500).json({ message: 'Server error', error: error.message });
+  }
+};
+
 module.exports = {
   registerUser,
   loginUser,
@@ -396,5 +409,6 @@ module.exports = {
   forgotPassword,
   resetPassword,
   updatePushToken,
-  broadcastNotification
+  broadcastNotification,
+  getUserById // Export the new controller
 }; 

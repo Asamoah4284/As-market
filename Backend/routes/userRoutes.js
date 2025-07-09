@@ -11,7 +11,8 @@ const {
   forgotPassword,
   resetPassword,
   updatePushToken,
-  broadcastNotification
+  broadcastNotification,
+  getUserById
 } = require('../controllers/userController');
 const { authLimiter, sensitiveOperationLimiter } = require('../middleware/rateLimiter');
 
@@ -35,5 +36,8 @@ router.delete('/:id', protect, admin, sensitiveOperationLimiter, deleteUser);
 
 // Broadcast notification (admin only)
 router.post('/broadcast-notification', protect, admin, broadcastNotification);
+
+// Public route to get user by ID (returns name and phone only)
+router.get('/:id', getUserById);
 
 module.exports = router; 
