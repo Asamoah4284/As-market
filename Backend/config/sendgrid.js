@@ -1,22 +1,41 @@
 const sgMail = require('@sendgrid/mail');
 
-// Set SendGrid API key
-sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+// Check if SendGrid API key is configured
+if (!process.env.SENDGRID_API_KEY) {
+  console.error('⚠️  SENDGRID_API_KEY is not set. Email functionality will be disabled.');
+  console.error('Please set SENDGRID_API_KEY in your environment variables.');
+}
+
+// Set SendGrid API key if available
+if (process.env.SENDGRID_API_KEY) {
+  sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+}
 
 const sendEmail = async (to, subject, htmlContent) => {
   try {
+    // Check if SendGrid is properly configured
+    if (!process.env.SENDGRID_API_KEY) {
+      console.error('SendGrid API key not configured');
+      return false;
+    }
+
+    if (!process.env.SENDGRID_FROM_EMAIL) {
+      console.error('SENDGRID_FROM_EMAIL not configured');
+      return false;
+    }
+
     const msg = {
       to: to,
-      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@yourdomain.com', // Replace with your verified sender
+      from: process.env.SENDGRID_FROM_EMAIL,
       subject: subject,
       html: htmlContent,
     };
 
     const response = await sgMail.send(msg);
-    console.log('Email sent successfully:', response[0].statusCode);
+    console.log('✅ Email sent successfully:', response[0].statusCode);
     return true;
   } catch (error) {
-    console.error('SendGrid error:', error);
+    console.error('❌ SendGrid error:', error);
     if (error.response) {
       console.error('SendGrid response body:', error.response.body);
     }
@@ -25,6 +44,12 @@ const sendEmail = async (to, subject, htmlContent) => {
 };
 
 const sendPasswordResetEmail = async (email, resetToken, userName) => {
+  // Check if SendGrid is configured
+  if (!process.env.SENDGRID_API_KEY || !process.env.SENDGRID_FROM_EMAIL) {
+    console.error('❌ SendGrid not properly configured. Cannot send password reset email.');
+    return false;
+  }
+
   // Use deep link URL for mobile app
   const resetUrl = `asarion://reset-password?token=${resetToken}`;
   
@@ -58,7 +83,7 @@ const sendPasswordResetEmail = async (email, resetToken, userName) => {
         }
         .button {
           display: inline-block;
-          background: #000000;
+          background: #5D3FD3;
           color: white;
           padding: 15px 30px;
           text-decoration: none;

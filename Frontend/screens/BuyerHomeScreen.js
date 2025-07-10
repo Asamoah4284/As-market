@@ -92,6 +92,15 @@ const BuyerHomeScreen = () => {
   const shimmerValue = useRef(new Animated.Value(0)).current;
   const searchTimeoutRef = useRef(null);
   
+  // Animation values for food icon
+  const foodIconScale = useRef(new Animated.Value(1)).current;
+  const foodIconRotation = useRef(new Animated.Value(0)).current;
+  const foodIconOpacity = useRef(new Animated.Value(0)).current;
+  const foodIconPulse = useRef(new Animated.Value(0)).current;
+  const foodIconGlow = useRef(new Animated.Value(0)).current;
+  const foodIconBounce = useRef(new Animated.Value(0)).current;
+  const foodIconShine = useRef(new Animated.Value(0)).current;
+  
   // Get cart items from Redux store
   const { items: cartItems } = useSelector(state => state.cart);
 
@@ -215,6 +224,100 @@ const BuyerHomeScreen = () => {
   // Fetch food and drinks on component mount
   useEffect(() => {
     fetchFoodAndDrinks();
+  }, []);
+
+  // Food icon animation
+  useEffect(() => {
+    // Start with dramatic fade in animation
+    Animated.timing(foodIconOpacity, {
+      toValue: 1,
+      duration: 800,
+      useNativeDriver: true,
+    }).start();
+
+    // Dramatic entrance bounce
+    Animated.sequence([
+      Animated.timing(foodIconBounce, {
+        toValue: 1,
+        duration: 600,
+        useNativeDriver: true,
+      }),
+      Animated.timing(foodIconBounce, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Continuous attention-grabbing animations
+    const startAttentionAnimations = () => {
+      // Pulsing glow effect
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(foodIconGlow, {
+            toValue: 1,
+            duration: 1500,
+            useNativeDriver: true,
+          }),
+          Animated.timing(foodIconGlow, {
+            toValue: 0,
+            duration: 1500,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+
+      // Gentle floating with pulse
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(foodIconScale, {
+            toValue: 1.15,
+            duration: 2000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(foodIconScale, {
+            toValue: 1,
+            duration: 2000,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+
+      // Shine effect
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(foodIconShine, {
+            toValue: 1,
+            duration: 3000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(foodIconShine, {
+            toValue: 0,
+            duration: 3000,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+
+      // Pulse effect
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(foodIconPulse, {
+            toValue: 1,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+          Animated.timing(foodIconPulse, {
+            toValue: 0,
+            duration: 1000,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    };
+
+    // Start attention animations after entrance
+    setTimeout(startAttentionAnimations, 1000);
   }, []);
 
   // Event handlers
@@ -356,6 +459,63 @@ const BuyerHomeScreen = () => {
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
     }
+  };
+
+  const handleFoodIconPress = () => {
+    // Dramatic tap animation sequence
+    Animated.sequence([
+      // Quick scale down
+      Animated.timing(foodIconScale, {
+        toValue: 0.7,
+        duration: 80,
+        useNativeDriver: true,
+      }),
+      // Explosive scale up
+      Animated.timing(foodIconScale, {
+        toValue: 1.4,
+        duration: 120,
+        useNativeDriver: true,
+      }),
+      // Settle back
+      Animated.timing(foodIconScale, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Dramatic rotation with bounce
+    Animated.sequence([
+      Animated.timing(foodIconRotation, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+      Animated.timing(foodIconRotation, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      foodIconRotation.setValue(0);
+    });
+
+    // Flash effect
+    Animated.sequence([
+      Animated.timing(foodIconGlow, {
+        toValue: 1,
+        duration: 100,
+        useNativeDriver: true,
+      }),
+      Animated.timing(foodIconGlow, {
+        toValue: 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Navigate to food service section
+    navigation.navigate('FoodService');
   };
 
   // Memoize expensive computations
@@ -1034,6 +1194,116 @@ const BuyerHomeScreen = () => {
            />
         )}
 
+        {/* Animated Food Icon */}
+        <Animated.View 
+          style={[
+            styles.foodIconContainer,
+            {
+              opacity: foodIconOpacity,
+              transform: [
+                { scale: foodIconScale },
+                {
+                  translateY: foodIconBounce.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [0, -10],
+                  }),
+                },
+                {
+                  rotate: foodIconRotation.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: ['0deg', '360deg'],
+                  }),
+                },
+              ],
+            },
+          ]}
+        >
+          {/* Glow effect layer */}
+          <Animated.View 
+            style={[
+              styles.foodIconGlow,
+              {
+                opacity: foodIconGlow.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0.3, 0.5],
+                }),
+                transform: [
+                  {
+                    scale: foodIconGlow.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [1, 1.1],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          />
+          
+          {/* Pulse ring effect */}
+          <Animated.View 
+            style={[
+              styles.foodIconPulseRing,
+              {
+                opacity: foodIconPulse.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: [0, 0.3],
+                }),
+                transform: [
+                  {
+                    scale: foodIconPulse.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [1, 1.2],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          />
+
+          <TouchableOpacity
+            style={styles.foodIconButton}
+            onPress={handleFoodIconPress}
+            activeOpacity={0.9}
+          >
+            {/* Main icon background with gradient effect */}
+            <View style={styles.foodIconBackground}>
+              {/* Shine overlay */}
+              <Animated.View 
+                style={[
+                  styles.foodIconShine,
+                  {
+                    opacity: foodIconShine.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [0, 0.2],
+                    }),
+                    transform: [
+                      {
+                        translateX: foodIconShine.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [-60, 60],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              />
+              
+              {/* Icon content */}
+              <View style={styles.foodIconContent}>
+                <Ionicons name="restaurant" size={28} color="#fff" />
+                <Ionicons name="fast-food" size={16} color="#fff" style={styles.foodIconSecondary} />
+              </View>
+              
+              {/* Sparkle effects */}
+              <View style={styles.foodIconSparkle1} />
+              <View style={styles.foodIconSparkle2} />
+              <View style={styles.foodIconSparkle3} />
+            </View>
+            
+         
+          </TouchableOpacity>
+        </Animated.View>
+
         {/* Bottom Navigation */}
         <BottomNavigation
           navigation={navigation}
@@ -1332,6 +1602,156 @@ const styles = StyleSheet.create({
   },
   recommendedGridItem: {
     width: (Dimensions.get('window').width - 30) / 2,
+  },
+  foodIconContainer: {
+    position: 'absolute',
+    bottom: 100,
+    left: 20,
+    zIndex: 1000,
+  },
+  foodIconButton: {
+    alignItems: 'center',
+  },
+  foodIconBackground: {
+    width: 58,
+    height: 58,
+    borderRadius: 32,
+    backgroundColor: '#FF6B35',
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#FF6B35',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.6,
+    shadowRadius: 16,
+    elevation: 12,
+    borderWidth: 3,
+    borderColor: '#fff',
+    position: 'relative',
+    overflow: 'hidden',
+  },
+  foodIconContent: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 2,
+  },
+  foodIconSecondary: {
+    position: 'absolute',
+    bottom: 4,
+    right: 4,
+  },
+  foodIconSparkle1: {
+    position: 'absolute',
+    top: -8,
+    left: -8,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#fff',
+    opacity: 0.8,
+    shadowColor: '#fff',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  foodIconSparkle2: {
+    position: 'absolute',
+    bottom: -8,
+    right: -8,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#fff',
+    opacity: 0.8,
+    shadowColor: '#fff',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  foodIconSparkle3: {
+    position: 'absolute',
+    bottom: -8,
+    left: -8,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#fff',
+    opacity: 0.8,
+    shadowColor: '#fff',
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  foodIconLabelContainer: {
+    position: 'absolute',
+    bottom: -25,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    backgroundColor: 'rgba(255, 107, 53, 0.9)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  foodIconText: {
+    fontSize: 10,
+    fontWeight: '900',
+    color: '#fff',
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+    letterSpacing: 1,
+  },
+  foodIconSubtext: {
+    fontSize: 8,
+    color: '#fff',
+    textShadowColor: 'rgba(0,0,0,0.5)',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 2,
+    fontWeight: '600',
+    letterSpacing: 0.5,
+  },
+  foodIconGlow: {
+    position: 'absolute',
+    top: -10,
+    left: -10,
+    right: -10,
+    bottom: -10,
+    borderRadius: 42,
+    backgroundColor: 'rgba(255, 107, 53, 0.4)',
+    opacity: 0.3,
+  },
+  foodIconPulseRing: {
+    position: 'absolute',
+    top: -15,
+    left: -15,
+    right: -15,
+    bottom: -15,
+    borderRadius: 47,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 255, 255, 0.6)',
+    opacity: 0.6,
+  },
+  foodIconShine: {
+    position: 'absolute',
+    top: 0,
+    left: -60,
+    width: 60,
+    height: '100%',
+    backgroundColor: 'rgba(255, 255, 255, 0.6)',
+    transform: [{ skewX: '-20deg' }],
   },
 });
 

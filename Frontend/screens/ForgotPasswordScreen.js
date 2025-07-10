@@ -59,7 +59,11 @@ function ForgotPasswordScreen({ navigation }) {
         setSuccess(data.message);
         setEmail(''); // Clear email field
       } else {
-        setError(data.message || 'Something went wrong. Please try again.');
+        if (data.message.includes('Email service not configured')) {
+          setError('Password reset service is temporarily unavailable. Please contact support.');
+        } else {
+          setError(data.message || 'Something went wrong. Please try again.');
+        }
       }
     } catch (err) {
       console.error('Forgot password error:', err);
@@ -104,6 +108,9 @@ function ForgotPasswordScreen({ navigation }) {
             </View>
             <Text style={styles.welcomeText}>Forgot Password</Text>
             <Text style={styles.subHeaderText}>Enter your email to reset your password</Text>
+            <Text style={styles.developmentNote}>
+              {__DEV__ ? '💡 Development: Check console for reset token' : ''}
+            </Text>
           </LinearGradient>
 
           {/* Form Section */}
@@ -206,6 +213,13 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.8)',
     textAlign: 'center',
     marginTop: 8,
+  },
+  developmentNote: {
+    fontSize: 12,
+    color: 'rgba(255, 255, 255, 0.6)',
+    textAlign: 'center',
+    marginTop: 4,
+    fontStyle: 'italic',
   },
   formContainer: {
     paddingHorizontal: 25,

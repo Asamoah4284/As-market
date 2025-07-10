@@ -208,6 +208,12 @@ const forgotPassword = async (req, res) => {
     // Send email
     const emailSent = await sendPasswordResetEmail(email, resetToken, user.name);
 
+    // For development/testing: log the reset token
+    if (process.env.NODE_ENV === 'development') {
+      console.log('🔑 DEVELOPMENT: Password reset token for', email, ':', resetToken);
+      console.log('🔗 Reset URL:', `asarion://reset-password?token=${resetToken}`);
+    }
+
     if (emailSent) {
       res.status(200).json({ 
         message: 'If an account with that email exists, a password reset link has been sent.' 
@@ -218,7 +224,16 @@ const forgotPassword = async (req, res) => {
       user.resetPasswordExpires = null;
       await user.save();
       
-      res.status(500).json({ message: 'Failed to send reset email. Please try again.' });
+      // Check if SendGrid is configured
+      if (!process.env.SENDGRID_API_KEY || !process.env.SENDGRID_FROM_EMAIL) {
+        res.status(500).json({ 
+          message: 'Email service not configured. Please contact support to reset your password.' 
+        });
+      } else {
+        res.status(500).json({ 
+          message: 'Failed to send reset email. Please try again.' 
+        });
+      }
     }
   } catch (error) {
     console.error('Forgot password error:', error);

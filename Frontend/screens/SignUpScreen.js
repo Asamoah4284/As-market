@@ -376,13 +376,13 @@ function SignUpScreen({ navigation }) {
               )}
             </TouchableOpacity>
             
-            <View style={styles.dividerContainer}>
+            {/* <View style={styles.dividerContainer}>
               <View style={styles.dividerLine} />
               <Text style={styles.dividerText}>OR</Text>
               <View style={styles.dividerLine} />
-            </View>
+            </View> */}
             
-            <View style={styles.socialButtonsContainer}>
+            {/* <View style={styles.socialButtonsContainer}>
               <TouchableOpacity style={styles.socialButton}>
                 <Image 
                   source={{uri: 'https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg'}}
@@ -405,7 +405,7 @@ function SignUpScreen({ navigation }) {
                   />
                 </TouchableOpacity>
               )}
-            </View>
+            </View> */}
             
             <View style={styles.loginContainer}>
               <Text style={styles.loginText}>Already have an account?</Text>
@@ -643,6 +643,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 20,
+    marginTop: 10,
   },
   loginText: {
     fontSize: 15,

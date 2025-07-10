@@ -301,13 +301,13 @@ function LoginScreen({ navigation, route }) {
               )}
             </TouchableOpacity>
             
-            <View style={styles.dividerContainer}>
+            {/* <View style={styles.dividerContainer}>
               <View style={styles.dividerLine} />
               <Text style={styles.dividerText}>OR</Text>
               <View style={styles.dividerLine} />
-            </View>
+            </View> */}
             
-            <View style={styles.socialButtonsContainer}>
+            {/* <View style={styles.socialButtonsContainer}>
               <TouchableOpacity style={styles.socialButton}>
                 <Image 
                   source={{uri: 'https://upload.wikimedia.org/wikipedia/commons/5/53/Google_%22G%22_Logo.svg'}}
@@ -330,7 +330,7 @@ function LoginScreen({ navigation, route }) {
                   />
                 </TouchableOpacity>
               )}
-            </View>
+            </View> */}
             
             <View style={styles.signupContainer}>
               <Text style={styles.signupText}>Don't have an account?</Text>
@@ -531,7 +531,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 30,
+    marginBottom: 20,
+    marginTop: 20,
   },
   signupText: {
     fontSize: 15,
