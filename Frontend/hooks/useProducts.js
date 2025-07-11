@@ -56,40 +56,42 @@ export const useProducts = () => {
     setIsLoadingProducts(true);
     setIsLoadingNewArrivals(true);
     try {
-      console.log('Fetching products from:', `${url}`);
+      // Fetch featured products from the new API endpoint
+      console.log('Fetching featured products from:', `${url}/featured`);
+      const featuredResponse = await fetch(`${url}/featured`);
+      console.log('Featured Products API Response Status:', featuredResponse.status);
+      
+      if (featuredResponse.ok) {
+        const featuredProducts = await featuredResponse.json();
+        console.log('Fetched featured products count:', featuredProducts.length);
+        console.log('Sample featured product:', featuredProducts[0]);
+        
+        setFeaturedProducts(featuredProducts);
+      } else {
+        console.log('Featured products API failed, falling back to general products');
+        // Fallback to general products if featured endpoint fails
+        const response = await fetch(`${url}`);
+        if (response.ok) {
+          const products = await response.json();
+          const nonServiceProducts = products.filter(product => product.isService !== true);
+          setFeaturedProducts(nonServiceProducts);
+        } else {
+          console.log('Using mock data due to API failure');
+          setFeaturedProducts(FEATURED_PRODUCTS);
+        }
+      }
+
+      // Fetch general products for new arrivals
+      console.log('Fetching general products from:', `${url}`);
       const response = await fetch(`${url}`);
       console.log('Products API Response Status:', response.status);
       
       if (response.ok) {
         const products = await response.json();
         console.log('Fetched products count:', products.length);
-        console.log('Sample product:', products[0]);
         
-        // Log creation dates for debugging
-        const productsWithDates = products.map(product => ({
-          ...product,
-          createdAt: product.createdAt || product.created_at || new Date().toISOString()
-        }));
-        
-        console.log('Products with creation dates:');
-        productsWithDates.slice(0, 3).forEach((product, index) => {
-          console.log(`Product ${index + 1}: ${product.name} - Created: ${product.createdAt}`);
-        });
-        
-        const nonServiceProducts = productsWithDates.filter(product => product.isService !== true);
+        const nonServiceProducts = products.filter(product => product.isService !== true);
         console.log('Non-service products count:', nonServiceProducts.length);
-        
-        // Sort by creation date (newest first) for featured products
-        const sortedProducts = nonServiceProducts.sort((a, b) => {
-          const dateA = new Date(a.createdAt || 0);
-          const dateB = new Date(b.createdAt || 0);
-          return dateB - dateA;
-        });
-        
-        console.log('Sorted products (newest first):');
-        sortedProducts.slice(0, 3).forEach((product, index) => {
-          console.log(`Sorted ${index + 1}: ${product.name} - Created: ${product.createdAt}`);
-        });
         
         // Shuffle products randomly for new arrivals
         const shuffledProducts = [...nonServiceProducts].sort(() => Math.random() - 0.5);
@@ -99,16 +101,16 @@ export const useProducts = () => {
           console.log(`Shuffled ${index + 1}: ${product.name}`);
         });
         
-        setFeaturedProducts(sortedProducts);
         setNewArrivals(shuffledProducts);
       } else {
-        console.log('Using mock data due to API failure');
-        setFeaturedProducts(FEATURED_PRODUCTS);
+        console.log('Failed to fetch new arrivals');
+        setNewArrivals([]);
       }
     } catch (error) {
       console.error('Error fetching products:', error);
       console.log('Using mock data due to error');
       setFeaturedProducts(FEATURED_PRODUCTS);
+      setNewArrivals([]);
     } finally {
       // Simulate minimum loading time for better UX
       setTimeout(() => {
@@ -197,22 +199,29 @@ export const useProducts = () => {
 
   const fetchOriginalProducts = async () => {
     try {
+      // Fetch featured products from the new API endpoint
+      const featuredResponse = await fetch(`${url}/featured`);
+      if (featuredResponse.ok) {
+        const featuredProducts = await featuredResponse.json();
+        setFeaturedProducts(featuredProducts);
+      } else {
+        // Fallback to general products if featured endpoint fails
+        const response = await fetch(`${url}`);
+        if (response.ok) {
+          const products = await response.json();
+          const nonServiceProducts = products.filter(product => product.isService !== true);
+          setFeaturedProducts(nonServiceProducts);
+        }
+      }
+
+      // Fetch general products for new arrivals
       const response = await fetch(`${url}`);
       if (response.ok) {
         const products = await response.json();
         const nonServiceProducts = products.filter(product => product.isService !== true);
         
-        // Sort by creation date (newest first) for featured products
-        const sortedProducts = nonServiceProducts.sort((a, b) => {
-          const dateA = new Date(a.createdAt || a.created_at || 0);
-          const dateB = new Date(b.createdAt || b.created_at || 0);
-          return dateB - dateA;
-        });
-        
         // Shuffle products randomly for new arrivals
         const shuffledProducts = [...nonServiceProducts].sort(() => Math.random() - 0.5);
-        
-        setFeaturedProducts(sortedProducts);
         setNewArrivals(shuffledProducts);
       }
     } catch (error) {

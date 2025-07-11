@@ -47,7 +47,7 @@ const BannerCarousel = memo(({
 
   // Optimized auto-scroll with scrollToOffset for better performance
   useEffect(() => {
-    if (banners.length > 1 && !isUserScrolling) {
+    if (banners && banners.length > 1 && !isUserScrolling) {
       autoScrollIntervalRef.current = setInterval(() => {
         if (flatListRef.current) {
           const nextIndex = (currentIndex + 1) % banners.length;
@@ -66,7 +66,7 @@ const BannerCarousel = memo(({
         clearInterval(autoScrollIntervalRef.current);
       }
     };
-  }, [currentIndex, banners.length, isUserScrolling]);
+  }, [currentIndex, banners?.length || 0, isUserScrolling]);
 
   // Handle user scroll interaction with debouncing
   const handleUserScroll = useCallback(() => {
@@ -162,8 +162,8 @@ const BannerCarousel = memo(({
 
   // Memoized pagination dots data to prevent unnecessary re-renders
   const paginationDotsData = useMemo(() => 
-    banners.map((_, index) => ({ index, key: `dot-${index}` }))
-  , [banners.length]);
+    (banners || []).map((_, index) => ({ index, key: `dot-${index}` }))
+  , [banners?.length || 0]);
 
   // Memoized keyExtractor for banner items
   const keyExtractor = useCallback((item, index) => {
@@ -172,7 +172,7 @@ const BannerCarousel = memo(({
 
   // Optimized pagination dots with memoized data
   const renderPaginationDots = useCallback(() => {
-    if (banners.length <= 1) return null;
+    if (!banners || banners.length <= 1) return null;
 
     return (
       <View style={styles.paginationContainer}>
@@ -210,7 +210,7 @@ const BannerCarousel = memo(({
         })}
       </View>
     );
-  }, [paginationDotsData, scrollX]);
+  }, [paginationDotsData, scrollX, banners]);
 
   if (isLoading) {
     return (
@@ -240,7 +240,7 @@ const BannerCarousel = memo(({
     );
   }
 
-  if (banners.length === 0) {
+  if (!banners || banners.length === 0) {
     return null;
   }
 

@@ -67,6 +67,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#5D3FD3',
   },
   header: {
+    
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
@@ -97,6 +98,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    // marginBottom: 4
   },
   locationText: {
     fontSize: 14,

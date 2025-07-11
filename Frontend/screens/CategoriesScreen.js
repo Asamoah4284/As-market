@@ -64,6 +64,7 @@ const CategoryScreen = ({ route, navigation }) => {
         // Handle different endpoint scenarios
         if (featuredOnly) {
           endpoint = `${API_BASE_URL}/api/products/featured`;
+          params.append('all', 'true'); // Fetch all featured products, not just 10
         }
 
         // Add new arrivals filter

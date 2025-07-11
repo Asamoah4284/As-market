@@ -62,7 +62,8 @@
       "eas": {
         "projectId": "987ca341-92d7-4d38-be41-f41cc65182c3"
       },
-      "API_URL": "https://unimarket-ikin.onrender.com",
+      // "API_URL": "https://unimarket-ikin.onrender.com",
+      "API_URL": "http://10.224.124.53:5000",
       "PAYSTACK_PUBLIC_KEY": "pk_live_544b2e05faa2e81574c0ff6fb9353f20fd880959"
     }
   }

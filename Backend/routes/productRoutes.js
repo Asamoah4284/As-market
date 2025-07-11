@@ -59,28 +59,33 @@ router.get('/', async (req, res) => {
   }
 });
 
-// Route for featured collections and special categories
+// Route for featured products (featuredType = "featured" and status = "approved")
 router.get('/featured', async (req, res) => {
   try {
-    const { type } = req.query;
-    let query = { status: 'approved' }; // Only show approved products
-    let limit = 10; // Default limit
+    const { all } = req.query; // Check if 'all' parameter is provided
     
-    if (type) {
-      query.featuredType = type;
-    } else {
-      // Return all featured items if no specific type requested
-      query.featuredType = { $exists: true, $ne: null };
+    let query = Product.find({
+      featuredType: 'featured',
+      status: 'approved'
+    })
+    .sort({ createdAt: -1 }) // Sort by creation date, most recent first
+    .populate('seller', 'name');
+    
+    // Only limit to 10 if 'all' parameter is not provided
+    if (!all) {
+      query = query.limit(10);
     }
     
-    const products = await Product.find(query)
-      .sort({ featuredRank: 1 }) // Sort by admin-defined ranking
-      .limit(limit)
-      .populate('seller', 'name');
-      
+    let products = await query;
+    
+    // Shuffle the products randomly if not fetching all (for home screen display)
+    if (!all) {
+      products = products.sort(() => Math.random() - 0.5);
+    }
+    
     res.json(products);
   } catch (error) {
-    console.error(`Error fetching ${req.query.type || 'featured'} products:`, error);
+    console.error('Error fetching featured products:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });
