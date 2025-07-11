@@ -65,6 +65,12 @@ const SellerDashboardScreen = () => {
     status: 'pending',
     gender: '',
     color: '',
+    // Food service specific fields
+    foodName: '',
+    preparationTime: '',
+    operatingHours: '',
+    contactNumber: '',
+    address: '',
   });
   const [isEditing, setIsEditing] = useState(false);
   const [currentProductId, setCurrentProductId] = useState(null);
@@ -92,7 +98,8 @@ const SellerDashboardScreen = () => {
       MC_DJ: 'MCs & DJs for Events',
       TUTORING: 'Tutoring & Lessons',
       FREELANCE_WRITING: 'Freelance Writing',
-      TECH_SUPPORT: 'Tech Support'
+      TECH_SUPPORT: 'Tech Support',
+      FOOD_SERVICE: 'Food Service'
     }
   });
   const [profileData, setProfileData] = useState({
@@ -439,6 +446,12 @@ const SellerDashboardScreen = () => {
       status: 'pending',
       gender: '',
       color: '',
+      // Food service specific fields
+      foodName: '',
+      preparationTime: '',
+      operatingHours: '',
+      contactNumber: '',
+      address: '',
     });
     setModalVisible(true);
   };
@@ -484,6 +497,12 @@ const SellerDashboardScreen = () => {
       rejectionReason: product.rejectionReason || null, // Store rejection reason if it exists
       gender: product.gender || '',
       color: product.color || '',
+      // Food service specific fields
+      foodName: product.foodName || '',
+      preparationTime: product.preparationTime || '',
+      operatingHours: product.operatingHours || '',
+      contactNumber: product.contactNumber || '',
+      address: product.address || '',
     });
     setModalVisible(true);
   };
@@ -540,6 +559,35 @@ const SellerDashboardScreen = () => {
         }
       }
       
+      // Add validation for food service specific fields
+      if (productForm.isService && productForm.category === 'Food Service') {
+        if (!productForm.foodName) {
+          setErrorMessage('Please enter the name of the food you offer');
+          setLoading(false);
+          return;
+        }
+        if (!productForm.preparationTime) {
+          setErrorMessage('Please enter preparation time');
+          setLoading(false);
+          return;
+        }
+        if (!productForm.contactNumber) {
+          setErrorMessage('Please enter your contact number');
+          setLoading(false);
+          return;
+        }
+        if (!productForm.address) {
+          setErrorMessage('Please enter your business address');
+          setLoading(false);
+          return;
+        }
+        if (!productForm.operatingHours) {
+          setErrorMessage('Please enter your operating hours');
+          setLoading(false);
+          return;
+        }
+      }
+      
       // Validate image
       if (!productForm.image) {
         setErrorMessage('Please select a main product image');
@@ -572,6 +620,12 @@ const SellerDashboardScreen = () => {
         rejectionReason: null, // Clear any previous rejection reason
         gender: productForm.gender,
         color: productForm.color,
+        // Food service specific fields
+        foodName: productForm.foodName,
+        preparationTime: productForm.preparationTime,
+        operatingHours: productForm.operatingHours,
+        contactNumber: productForm.contactNumber,
+        address: productForm.address,
       };
       
       // Use the same base URL as fetch products
@@ -816,6 +870,36 @@ const SellerDashboardScreen = () => {
               </Text>
             </View>
           </View>
+          
+          {/* Display food service information if it's a food service */}
+          {item.isService && item.category === 'Food Service' && (
+            <View style={styles.foodServiceInfo}>
+              {item.foodName && (
+                <View style={styles.foodServiceItem}>
+                  <MaterialIcons name="restaurant" size={16} color={theme.primary} />
+                  <Text style={[styles.foodServiceText, { color: theme.text }]}>
+                    {item.foodName}
+                  </Text>
+                </View>
+              )}
+              {item.preparationTime && (
+                <View style={styles.foodServiceItem}>
+                  <MaterialIcons name="access-time" size={16} color={theme.success} />
+                  <Text style={[styles.foodServiceText, { color: theme.text }]}>
+                    {item.preparationTime}
+                  </Text>
+                </View>
+              )}
+              {item.operatingHours && (
+                <View style={styles.foodServiceItem}>
+                  <MaterialIcons name="schedule" size={16} color={theme.textSecondary} />
+                  <Text style={[styles.foodServiceText, { color: theme.text }]}>
+                    {item.operatingHours}
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
           <View style={styles.ratingContainer}>
             <Text style={styles.ratingText}>{item.rating || 0}</Text>
             <View style={styles.starsContainer}>
@@ -1978,6 +2062,69 @@ const SellerDashboardScreen = () => {
                   </View>
                 </View>
               </View>
+
+              {/* Food Service Specific Fields */}
+              {productForm.isService && productForm.category === 'Food Service' && (
+                <View style={styles.formSection}>
+                  <Text style={[styles.sectionTitle, { color: theme.text }]}>Food Service Information</Text>
+                  <View style={styles.basicInfoContainer}>
+                    <View style={styles.inputWrapper}>
+                      <Text style={[styles.inputLabel, { color: theme.text }]}>Name of Food</Text>
+                      <TextInput
+                        style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
+                        value={productForm.foodName}
+                        onChangeText={(text) => setProductForm({...productForm, foodName: text})}
+                        placeholder="e.g. Jollof Rice, Pizza, Kebab, etc."
+                        placeholderTextColor={theme.textSecondary}
+                      />
+                    </View>
+                    <View style={styles.inputWrapper}>
+                      <Text style={[styles.inputLabel, { color: theme.text }]}>Preparation Time</Text>
+                      <TextInput
+                        style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
+                        value={productForm.preparationTime}
+                        onChangeText={(text) => setProductForm({...productForm, preparationTime: text})}
+                        placeholder="e.g. 15-20 minutes, 30-45 minutes"
+                        placeholderTextColor={theme.textSecondary}
+                      />
+                    </View>
+                    <View style={styles.inputWrapper}>
+                      <Text style={[styles.inputLabel, { color: theme.text }]}>Operating Hours</Text>
+                      <TextInput
+                        style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
+                        value={productForm.operatingHours}
+                        onChangeText={(text) => setProductForm({...productForm, operatingHours: text})}
+                        placeholder="e.g. Mon-Fri: 8AM-10PM, Sat-Sun: 9AM-11PM"
+                        placeholderTextColor={theme.textSecondary}
+                      />
+                    </View>
+                    <View style={styles.inputWrapper}>
+                      <Text style={[styles.inputLabel, { color: theme.text }]}>Contact Number</Text>
+                      <TextInput
+                        style={[styles.input, { backgroundColor: theme.inputBackground, color: theme.text }]}
+                        value={productForm.contactNumber}
+                        onChangeText={(text) => setProductForm({...productForm, contactNumber: text})}
+                        placeholder="Enter your phone number"
+                        placeholderTextColor={theme.textSecondary}
+                        keyboardType="phone-pad"
+                      />
+                    </View>
+                    <View style={styles.inputWrapper}>
+                      <Text style={[styles.inputLabel, { color: theme.text }]}>Business Address</Text>
+                      <TextInput
+                        style={[styles.textArea, { backgroundColor: theme.inputBackground, color: theme.text }]}
+                        value={productForm.address}
+                        onChangeText={(text) => setProductForm({...productForm, address: text})}
+                        placeholder="Enter your business address"
+                        placeholderTextColor={theme.textSecondary}
+                        multiline
+                        numberOfLines={3}
+                        textAlignVertical="top"
+                      />
+                    </View>
+                  </View>
+                </View>
+              )}
 
               <View style={styles.formSection}>
                 <Text style={[styles.sectionTitle, { color: theme.text }]}>
@@ -3281,6 +3428,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+  },
+  foodServiceInfo: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: '#E2E8F0',
+  },
+  foodServiceItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+    gap: 8,
+  },
+  foodServiceText: {
+    fontSize: 13,
+    flex: 1,
   },
 });
 

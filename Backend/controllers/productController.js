@@ -90,7 +90,13 @@ const createProduct = asyncHandler(async (req, res) => {
     additionalImages, 
     isService,
     gender,
-    color 
+    color,
+    // Food service specific fields
+    foodName,
+    preparationTime,
+    operatingHours,
+    contactNumber,
+    address
   } = req.body;
 
   // Check if user is a seller
@@ -139,7 +145,13 @@ const createProduct = asyncHandler(async (req, res) => {
     seller: req.user._id,
     status: 'pending', // Always start as pending
     gender: isService ? undefined : gender, // Only include gender for products
-    color: isService ? undefined : color // Only include color for products
+    color: isService ? undefined : color, // Only include color for products
+    // Food service specific fields
+    foodName: isService ? foodName : undefined,
+    preparationTime: isService ? preparationTime : undefined,
+    operatingHours: isService ? operatingHours : undefined,
+    contactNumber: isService ? contactNumber : undefined,
+    address: isService ? address : undefined
   });
 
   if (product) {
@@ -201,7 +213,13 @@ const updateProduct = asyncHandler(async (req, res) => {
     additionalImages, 
     isService,
     gender,
-    color 
+    color,
+    // Food service specific fields
+    foodName,
+    preparationTime,
+    operatingHours,
+    contactNumber,
+    address
   } = req.body;
 
   const product = await Product.findById(req.params.id);
@@ -263,6 +281,15 @@ const updateProduct = asyncHandler(async (req, res) => {
   if (!product.isService) {
     product.gender = gender || product.gender;
     product.color = color || product.color;
+  }
+
+  // Only update food service specific fields if the product is a service
+  if (product.isService) {
+    product.foodName = foodName || product.foodName;
+    product.preparationTime = preparationTime || product.preparationTime;
+    product.operatingHours = operatingHours || product.operatingHours;
+    product.contactNumber = contactNumber || product.contactNumber;
+    product.address = address || product.address;
   }
 
   const updatedProduct = await product.save();

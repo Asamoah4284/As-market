@@ -164,6 +164,27 @@ const productSchema = new mongoose.Schema(
     views: {
       type: Number,
       default: 0
+    },
+    // Food service specific fields
+    foodName: {
+      type: String,
+      trim: true
+    },
+    preparationTime: {
+      type: String,
+      trim: true
+    },
+    operatingHours: {
+      type: String,
+      trim: true
+    },
+    contactNumber: {
+      type: String,
+      trim: true
+    },
+    address: {
+      type: String,
+      trim: true
     }
   },
   {

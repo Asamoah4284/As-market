@@ -31,11 +31,12 @@ const FoodServiceScreen = () => {
   
   // State
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState('all');
+
   const [foodItems, setFoodItems] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [cartItems, setCartItems] = useState([]);
+  const [error, setError] = useState(null);
   
   // Animation values
   const fadeAnim = useRef(new Animated.Value(0)).current;
@@ -43,17 +44,29 @@ const FoodServiceScreen = () => {
   const scaleAnim = useRef(new Animated.Value(0.8)).current;
   const pulseAnim = useRef(new Animated.Value(1)).current;
   
-  // Categories
-  const categories = [
-    { id: 'all', name: 'All', icon: 'restaurant' },
-    { id: 'fast-food', name: 'Fast Food', icon: 'fast-food' },
-    { id: 'beverages', name: 'Beverages', icon: 'cafe' },
-    { id: 'desserts', name: 'Desserts', icon: 'ice-cream' },
-    { id: 'healthy', name: 'Healthy', icon: 'leaf' },
-    { id: 'snacks', name: 'Snacks', icon: 'nutrition' },
-  ];
 
-  // Mock food items data
+
+  // Function to show coming soon message
+  const showComingSoon = async () => {
+    try {
+      setLoading(true);
+      setError(null);
+      
+      // Simulate loading delay
+      await new Promise(resolve => setTimeout(resolve, 1000));
+      
+      // Set empty array to show coming soon message
+      setFoodItems([]);
+      
+    } catch (error) {
+      console.error('Error:', error);
+      setError('Something went wrong. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Mock food items data (fallback)
   const mockFoodItems = [
     {
       id: '1',
@@ -174,45 +187,16 @@ const FoodServiceScreen = () => {
     };
 
     startAnimations();
-    loadFoodItems();
+    showComingSoon();
   }, []);
-
-  const loadFoodItems = async () => {
-    try {
-      setLoading(true);
-      // Simulate API call
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      setFoodItems(mockFoodItems);
-    } catch (error) {
-      console.error('Error loading food items:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await loadFoodItems();
+    await showComingSoon();
     setRefreshing(false);
   };
 
-  const handleCategoryPress = (categoryId) => {
-    setSelectedCategory(categoryId);
-    
-    // Animation for category selection
-    Animated.sequence([
-      Animated.timing(scaleAnim, {
-        toValue: 0.95,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scaleAnim, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
+
 
   const handleAddToCart = async (item) => {
     if (!(await requireAuthentication(navigation, 'add items to cart'))) {
@@ -238,42 +222,21 @@ const FoodServiceScreen = () => {
   };
 
   const handleItemPress = (item) => {
-    navigation.navigate('ProductDetails', { 
-      productId: item.id,
-      product: item
+    navigation.navigate('FoodServiceDetails', { 
+      foodItem: item
     });
   };
 
-  const filteredItems = foodItems.filter(item => 
-    selectedCategory === 'all' || item.category === selectedCategory
-  );
+  const filteredItems = foodItems.filter(item => {
+    // Filter by search query
+    const searchMatch = searchQuery === '' || 
+      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.description.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    return searchMatch;
+  });
 
-  const renderCategoryItem = ({ item }) => (
-    <TouchableOpacity
-      style={[
-        styles.categoryItem,
-        selectedCategory === item.id && styles.selectedCategoryItem
-      ]}
-      onPress={() => handleCategoryPress(item.id)}
-    >
-      <Animated.View style={[
-        styles.categoryIcon,
-        selectedCategory === item.id && styles.selectedCategoryIcon
-      ]}>
-        <Ionicons 
-          name={item.icon} 
-          size={24} 
-          color={selectedCategory === item.id ? '#fff' : '#FF6B35'} 
-        />
-      </Animated.View>
-      <Text style={[
-        styles.categoryText,
-        selectedCategory === item.id && styles.selectedCategoryText
-      ]}>
-        {item.name}
-      </Text>
-    </TouchableOpacity>
-  );
+
 
   const renderFoodItem = ({ item }) => (
     <Animated.View style={[styles.foodItem, { transform: [{ scale: scaleAnim }] }]}>
@@ -353,7 +316,7 @@ const FoodServiceScreen = () => {
           </TouchableOpacity>
           
           <View style={styles.headerTitleContainer}>
-            <Text style={styles.headerTitle}>Food & Drinks</Text>
+            <Text style={styles.headerTitle}>Food Services</Text>
             <Text style={styles.headerSubtitle}>Delicious meals delivered to you</Text>
           </View>
           
@@ -403,31 +366,42 @@ const FoodServiceScreen = () => {
           }
         ]}
       >
-        {/* Categories */}
-        <View style={styles.categoriesContainer}>
-          <FlatList
-            data={categories}
-            renderItem={renderCategoryItem}
-            keyExtractor={(item) => item.id}
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerStyle={styles.categoriesList}
-          />
-        </View>
-        
         {/* Food Items */}
         <View style={styles.foodItemsContainer}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>
-              {selectedCategory === 'all' ? 'All Items' : categories.find(c => c.id === selectedCategory)?.name}
-            </Text>
-            <Text style={styles.itemCount}>{filteredItems.length} items</Text>
+            {/* <Text style={styles.sectionTitle}>All Food Services</Text> */}
+            {/* <Text style={styles.itemCount}>{filteredItems.length} items</Text> */}
           </View>
           
           {loading ? (
             <View style={styles.loadingContainer}>
               <ActivityIndicator size="large" color="#FF6B35" />
               <Text style={styles.loadingText}>Loading delicious food...</Text>
+            </View>
+          ) : error ? (
+            <View style={styles.errorContainer}>
+              <Ionicons name="alert-circle-outline" size={48} color="#FF6B35" />
+              <Text style={styles.errorText}>{error}</Text>
+              <TouchableOpacity 
+                style={styles.retryButton}
+                onPress={showComingSoon}
+              >
+                <Text style={styles.retryButtonText}>Retry</Text>
+              </TouchableOpacity>
+            </View>
+          ) : foodItems.length === 0 ? (
+            <View style={styles.comingSoonContainer}>
+              <Ionicons name="restaurant" size={80} color="#FF6B35" />
+              <Text style={styles.comingSoonTitle}>Coming Soon!</Text>
+              <Text style={styles.comingSoonText}>
+                We're cooking up something amazing for you. Food services will be available soon!
+              </Text>
+              <TouchableOpacity 
+                style={styles.notifyButton}
+                onPress={() => Alert.alert('Notification', 'You\'ll be notified when food services are available!')}
+              >
+                <Text style={styles.notifyButtonText}>Notify Me</Text>
+              </TouchableOpacity>
             </View>
           ) : (
             <FlatList
@@ -544,46 +518,6 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-  },
-  categoriesContainer: {
-    paddingVertical: 20,
-    backgroundColor: '#fff',
-    marginBottom: 10,
-  },
-  categoriesList: {
-    paddingHorizontal: 20,
-  },
-  categoryItem: {
-    alignItems: 'center',
-    marginRight: 20,
-    paddingVertical: 10,
-    paddingHorizontal: 15,
-    borderRadius: 20,
-    backgroundColor: '#f8f9fa',
-    minWidth: 80,
-  },
-  selectedCategoryItem: {
-    backgroundColor: '#FF6B35',
-  },
-  categoryIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 107, 53, 0.1)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  selectedCategoryIcon: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-  },
-  categoryText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: '#666',
-  },
-  selectedCategoryText: {
-    color: '#fff',
   },
   foodItemsContainer: {
     flex: 1,
@@ -750,6 +684,69 @@ const styles = StyleSheet.create({
     marginTop: 12,
     color: '#666',
     fontSize: 16,
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingTop: 50,
+  },
+  errorText: {
+    marginTop: 16,
+    color: '#666',
+    fontSize: 16,
+    textAlign: 'center',
+    lineHeight: 24,
+  },
+  retryButton: {
+    marginTop: 20,
+    backgroundColor: '#FF6B35',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 25,
+  },
+  retryButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  comingSoonContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 40,
+    paddingTop: 50,
+  },
+  comingSoonTitle: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#333',
+    marginTop: 20,
+    marginBottom: 12,
+  },
+  comingSoonText: {
+    fontSize: 16,
+    color: '#666',
+    textAlign: 'center',
+    lineHeight: 24,
+    marginBottom: 30,
+  },
+  notifyButton: {
+    backgroundColor: '#FF6B35',
+    paddingHorizontal: 30,
+    paddingVertical: 12,
+    borderRadius: 25,
+    shadowColor: '#FF6B35',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  notifyButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });
 

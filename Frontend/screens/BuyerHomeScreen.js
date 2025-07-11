@@ -1022,7 +1022,7 @@ const BuyerHomeScreen = () => {
             })}
           >
             <Image 
-              source={{ uri: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?ixlib=rb-4.0.3' }} 
+              source={require('../assets/images/new.png')} 
               style={styles.gridImage}
             />
             <View style={styles.gridOverlay}>
@@ -1042,7 +1042,7 @@ const BuyerHomeScreen = () => {
             })}
           >
             <Image 
-              source={{ uri: 'https://images.unsplash.com/photo-1535043934128-cf0b28d52f95?ixlib=rb-4.0.3' }} 
+              source={require('../assets/images/women.png')} 
               style={styles.gridImage}
             />
             <View style={styles.gridOverlay}>
@@ -1062,7 +1062,7 @@ const BuyerHomeScreen = () => {
             })}
           >
             <Image 
-              source={{ uri: 'https://images.unsplash.com/photo-1550246140-29f40b909e5a?ixlib=rb-4.0.3' }} 
+              source={require('../assets/images/men.png')} 
               style={styles.gridImage}
             />
             <View style={styles.gridOverlay}>
@@ -1082,7 +1082,7 @@ const BuyerHomeScreen = () => {
             })}
           >
             <Image 
-              source={require('../assets/images/Asarion2.png')} 
+              source={require('../assets/images/market.png')} 
               style={styles.gridImage}
             />
             <View style={styles.gridOverlay}>
@@ -1125,7 +1125,7 @@ const BuyerHomeScreen = () => {
             })}
           >
             <Image 
-              source={{ uri: 'https://images.unsplash.com/photo-1524592094714-0f0654e20314?ixlib=rb-4.0.3' }} 
+              source={require('../assets/images/watches.png')} 
               style={styles.gridImage}
             />
             <View style={styles.gridOverlay}>
@@ -1145,7 +1145,7 @@ const BuyerHomeScreen = () => {
             })}
           >
             <Image 
-              source={{ uri: 'https://i.pinimg.com/474x/0b/8f/d9/0b8fd9d0b8f2006f2af7077c273a5375.jpg' }} 
+              source={require('../assets/images/bags.png')} 
               style={styles.gridImage}
             />
             <View style={styles.gridOverlay}>
@@ -1165,7 +1165,7 @@ const BuyerHomeScreen = () => {
             })}
           >
             <Image 
-              source={{ uri: 'https://images.unsplash.com/photo-1583292650898-7d22cd27ca6f?ixlib=rb-4.0.3' }} 
+              source={require('../assets/images/crop-tops.jpg')} 
               style={styles.gridImage}
             />
             <View style={styles.gridOverlay}>

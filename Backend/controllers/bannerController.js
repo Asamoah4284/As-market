@@ -29,11 +29,12 @@ exports.createBanner = async (req, res) => {
   }
 };
 
-// Get all active banners (expiryDate > now)
+// Get all active banners (expiryDate > now) sorted by most recent first
 exports.getActiveBanners = async (req, res) => {
   try {
     const now = new Date();
-    const banners = await Banner.find({ expiryDate: { $gt: now } });
+    const banners = await Banner.find({ expiryDate: { $gt: now } })
+      .sort({ createdAt: -1 }); // Sort by most recent first
     res.json(banners);
   } catch (error) {
     res.status(500).json({ message: error.message });

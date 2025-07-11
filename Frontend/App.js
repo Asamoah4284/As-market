@@ -40,6 +40,7 @@ import Bookings from './screens/Bookings';
 import ServiceBooking from './screens/ServiceBooking';
 import ServiceDetails from './screens/ServiceDetails';
 import FoodServiceScreen from './screens/FoodServiceScreen';
+import FoodServiceDetails from './screens/FoodServiceDetails';
 
 const Stack = createStackNavigator();
 
@@ -369,6 +370,11 @@ function AppContent() {
           <Stack.Screen name="ServiceBooking" component={ServiceBooking} />
           <Stack.Screen name="ServiceDetails" component={ServiceDetails} />
           <Stack.Screen name="FoodService" component={FoodServiceScreen} />
+          <Stack.Screen 
+            name="FoodServiceDetails" 
+            component={FoodServiceDetails} 
+            options={{ headerShown: false }}
+          />
           <Stack.Screen name="SellerProfile" component={SellerProfileScreen} />
           <Stack.Screen name="Payment" component={PaymentScreen} />
 
