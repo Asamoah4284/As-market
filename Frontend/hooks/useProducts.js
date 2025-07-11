@@ -39,10 +39,12 @@ let url = `${API_BASE_URL}/api/products`;
 export const useProducts = () => {
   const [featuredProducts, setFeaturedProducts] = useState([]);
   const [newArrivals, setNewArrivals] = useState([]);
+  const [trendingProducts, setTrendingProducts] = useState([]);
   const [services, setServices] = useState([]);
   const [isLoadingProducts, setIsLoadingProducts] = useState(true);
   const [isLoadingServices, setIsLoadingServices] = useState(true);
   const [isLoadingNewArrivals, setIsLoadingNewArrivals] = useState(true);
+  const [isLoadingTrendingProducts, setIsLoadingTrendingProducts] = useState(true);
   const searchTimeoutRef = useRef(null);
 
   // Automatically fetch products when hook is initialized
@@ -50,6 +52,19 @@ export const useProducts = () => {
     console.log('useProducts hook initialized, fetching data...');
     fetchProducts();
     fetchServices();
+    fetchTrendingProducts();
+  }, []);
+
+  // Set up periodic refresh for trending products (every 5 minutes)
+  useEffect(() => {
+    const trendingInterval = setInterval(() => {
+      console.log('Refreshing trending products...');
+      fetchTrendingProducts();
+    }, 5 * 60 * 1000); // 5 minutes
+
+    return () => {
+      clearInterval(trendingInterval);
+    };
   }, []);
 
   const fetchProducts = async () => {
@@ -136,7 +151,43 @@ export const useProducts = () => {
           product.isService === true || product.featuredType === 'featured-service'
         );
         console.log('Filtered services count:', serviceProducts.length);
-        setServices(serviceProducts);
+        
+        // Implement rotating sorting strategies for services
+        const sortStrategies = [
+          // Strategy 1: Random shuffle
+          () => [...serviceProducts].sort(() => Math.random() - 0.5),
+          
+          // Strategy 2: Sort by views (most viewed first)
+          () => [...serviceProducts].sort((a, b) => (b.views || 0) - (a.views || 0)),
+          
+          // Strategy 3: Sort by rating (highest rating first)
+          () => [...serviceProducts].sort((a, b) => (b.rating || 0) - (a.rating || 0)),
+          
+          // Strategy 4: Sort by price (lowest price first)
+          () => [...serviceProducts].sort((a, b) => (a.price || 0) - (b.price || 0)),
+          
+          // Strategy 5: Sort by name (alphabetical)
+          () => [...serviceProducts].sort((a, b) => (a.name || '').localeCompare(b.name || '')),
+          
+          // Strategy 6: Sort by creation date (oldest first)
+          () => [...serviceProducts].sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0)),
+          
+          // Strategy 7: Sort by featured rank (highest rank first)
+          () => [...serviceProducts].sort((a, b) => (b.featuredRank || 0) - (a.featuredRank || 0)),
+          
+          // Strategy 8: Sort by discount percentage (highest discount first)
+          () => [...serviceProducts].sort((a, b) => (b.discountPercentage || 0) - (a.discountPercentage || 0))
+        ];
+        
+        // Get current timestamp to determine which strategy to use
+        const currentTime = Date.now();
+        const strategyIndex = Math.floor((currentTime / (5 * 60 * 1000)) % sortStrategies.length); // Change every 5 minutes
+        
+        // Apply the selected sorting strategy
+        const sortedServices = sortStrategies[strategyIndex]();
+        
+        console.log(`Applied sorting strategy ${strategyIndex + 1} for services`);
+        setServices(sortedServices);
       } else {
         console.log('Failed to fetch services');
         setServices([]); // Set empty array if fetch fails
@@ -147,6 +198,31 @@ export const useProducts = () => {
     } finally {
       setTimeout(() => {
         setIsLoadingServices(false);
+      }, 1000);
+    }
+  };
+
+  const fetchTrendingProducts = async () => {
+    setIsLoadingTrendingProducts(true);
+    try {
+      console.log('Fetching trending products from:', `${url}/trending`);
+      const response = await fetch(`${url}/trending`);
+      console.log('Trending Products API Response Status:', response.status);
+      
+      if (response.ok) {
+        const trendingData = await response.json();
+        console.log('Fetched trending products count:', trendingData.length);
+        setTrendingProducts(trendingData);
+      } else {
+        console.log('Failed to fetch trending products');
+        setTrendingProducts([]); // Set empty array if fetch fails
+      }
+    } catch (error) {
+      console.error('Error fetching trending products:', error);
+      setTrendingProducts([]); // Set empty array on error
+    } finally {
+      setTimeout(() => {
+        setIsLoadingTrendingProducts(false);
       }, 1000);
     }
   };
@@ -307,6 +383,8 @@ export const useProducts = () => {
     setFeaturedProducts,
     newArrivals,
     setNewArrivals,
+    trendingProducts,
+    setTrendingProducts,
     services,
     isLoadingProducts,
     setIsLoadingProducts,
@@ -314,9 +392,12 @@ export const useProducts = () => {
     setIsLoadingServices,
     isLoadingNewArrivals,
     setIsLoadingNewArrivals,
+    isLoadingTrendingProducts,
+    setIsLoadingTrendingProducts,
     searchTimeoutRef,
     fetchProducts,
     fetchServices,
+    fetchTrendingProducts,
     handleSearch,
     fetchOriginalProducts,
     fetchProductsByCategory,

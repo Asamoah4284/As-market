@@ -50,6 +50,8 @@ router.get('/', async (req, res) => {
     // Apply sorting if specified
     if (sort === 'newest') {
       products = products.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    } else if (sort === 'views') {
+      products = products.sort((a, b) => (b.views || 0) - (a.views || 0));
     }
     
     res.json(products);
@@ -160,6 +162,23 @@ router.get('/new', async (req, res) => {
     res.json(newProducts);
   } catch (error) {
     console.error('Error fetching new products:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
+// Route for trending products - now based on actual views
+router.get('/trending', async (req, res) => {
+  try {
+    const trendingProducts = await Product.find({
+      status: 'approved'
+    })
+    .populate('seller', 'name')
+    .sort({ views: -1 }) // Sort by views in descending order
+    .limit(10); // Limit to top 10 most viewed products
+    
+    res.json(trendingProducts);
+  } catch (error) {
+    console.error('Error fetching trending products:', error);
     res.status(500).json({ message: 'Server error' });
   }
 });

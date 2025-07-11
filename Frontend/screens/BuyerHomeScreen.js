@@ -111,6 +111,8 @@ const BuyerHomeScreen = () => {
     setFeaturedProducts, 
     newArrivals,
     setNewArrivals,
+    trendingProducts,
+    setTrendingProducts,
     services, 
     isLoadingProducts, 
     setIsLoadingProducts,
@@ -118,9 +120,12 @@ const BuyerHomeScreen = () => {
     setIsLoadingServices,
     isLoadingNewArrivals,
     setIsLoadingNewArrivals,
+    isLoadingTrendingProducts,
+    setIsLoadingTrendingProducts,
     searchTimeoutRef: productsSearchTimeoutRef,
     fetchProducts,
     fetchServices,
+    fetchTrendingProducts,
     handleSearch,
     fetchOriginalProducts,
     fetchProductsByCategory 
@@ -205,7 +210,7 @@ const BuyerHomeScreen = () => {
   const fetchFoodAndDrinks = async () => {
     try {
       setIsLoadingFoodAndDrinks(true);
-      const res = await fetch('https://unimarket-ikin.onrender.com/api/products');
+      const res = await fetch(`${API_BASE_URL}/api/products`);
       const allProducts = await res.json();
 
       const foodAndDrinks = allProducts.filter(
@@ -518,13 +523,15 @@ const BuyerHomeScreen = () => {
     navigation.navigate('FoodService');
   };
 
-  // Memoize expensive computations
+  // Memoize expensive computations - sort by views in descending order and limit to 10
   const memoizedSortedProducts = useMemo(() => {
-    return [...featuredProducts].sort((a, b) => {
-      const dateA = new Date(a.createdAt || 0);
-      const dateB = new Date(b.createdAt || 0);
-      return dateB - dateA;
-    });
+    return [...featuredProducts]
+      .sort((a, b) => {
+        const viewsA = a.views || 0;
+        const viewsB = b.views || 0;
+        return viewsB - viewsA; // Descending order (highest views first)
+      })
+      .slice(0, 10); // Limit to top 10 products
   }, [featuredProducts]);
 
   // Create sections data for FlatList
@@ -587,7 +594,32 @@ const BuyerHomeScreen = () => {
       data: foodAndDrinks,
       isLoading: isLoadingFoodAndDrinks,
       accentColor: '#FF6B35',
-      seeAllParams: { categoryName: 'Food & Drinks', filter: { category: 'food-and-drinks' } }
+      seeAllParams: { 
+        categoryName: 'Food & Drinks', 
+        filter: { 
+          searchTerm: 'Food & Drinks',
+          sortBy: 'createdAt',
+          sortOrder: 'desc'
+        },
+        isMainCategoryFilter: true
+      }
+    });
+    
+    // Trending products section (fixed position below food and drinks)
+    sections.push({
+      type: 'products',
+      id: 'trending-products',
+      title: '🔥 Trending Now',
+      data: trendingProducts,
+      isLoading: isLoadingTrendingProducts,
+      accentColor: '#FF6B6B',
+      seeAllParams: { 
+        categoryName: 'Trending Products',
+        filter: { 
+          sortBy: 'views',
+          sortOrder: 'desc'
+        }
+      }
     });
     
     // Trending categories
@@ -624,6 +656,7 @@ const BuyerHomeScreen = () => {
     isLoadingCategories,
     featuredProducts, isLoadingProducts,
     newArrivals, isLoadingNewArrivals,
+    trendingProducts, isLoadingTrendingProducts,
     services, isLoadingServices,
     foodAndDrinks, isLoadingFoodAndDrinks,
     isLoadingDeals, isLoadingBrands,
@@ -720,7 +753,13 @@ const BuyerHomeScreen = () => {
         </View>
         <TouchableOpacity 
           style={styles.seeAllButton} 
-          onPress={() => navigation.navigate('CategoriesScreen', { recommended: true })}
+          onPress={() => navigation.navigate('CategoriesScreen', { 
+            categoryName: 'Most Viewed Products',
+            filter: { 
+              sortBy: 'views',
+              sortOrder: 'desc'
+            }
+          })}
         >
           <Text style={styles.seeAllText}>See All</Text>
           <Ionicons name="chevron-forward" size={16} color="#5D3FD3" />
@@ -965,7 +1004,7 @@ const BuyerHomeScreen = () => {
       <View style={styles.sectionHeader}>
         <View style={styles.sectionTitleContainer}>
           <View style={[styles.sectionTitleAccent, {backgroundColor: '#FFD166'}]}></View>
-          <Text style={styles.sectionTitle}>Trending Categories</Text>
+          <Text style={styles.sectionTitle}>You dont want to Miss</Text>
         </View>
       </View>
       <View style={styles.gridContainer}>

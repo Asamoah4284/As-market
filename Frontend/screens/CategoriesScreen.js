@@ -30,12 +30,15 @@ const CategoryScreen = ({ route, navigation }) => {
     featuredOnly = false, 
     services = false,
     newArrivals = false,
-    filter = {}
+    trending = false,
+    filter = {},
+    isMainCategoryFilter = false
   } = route?.params || {};
   
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [addingToCart, setAddingToCart] = useState(false);
 
   // Memoize the filter parameters to prevent unnecessary re-renders
   const filterParams = React.useMemo(() => ({
@@ -44,8 +47,10 @@ const CategoryScreen = ({ route, navigation }) => {
     featuredOnly,
     services,
     newArrivals,
-    filter
-  }), [categoryId, categoryName, featuredOnly, services, newArrivals, JSON.stringify(filter)]);
+    trending,
+    filter,
+    isMainCategoryFilter
+  }), [categoryId, categoryName, featuredOnly, services, newArrivals, trending, JSON.stringify(filter), isMainCategoryFilter]);
 
   useEffect(() => {
     let isMounted = true;
@@ -67,11 +72,28 @@ const CategoryScreen = ({ route, navigation }) => {
           params.append('all', 'true'); // Fetch all featured products, not just 10
         }
 
+        // Handle trending products
+        if (trending) {
+          endpoint = `${API_BASE_URL}/api/products/trending`;
+        } else if (filter.sortBy === 'views' && filter.sortOrder === 'desc') {
+          // If sorting by views, use the trending endpoint
+          endpoint = `${API_BASE_URL}/api/products/trending`;
+        }
+
         // Add new arrivals filter
         if (newArrivals) {
           params.append('sortBy', 'createdAt');
           params.append('sortOrder', 'desc');
           params.append('limit', '20');
+        }
+
+        // Handle sorting parameters
+        if (filter.sortBy) {
+          if (filter.sortBy === 'views') {
+            params.append('sort', 'views');
+          } else if (filter.sortBy === 'createdAt') {
+            params.append('sort', 'newest');
+          }
         }
 
         // Add category filtering - check both categoryId and category name
@@ -85,10 +107,10 @@ const CategoryScreen = ({ route, navigation }) => {
         // Add service/product filter
         params.append('isService', services ? 'true' : 'false');
         
-        // Add any additional filters from the filter prop (except searchTerm which we'll handle client-side)
+        // Add any additional filters from the filter prop (except searchTerm, sortBy, sortOrder which we'll handle separately)
         if (filter && Object.keys(filter).length > 0) {
           Object.entries(filter).forEach(([key, value]) => {
-            if (value && key !== 'categoryId' && key !== 'category' && key !== 'searchTerm') {
+            if (value && key !== 'categoryId' && key !== 'category' && key !== 'searchTerm' && key !== 'sortBy' && key !== 'sortOrder') {
               params.append(key, value);
             }
           });
@@ -106,6 +128,17 @@ const CategoryScreen = ({ route, navigation }) => {
         
         let fetchedData = await response.json();
         console.log('Fetched products:', fetchedData); // Debug log
+        
+        // Handle mainCategory filtering client-side (for Food & Drinks)
+        if (isMainCategoryFilter && categoryName) {
+          const categoryToMatch = categoryName.toLowerCase().trim();
+          fetchedData = fetchedData.filter(product => {
+            const productMainCategory = (product.mainCategory || '').toLowerCase();
+            return productMainCategory === categoryToMatch;
+          });
+          
+          console.log(`Filtered ${fetchedData.length} products for mainCategory: "${categoryName}"`);
+        }
         
         // Handle searchTerm filtering client-side
         if (filter.searchTerm && filter.searchTerm.trim()) {
@@ -155,17 +188,24 @@ const CategoryScreen = ({ route, navigation }) => {
   }, [filterParams]); // Only depend on the memoized filterParams
 
   const handleAddToCart = async (product) => {
+    // Prevent multiple rapid clicks
+    if (addingToCart) {
+      return;
+    }
+    
     // Check if user is authenticated
     if (!(await requireAuthentication(navigation, 'add items to cart'))) {
       return;
     }
     
-    // Check if product has stock available
-    if (product.stock <= 0) {
+    // Check if product has stock available - use stock field consistently
+    const stockQuantity = product.stock || product.countInStock || 0;
+    if (stockQuantity <= 0) {
       Alert.alert('Out of Stock', 'This product is currently out of stock.');
       return;
     }
     
+    setAddingToCart(true);
     try {
       const token = await AsyncStorage.getItem('userToken');
       // Token is guaranteed to exist at this point because of requireAuthentication
@@ -189,11 +229,14 @@ const CategoryScreen = ({ route, navigation }) => {
         Alert.alert('Success', 'Product added to cart');
       } else {
         const errorData = await response.json();
+        console.error('Add to cart API error:', errorData);
         Alert.alert('Error', errorData.message || 'Failed to add product to cart');
       }
     } catch (error) {
       console.error('Error adding to cart:', error);
-      Alert.alert('Error', 'Failed to add product to cart');
+      Alert.alert('Error', 'Network error. Please check your connection and try again.');
+    } finally {
+      setAddingToCart(false);
     }
   };
 
@@ -258,13 +301,11 @@ const CategoryScreen = ({ route, navigation }) => {
           {/* Price section */}
           <View style={styles.priceContainer}>
             <Text style={styles.productPrice}>
-              <Text>GH¢</Text>
-              {price}
+              GH¢{price}
             </Text>
             {isOnSale && item.originalPrice && (
               <Text style={styles.originalPrice}>
-                <Text>$</Text>
-                {originalPrice}
+                ${originalPrice}
               </Text>
             )}
           </View>
@@ -274,7 +315,7 @@ const CategoryScreen = ({ route, navigation }) => {
             <Text style={styles.serviceTag}>Service</Text>
           ) : (
             <>
-              {(item.countInStock === undefined || item.countInStock === null || item.countInStock > 0) ? (
+              {(item.stock === undefined || item.stock === null || item.stock > 0) ? (
                 <Text style={styles.inStock}>In Stock</Text>
               ) : (
                 <Text style={styles.outOfStock}>Out of Stock</Text>
@@ -282,11 +323,18 @@ const CategoryScreen = ({ route, navigation }) => {
               
               {/* Add to cart button - only show for non-service items */}
               <TouchableOpacity 
-                style={styles.addToCartButton}
+                style={[styles.addToCartButton, addingToCart && styles.addToCartButtonDisabled]}
                 onPress={() => handleAddToCart(item)}
+                disabled={addingToCart}
               >
-                <Ionicons name="cart-outline" size={16} color="#fff" />
-                <Text style={styles.addToCartText}>Add</Text>
+                {addingToCart ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="cart-outline" size={16} color="#fff" />
+                    <Text style={styles.addToCartText}>Add</Text>
+                  </>
+                )}
               </TouchableOpacity>
             </>
           )}
@@ -319,18 +367,20 @@ const CategoryScreen = ({ route, navigation }) => {
     );
   }
 
-  // Update getScreenTitle to include newArrivals
+  // Update getScreenTitle to include newArrivals and trending
   const getScreenTitle = () => {
     if (featuredOnly) return "Featured Products";
     if (services) return "Services";
     if (newArrivals) return "New Arrivals";
+    if (trending) return "Trending Now";
     return categoryName || "Products";
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <View style={styles.container}>
       <StatusBar style="light" />
       
+      {/* Header that extends to the top of the screen */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color="#fff" />
@@ -338,60 +388,65 @@ const CategoryScreen = ({ route, navigation }) => {
         <Text style={styles.headerTitle}>
           {getScreenTitle()}
         </Text>
-      
       </View>
 
-      {loading ? (
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color="#3498db" />
-        </View>
-      ) : error ? (
-        <View style={styles.emptyState}>
-          <Ionicons name="alert-circle-outline" size={70} color="#e74c3c" />
-          <Text style={styles.emptyStateTitle}>Error Loading Products</Text>
-          <Text style={styles.emptyStateText}>{error}</Text>
-          <TouchableOpacity 
-            style={styles.browseButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.browseButtonText}>Go Back</Text>
-          </TouchableOpacity>
-        </View>
-      ) : products.length === 0 ? (
-        <View style={styles.emptyState}>
-          <Ionicons name="search-outline" size={70} color="#ddd" />
-          <Text style={styles.emptyStateTitle}>No Products Found</Text>
-          <Text style={styles.emptyStateText}>
-            We couldn't find any products matching "{categoryName || 'this category'}".
-          </Text>
-          <TouchableOpacity 
-            style={styles.browseButton}
-            onPress={() => navigation.goBack()}
-          >
-            <Text style={styles.browseButtonText}>Go Back</Text>
-          </TouchableOpacity>
-        </View>
-      ) : (
-        <FlatList
-          key="product-list"
-          data={products}
-          keyExtractor={(item) => item._id ? item._id.toString() : Math.random().toString()}
-          renderItem={renderProductItem}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.listContainer}
-          numColumns={2}
-          columnWrapperStyle={styles.columnWrapper}
-        />
-      )}
-    </SafeAreaView>
+      {/* Content area with SafeAreaView */}
+      <SafeAreaView style={styles.contentContainer}>
+        {loading ? (
+          <View style={styles.centered}>
+            <ActivityIndicator size="large" color="#3498db" />
+          </View>
+        ) : error ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="alert-circle-outline" size={70} color="#e74c3c" />
+            <Text style={styles.emptyStateTitle}>Error Loading Products</Text>
+            <Text style={styles.emptyStateText}>{error}</Text>
+            <TouchableOpacity 
+              style={styles.browseButton}
+              onPress={() => navigation.goBack()}
+            >
+              <Text style={styles.browseButtonText}>Go Back</Text>
+            </TouchableOpacity>
+          </View>
+        ) : products.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Ionicons name="search-outline" size={70} color="#ddd" />
+            <Text style={styles.emptyStateTitle}>No Products Found</Text>
+            <Text style={styles.emptyStateText}>
+              We couldn't find any products matching "{categoryName || 'this category'}".
+            </Text>
+            <TouchableOpacity 
+              style={styles.browseButton}
+              onPress={() => navigation.goBack()}
+            >
+              <Text style={styles.browseButtonText}>Go Back</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <FlatList
+            key="product-list"
+            data={products}
+            keyExtractor={(item) => item._id ? item._id.toString() : Math.random().toString()}
+            renderItem={renderProductItem}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.listContainer}
+            numColumns={2}
+            columnWrapperStyle={styles.columnWrapper}
+          />
+        )}
+      </SafeAreaView>
+    </View>
   );
 };
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#5D3FD3',
+  },
+  contentContainer: {
+    flex: 1,
     backgroundColor: '#f8f9fa',
-    paddingTop: Platform.OS === 'android' ? Constants.statusBarHeight : 0,
   },
   centered: {
     flex: 1,
@@ -410,8 +465,8 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 5,
-    marginBottom: 10,
-    height: Platform.OS === 'android' ? 56 : 'auto',
+    paddingTop: Platform.OS === 'android' ? Constants.statusBarHeight : 0,
+    height: Platform.OS === 'android' ? 56 + Constants.statusBarHeight : 'auto',
   },
   backButton: {
     padding: 6,
@@ -444,7 +499,7 @@ const styles = StyleSheet.create({
   productItem: {
     width: '48%',
     backgroundColor: '#fff',
-    // borderRadius: 14,
+    // borderRadius: 4,
     marginBottom: 15,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
@@ -456,6 +511,7 @@ const styles = StyleSheet.create({
   imageContainer: {
     position: 'relative',
     width: '100%',
+    // borderRadius: 4,
     height: 100,
   },
   productImage: {
@@ -549,7 +605,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 6,
-    // borderRadius: 10,
+    borderRadius: 6,
     marginTop: 4,
   },
   addToCartText: {
@@ -557,6 +613,10 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginLeft: 5,
+  },
+  addToCartButtonDisabled: {
+    backgroundColor: '#ccc',
+    opacity: 0.7,
   },
   emptyState: {
     flex: 1,

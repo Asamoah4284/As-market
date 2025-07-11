@@ -78,6 +78,12 @@ const ProductsSection = memo(({
           <View style={styles.sectionTitleContainer}>
             <View style={[styles.sectionTitleAccent, { backgroundColor: accentColor }]}></View>
             <Text style={styles.sectionTitle}>{title}</Text>
+            {title.includes('Trending') && (
+              <View style={styles.liveIndicator}>
+                <View style={styles.liveDot} />
+                <Text style={styles.liveText}>LIVE</Text>
+              </View>
+            )}
           </View>
           {showSeeAll && (
             <TouchableOpacity 
@@ -118,6 +124,12 @@ const ProductsSection = memo(({
         <View style={styles.sectionTitleContainer}>
           <View style={[styles.sectionTitleAccent, { backgroundColor: accentColor }]}></View>
           <Text style={styles.sectionTitle}>{title}</Text>
+          {title.includes('Trending') && (
+            <View style={styles.liveIndicator}>
+              <View style={styles.liveDot} />
+              <Text style={styles.liveText}>LIVE</Text>
+            </View>
+          )}
         </View>
         {showSeeAll && (
           <TouchableOpacity 
@@ -192,6 +204,23 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: 'bold',
     color: '#333',
+  },
+  liveIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 8,
+  },
+  liveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: '#FF4757',
+    marginRight: 4,
+  },
+  liveText: {
+    fontSize: 10,
+    fontWeight: 'bold',
+    color: '#FF4757',
   },
   seeAllButton: {
     flexDirection: 'row',

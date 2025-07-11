@@ -88,8 +88,9 @@ export const productService = {
         throw new Error('User not authenticated');
       }
 
-      // Check if product has stock available
-      if (product.stock <= 0) {
+      // Check if product has stock available - use stock field consistently
+      const stockQuantity = product.stock || product.countInStock || 0;
+      if (stockQuantity <= 0) {
         Alert.alert('Out of Stock', 'This product is currently out of stock.');
         return false;
       }
@@ -114,12 +115,13 @@ export const productService = {
         return true;
       } else {
         const errorData = await response.json();
+        console.error('Add to cart API error:', errorData);
         Alert.alert('Error', errorData.message || 'Failed to add product to cart');
         return false;
       }
     } catch (error) {
       console.error('Error adding to cart:', error);
-      Alert.alert('Error', 'Failed to add product to cart');
+      Alert.alert('Error', 'Network error. Please check your connection and try again.');
       return false;
     }
   },
