@@ -1169,7 +1169,12 @@ const ProductDetailsScreen = () => {
                   <TouchableOpacity 
                     style={styles.similarProductItem}
                     onPress={() => {
-                      navigation.push('ProductDetails', { productId: item._id });
+                      // Navigate to ServiceDetails for services, ProductDetails for products
+                      if (item.isService) {
+                        navigation.push('ServiceDetails', { serviceId: item._id });
+                      } else {
+                        navigation.push('ProductDetails', { productId: item._id });
+                      }
                     }}
                   >
                     <Image

@@ -562,7 +562,7 @@ const BuyerHomeScreen = () => {
       type: 'products',
       id: 'new-arrivals',
       title: 'New Arrivals',
-      data: newArrivals.slice(0, 3),
+      data: newArrivals.slice(0, 8),
       isLoading: isLoadingNewArrivals,
       accentColor: '#5D3FD3',
       seeAllParams: { newArrivals: true }

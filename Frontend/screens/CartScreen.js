@@ -473,9 +473,12 @@ const CartScreen = ({ navigation }) => {
       console.error('Error incrementing views:', error);
     }
     
-    navigation.navigate('ProductDetails', { 
-      productId: product._id
-    });
+    // Navigate to ServiceDetails for services, ProductDetails for products
+    if (product.isService) {
+      navigation.navigate('ServiceDetails', { serviceId: product._id });
+    } else {
+      navigation.navigate('ProductDetails', { productId: product._id });
+    }
   };
 
   // Handle service booking

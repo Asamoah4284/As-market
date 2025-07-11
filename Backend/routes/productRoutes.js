@@ -149,6 +149,21 @@ router.get('/seller', protect, getSellerProducts);
 router.put('/:id', protect, updateProduct);
 router.delete('/:id', protect, deleteProduct);
 
+// Route for new arrivals - most recently added approved products
+router.get('/new', async (req, res) => {
+  try {
+    const newProducts = await Product.find({ status: 'approved' })
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .populate('seller', 'name');
+    
+    res.json(newProducts);
+  } catch (error) {
+    console.error('Error fetching new products:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+});
+
 // This should come after all other routes to avoid conflicts
 router.get('/:id', getProductById);
 

@@ -81,30 +81,33 @@ export const useProducts = () => {
         }
       }
 
-      // Fetch general products for new arrivals
-      console.log('Fetching general products from:', `${url}`);
-      const response = await fetch(`${url}`);
-      console.log('Products API Response Status:', response.status);
+      // Fetch new arrivals from the dedicated API endpoint
+      console.log('Fetching new arrivals from:', `${url}/new`);
+      const newArrivalsResponse = await fetch(`${url}/new`);
+      console.log('New Arrivals API Response Status:', newArrivalsResponse.status);
       
-      if (response.ok) {
-        const products = await response.json();
-        console.log('Fetched products count:', products.length);
+      if (newArrivalsResponse.ok) {
+        const newArrivalsData = await newArrivalsResponse.json();
+        console.log('Fetched new arrivals count:', newArrivalsData.length);
         
-        const nonServiceProducts = products.filter(product => product.isService !== true);
-        console.log('Non-service products count:', nonServiceProducts.length);
-        
-        // Shuffle products randomly for new arrivals
-        const shuffledProducts = [...nonServiceProducts].sort(() => Math.random() - 0.5);
-        
-        console.log('Shuffled products (random order):');
-        shuffledProducts.slice(0, 3).forEach((product, index) => {
-          console.log(`Shuffled ${index + 1}: ${product.name}`);
+        console.log('New arrivals (sorted by creation date):');
+        newArrivalsData.slice(0, 3).forEach((product, index) => {
+          console.log(`New arrival ${index + 1}: ${product.name} (created: ${product.createdAt})`);
         });
         
-        setNewArrivals(shuffledProducts);
+        setNewArrivals(newArrivalsData);
       } else {
-        console.log('Failed to fetch new arrivals');
-        setNewArrivals([]);
+        console.log('Failed to fetch new arrivals from dedicated endpoint, falling back to general products');
+        // Fallback to general products if new arrivals endpoint fails
+        const response = await fetch(`${url}`);
+        if (response.ok) {
+          const products = await response.json();
+          const nonServiceProducts = products.filter(product => product.isService !== true);
+          const shuffledProducts = [...nonServiceProducts].sort(() => Math.random() - 0.5);
+          setNewArrivals(shuffledProducts);
+        } else {
+          setNewArrivals([]);
+        }
       }
     } catch (error) {
       console.error('Error fetching products:', error);
@@ -214,15 +217,20 @@ export const useProducts = () => {
         }
       }
 
-      // Fetch general products for new arrivals
-      const response = await fetch(`${url}`);
-      if (response.ok) {
-        const products = await response.json();
-        const nonServiceProducts = products.filter(product => product.isService !== true);
-        
-        // Shuffle products randomly for new arrivals
-        const shuffledProducts = [...nonServiceProducts].sort(() => Math.random() - 0.5);
-        setNewArrivals(shuffledProducts);
+      // Fetch new arrivals from the dedicated API endpoint
+      const newArrivalsResponse = await fetch(`${url}/new`);
+      if (newArrivalsResponse.ok) {
+        const newArrivalsData = await newArrivalsResponse.json();
+        setNewArrivals(newArrivalsData);
+      } else {
+        // Fallback to general products if new arrivals endpoint fails
+        const response = await fetch(`${url}`);
+        if (response.ok) {
+          const products = await response.json();
+          const nonServiceProducts = products.filter(product => product.isService !== true);
+          const shuffledProducts = [...nonServiceProducts].sort(() => Math.random() - 0.5);
+          setNewArrivals(shuffledProducts);
+        }
       }
     } catch (error) {
       console.error('Error fetching original products:', error);

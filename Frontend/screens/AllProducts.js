@@ -39,7 +39,14 @@ const AllProducts = ({ navigation }) => {
   const renderProductItem = ({ item }) => (
     <TouchableOpacity 
       style={styles.productCard}
-      onPress={() => navigation.navigate('ProductDetails', { productId: item._id })}
+      onPress={() => {
+        // Navigate to ServiceDetails for services, ProductDetails for products
+        if (item.isService) {
+          navigation.navigate('ServiceDetails', { serviceId: item._id });
+        } else {
+          navigation.navigate('ProductDetails', { productId: item._id });
+        }
+      }}
     >
       <View style={styles.cardContent}>
         <Image 
