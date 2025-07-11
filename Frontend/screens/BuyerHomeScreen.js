@@ -1105,7 +1105,7 @@ const BuyerHomeScreen = () => {
             })}
           >
               <Image 
-              source={require('../assets/images/shoes.png')} 
+              source={require('../assets/images/shoes.jpg')} 
               style={styles.gridImage}
             />
             <View style={styles.gridOverlay}>
