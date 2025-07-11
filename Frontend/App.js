@@ -41,6 +41,8 @@ import ServiceBooking from './screens/ServiceBooking';
 import ServiceDetails from './screens/ServiceDetails';
 import FoodServiceScreen from './screens/FoodServiceScreen';
 import FoodServiceDetails from './screens/FoodServiceDetails';
+import PushNotificationTest from './screens/PushNotificationTest';
+import { registerForPushNotificationsAsync } from './services/notificationService';
 
 const Stack = createStackNavigator();
 
@@ -203,28 +205,15 @@ function AppContent() {
       handleDeepLink(event.url);
     });
 
-    // Register for push notifications
-    const initializePushNotifications = async () => {
+    // Register push token for all users on app start
+    const registerToken = async () => {
       try {
-        console.log('🔔 Initializing push notification system...');
-        
-        // Set up notification handlers and listeners only
-        // Push token registration is now handled during user signup
-        
-        // Try to get any existing token for local state (optional)
-        const existingToken = await AsyncStorage.getItem('pushToken');
-        if (existingToken) {
-          setExpoPushToken(existingToken);
-          dispatch(setPushToken(existingToken));
-          console.log('📱 Found existing push token in storage');
-        }
-        
-      } catch (error) {
-        console.error('Error initializing push notifications:', error);
+        await registerForPushNotificationsAsync();
+      } catch (e) {
+        console.error('Push token registration error:', e);
       }
     };
-
-    initializePushNotifications();
+    registerToken();
 
     // This listener is fired whenever a notification is received while the app is foregrounded
     notificationListener.current = Notifications.addNotificationReceivedListener(notification => {
@@ -309,6 +298,7 @@ function AppContent() {
             screens: {
               ResetPassword: 'reset-password',
               ProductDetails: 'product',
+              PushNotificationTest: 'push-test',
             },
           },
         }}
@@ -383,6 +373,7 @@ function AppContent() {
           <Stack.Screen name="Favorites" component={FavoritesScreen} />
           <Stack.Screen name="ForgotPassword" component={ForgotPasswordScreen} />
           <Stack.Screen name="ResetPassword" component={ResetPasswordScreen} />
+          <Stack.Screen name="PushNotificationTest" component={PushNotificationTest} />
         </Stack.Navigator>
         <StatusBar style="light" backgroundColor="#5D3FD3" translucent={false} />
       </NavigationContainer>

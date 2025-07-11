@@ -1104,8 +1104,8 @@ const BuyerHomeScreen = () => {
               }
             })}
           >
-            <Image 
-              source={{ uri: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?ixlib=rb-4.0.3' }} 
+              <Image 
+              source={require('../assets/images/shoes.png')} 
               style={styles.gridImage}
             />
             <View style={styles.gridOverlay}>
