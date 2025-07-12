@@ -909,9 +909,9 @@ const BuyerHomeScreen = () => {
             <Text style={styles.dealBadgeText}>50% OFF</Text>
           </View>
           <Image 
-            source={{ uri: 'https://images.unsplash.com/photo-1523275335684-37898b6baf30' }}
-            style={styles.dealImage}
-          />
+              source={require('../assets/images/flash.png')} 
+              style={styles.gridImage}
+            />
           <View style={styles.dealInfo}>
             <Text style={styles.dealTitle}>Flash Sale</Text>
             <Text style={styles.dealDescription}>Ends in 2 hours</Text>
@@ -1035,7 +1035,7 @@ const BuyerHomeScreen = () => {
             onPress={() => navigation.navigate('CategoriesScreen', { 
               categoryName: 'Women',
               filter: {
-                searchTerm: 'women',
+                gender: 'women',
                 sortBy: 'views',
                 sortOrder: 'desc'
               }
@@ -1055,7 +1055,7 @@ const BuyerHomeScreen = () => {
             onPress={() => navigation.navigate('CategoriesScreen', { 
               categoryName: 'Men',
               filter: {
-                searchTerm: 'men',
+                gender: 'men',
                 sortBy: 'views',
                 sortOrder: 'desc'
               }
@@ -1075,7 +1075,7 @@ const BuyerHomeScreen = () => {
             onPress={() => navigation.navigate('CategoriesScreen', { 
               categoryName: 'Asarion',
               filter: {
-                searchTerm: 'asarion',
+                mainCategory: 'Asarion',
                 sortBy: 'views',
                 sortOrder: 'desc'
               }
@@ -1098,13 +1098,13 @@ const BuyerHomeScreen = () => {
             onPress={() => navigation.navigate('CategoriesScreen', { 
               categoryName: 'Shoes',
               filter: {
-                searchTerm: 'shoes',
+                subcategory: 'Shoes',
                 sortBy: 'views',
                 sortOrder: 'desc'
               }
             })}
           >
-              <Image 
+            <Image 
               source={require('../assets/images/shoes.jpg')} 
               style={styles.gridImage}
             />
@@ -1118,7 +1118,7 @@ const BuyerHomeScreen = () => {
             onPress={() => navigation.navigate('CategoriesScreen', { 
               categoryName: 'Watches',
               filter: {
-                searchTerm: 'watch',
+                subcategory: 'Watches',
                 sortBy: 'views',
                 sortOrder: 'desc'
               }
@@ -1138,7 +1138,7 @@ const BuyerHomeScreen = () => {
             onPress={() => navigation.navigate('CategoriesScreen', { 
               categoryName: 'Bags',
               filter: {
-                searchTerm: 'bag',
+                subcategory: 'Bags',
                 sortBy: 'views',
                 sortOrder: 'desc'
               }
@@ -1158,7 +1158,7 @@ const BuyerHomeScreen = () => {
             onPress={() => navigation.navigate('CategoriesScreen', { 
               categoryName: 'Crop Tops',
               filter: {
-                searchTerm: 'crop top',
+                searchTerm: 'crop tops',
                 sortBy: 'views',
                 sortOrder: 'desc'
               }
@@ -1467,7 +1467,7 @@ const styles = StyleSheet.create({
   gridItem: {
     width: (Dimensions.get('window').width - 56) / 4,
     height: (Dimensions.get('window').width - 56) / 4,
-    borderRadius: 16,
+    borderRadius: 10,
     overflow: 'hidden',
     position: 'relative',
     marginHorizontal: 2,
@@ -1490,8 +1490,8 @@ const styles = StyleSheet.create({
     right: 0,
     backgroundColor: 'rgba(0,0,0,0.6)',
     padding: 8,
-    borderBottomLeftRadius: 16,
-    borderBottomRightRadius: 16,
+    borderBottomLeftRadius: 10,
+    borderBottomRightRadius: 10,
   },
   gridTitle: {
     color: '#fff',

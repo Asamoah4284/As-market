@@ -23,6 +23,11 @@ import { requireAuthentication } from '../App';
 
 const CategoryScreen = ({ route, navigation }) => {
   const dispatch = useDispatch();
+  
+  // Add debugging for route params
+  console.log('🔍 CategoriesScreen - Route params:', route?.params);
+  console.log('🔍 CategoriesScreen - Filter object:', route?.params?.filter);
+  
   // Add default values to prevent undefined errors
   const { 
     categoryId = '1', 
@@ -34,6 +39,12 @@ const CategoryScreen = ({ route, navigation }) => {
     filter = {},
     isMainCategoryFilter = false
   } = route?.params || {};
+  
+  // Debug the extracted filter
+  console.log('🔍 CategoriesScreen - Extracted filter:', filter);
+  console.log('🔍 CategoriesScreen - Filter subcategory:', filter.subcategory);
+  console.log('🔍 CategoriesScreen - Filter type:', typeof filter.subcategory);
+  console.log('🔍 CategoriesScreen - Is array?', Array.isArray(filter.subcategory));
   
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -72,11 +83,11 @@ const CategoryScreen = ({ route, navigation }) => {
           params.append('all', 'true'); // Fetch all featured products, not just 10
         }
 
-        // Handle trending products
-        if (trending) {
+        // Handle trending products - but NOT when we have specific filters like subcategory, searchTerm, etc.
+        if (trending && !filter.subcategory && !filter.mainCategory && !filter.category && !filter.gender && !filter.searchTerm) {
           endpoint = `${API_BASE_URL}/api/products/trending`;
-        } else if (filter.sortBy === 'views' && filter.sortOrder === 'desc') {
-          // If sorting by views, use the trending endpoint
+        } else if (filter.sortBy === 'views' && filter.sortOrder === 'desc' && !filter.subcategory && !filter.mainCategory && !filter.category && !filter.gender && !filter.searchTerm) {
+          // If sorting by views, use the trending endpoint ONLY if no specific filters are applied
           endpoint = `${API_BASE_URL}/api/products/trending`;
         }
 
@@ -118,6 +129,13 @@ const CategoryScreen = ({ route, navigation }) => {
 
         // Construct final URL
         const finalEndpoint = `${endpoint}${params.toString() ? '?' + params.toString() : ''}`;
+        console.log('🔍 Using endpoint:', endpoint);
+        console.log('🔍 Endpoint reason:', 
+          featuredOnly ? 'featuredOnly' : 
+          (trending && !filter.subcategory && !filter.mainCategory && !filter.category && !filter.gender && !filter.searchTerm) ? 'trending' :
+          (filter.sortBy === 'views' && filter.sortOrder === 'desc' && !filter.subcategory && !filter.mainCategory && !filter.category && !filter.gender && !filter.searchTerm) ? 'trending (views sort)' :
+          'default products endpoint'
+        );
         console.log('Fetching products from:', finalEndpoint); // Debug log
         
         const response = await fetch(finalEndpoint);
@@ -143,6 +161,9 @@ const CategoryScreen = ({ route, navigation }) => {
         // Handle searchTerm filtering client-side
         if (filter.searchTerm && filter.searchTerm.trim()) {
           const searchTerm = filter.searchTerm.toLowerCase().trim();
+          console.log('🔍 Searching for term:', searchTerm);
+          console.log('🔍 Total products before search:', fetchedData.length);
+          
           fetchedData = fetchedData.filter(product => {
             const productName = (product.name || '').toLowerCase();
             const productDescription = (product.description || '').toLowerCase();
@@ -150,14 +171,100 @@ const CategoryScreen = ({ route, navigation }) => {
             const productSubcategory = (product.subcategory || '').toLowerCase();
             const productMainCategory = (product.mainCategory || '').toLowerCase();
             
-            return productName.includes(searchTerm) ||
-                   productDescription.includes(searchTerm) ||
-                   productCategory.includes(searchTerm) ||
-                   productSubcategory.includes(searchTerm) ||
-                   productMainCategory.includes(searchTerm);
+            const nameMatch = productName.includes(searchTerm);
+            const descMatch = productDescription.includes(searchTerm);
+            const catMatch = productCategory.includes(searchTerm);
+            const subcatMatch = productSubcategory.includes(searchTerm);
+            const mainCatMatch = productMainCategory.includes(searchTerm);
+            
+            const matches = nameMatch || descMatch || catMatch || subcatMatch || mainCatMatch;
+            
+            console.log(`🔍 Product: ${product.name}`);
+            console.log(`🔍   Name: "${productName}" (match: ${nameMatch})`);
+            console.log(`🔍   Description: "${productDescription}" (match: ${descMatch})`);
+            console.log(`🔍   Category: "${productCategory}" (match: ${catMatch})`);
+            console.log(`🔍   Subcategory: "${productSubcategory}" (match: ${subcatMatch})`);
+            console.log(`🔍   MainCategory: "${productMainCategory}" (match: ${mainCatMatch})`);
+            console.log(`🔍   Overall match: ${matches}`);
+            
+            return matches;
           });
           
-          console.log(`Filtered ${fetchedData.length} products for search term: "${searchTerm}"`);
+          console.log(`🔍 Filtered from ${fetchedData.length} products for search term: "${searchTerm}"`);
+        }
+        
+        // Client-side filtering for mainCategory, subcategory, gender, etc.
+        if (filter.mainCategory) {
+          if (Array.isArray(filter.mainCategory)) {
+            fetchedData = fetchedData.filter(product =>
+              filter.mainCategory.map(s => s.toLowerCase()).includes((product.mainCategory || '').toLowerCase())
+            );
+          } else {
+            fetchedData = fetchedData.filter(product =>
+              (product.mainCategory || '').toLowerCase() === filter.mainCategory.toLowerCase()
+            );
+          }
+        }
+        if (filter.category) {
+          if (Array.isArray(filter.category)) {
+            fetchedData = fetchedData.filter(product =>
+              filter.category.map(s => s.toLowerCase()).includes((product.category || '').toLowerCase())
+            );
+          } else {
+            fetchedData = fetchedData.filter(product =>
+              (product.category || '').toLowerCase() === filter.category.toLowerCase()
+            );
+          }
+        }
+        if (filter.subcategory) {
+          console.log('🔍 Filtering by subcategory:', filter.subcategory);
+          console.log('🔍 Subcategory type:', typeof filter.subcategory);
+          console.log('🔍 Is array?', Array.isArray(filter.subcategory));
+          
+          if (Array.isArray(filter.subcategory)) {
+            console.log('🔍 Filtering by subcategory array:', filter.subcategory);
+            const beforeCount = fetchedData.length;
+            fetchedData = fetchedData.filter(product => {
+              const productSubcategory = (product.subcategory || '').toLowerCase();
+              const matches = filter.subcategory.map(s => s.toLowerCase()).includes(productSubcategory);
+              console.log(`🔍 Product: ${product.name}, Subcategory: ${product.subcategory}, Matches: ${matches}`);
+              return matches;
+            });
+            console.log(`🔍 Filtered from ${beforeCount} to ${fetchedData.length} products for subcategory array`);
+          } else {
+            console.log('🔍 Filtering by single subcategory:', filter.subcategory);
+            const beforeCount = fetchedData.length;
+            fetchedData = fetchedData.filter(product => {
+              const productSubcategory = (product.subcategory || '').toLowerCase();
+              const filterSubcategory = filter.subcategory.toLowerCase();
+              const matches = productSubcategory === filterSubcategory;
+              console.log(`🔍 Product: ${product.name}, Subcategory: ${product.subcategory}, Filter: ${filter.subcategory}, Matches: ${matches}`);
+              return matches;
+            });
+            console.log(`🔍 Filtered from ${beforeCount} to ${fetchedData.length} products for subcategory: "${filter.subcategory}"`);
+          }
+        }
+        if (filter.gender) {
+          if (Array.isArray(filter.gender)) {
+            fetchedData = fetchedData.filter(product =>
+              filter.gender.map(s => s.toLowerCase()).includes((product.gender || '').toLowerCase())
+            );
+          } else {
+            fetchedData = fetchedData.filter(product =>
+              (product.gender || '').toLowerCase() === filter.gender.toLowerCase()
+            );
+          }
+        }
+        // Price range filtering
+        if (filter.minPrice !== undefined) {
+          fetchedData = fetchedData.filter(product => Number(product.price) >= filter.minPrice);
+        }
+        if (filter.maxPrice !== undefined) {
+          fetchedData = fetchedData.filter(product => Number(product.price) <= filter.maxPrice);
+        }
+        // Minimum rating filtering
+        if (filter.minRating !== undefined) {
+          fetchedData = fetchedData.filter(product => Number(product.rating) >= filter.minRating);
         }
         
         if (isMounted) {
